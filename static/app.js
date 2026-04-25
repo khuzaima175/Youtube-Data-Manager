@@ -198,7 +198,13 @@ async function renderDash(){
         </div>
       </div>`;
 
+      /* 4A placeholder */
+      html+=`<div id="dashMonthGlance" class="dash-mg-wrap au"><div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px"><div class="spin"></div>Loading this month…</div></div>`;
+
       if(all.length>1)html+=buildLB(primary,comps);
+
+      /* 4B placeholder */
+      html+=`<div id="dashFastGrow"></div>`;
 
       const forRace=[primary,...comps].filter(c=>c.video&&c.video.title);
       if(forRace.length){
@@ -226,6 +232,9 @@ async function renderDash(){
         html+=`</div>`;
       }
 
+      /* 4C placeholder */
+      html+=`<div id="dashVelocity"></div>`;
+
       html+=`<div class="sl d3">My Recent Uploads</div>
         <div class="ru-grid d4" id="ruGrid">
           <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px"><div class="spin"></div>Loading…</div>
@@ -234,6 +243,11 @@ async function renderDash(){
 
     el.innerHTML=html;
     if(all.length>1)setTimeout(animateBars,60);
+    /* Load Feature 4 async panels */
+    if(primary){
+      loadThisMonthPanel(primary.id);
+      if(all.length>1){loadFastestGrowing([primary,...comps]);loadUploadVelocity([primary,...comps]);}
+    }
     setTimeout(()=>{
       document.querySelectorAll('.count-up').forEach(el=>{
         const target=parseFloat(el.dataset.target||0);
@@ -1430,6 +1444,143 @@ async function refreshAll2(){
   await renderChannels();
   if(btn){btn.disabled=false;btn.innerHTML=orig;}
   toast('All channels refreshed!','s');
+}
+
+/* ════════════════════════════════════════════════════════
+   FEATURE 4 — DASHBOARD ASYNC PANELS
+════════════════════════════════════════════════════════ */
+const CH_COLORS=['#00E5FF','#FFD54F','#56FFA7','#FF7043','#BA68C8','#4FC3F7','#AED581','#F06292'];
+
+async function loadThisMonthPanel(primaryId){
+  const el=document.getElementById('dashMonthGlance');
+  if(!el)return;
+  try{
+    const [vRes,sRes]=await Promise.all([
+      fetch(`/api/channels/${primaryId}/videos/full`),
+      fetch(`/api/snapshots/${primaryId}`)
+    ]);
+    const [vids,snaps]=await Promise.all([vRes.json(),sRes.json()]);
+    if(!vids||!vids.length){el.style.display='none';return;}
+    const now=new Date();
+    const tm=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const lmd=new Date(now.getFullYear(),now.getMonth()-1,1);
+    const lm=`${lmd.getFullYear()}-${String(lmd.getMonth()+1).padStart(2,'0')}`;
+    const tmV=vids.filter(v=>(v.published_at||v.date||'').startsWith(tm));
+    const lmV=vids.filter(v=>(v.published_at||v.date||'').startsWith(lm));
+    const tmViews=tmV.reduce((s,v)=>s+(v.view_count||v.views_raw||0),0);
+    const lmViews=lmV.reduce((s,v)=>s+(v.view_count||v.views_raw||0),0);
+    const tmLikes=tmV.reduce((s,v)=>s+(v.like_count||0),0);
+    const tmCmts=tmV.reduce((s,v)=>s+(v.comment_count||0),0);
+    const eng=tmViews>0?((tmLikes+tmCmts)/tmViews*100).toFixed(1):null;
+    const mom=lmViews>0?Math.round(((tmViews-lmViews)/lmViews)*100):null;
+    let subsDelta=null;
+    if(snaps&&snaps.length>=2){
+      const ss=[...snaps].sort((a,b)=>a.date.localeCompare(b.date));
+      subsDelta=(ss[ss.length-1].subscribers||0)-(ss[0].subscribers||0);
+    }
+    const momC=mom>=0?'var(--gr)':'var(--rd)';
+    el.innerHTML=`
+      <div class="sl d-mg">✨ This Month at a Glance</div>
+      <div class="mg-grid d-mg2">
+        <div class="mg-item">
+          <div class="mg-ico">👁</div>
+          <div class="mg-val" style="color:var(--gold)">${fmtN(tmViews)}</div>
+          <div class="mg-lbl">Views This Month</div>
+          ${mom!==null?`<div class="mg-delta" style="color:${momC}">${mom>=0?'↑':'↓'} ${Math.abs(mom)}% vs last mo</div>`:''}
+        </div>
+        <div class="mg-item">
+          <div class="mg-ico">🎬</div>
+          <div class="mg-val" style="color:var(--pr)">${tmV.length}</div>
+          <div class="mg-lbl">Videos Uploaded</div>
+          <div class="mg-delta" style="color:var(--t3)">${lmV.length} last month</div>
+        </div>
+        <div class="mg-item">
+          <div class="mg-ico">💬</div>
+          <div class="mg-val" style="color:${eng>=4?'var(--gr)':eng>=2?'var(--gold)':eng?'var(--rd)':'var(--t3)'}">${eng!==null?eng+'%':'—'}</div>
+          <div class="mg-lbl">Engagement Rate</div>
+        </div>
+        ${subsDelta!==null?`
+        <div class="mg-item">
+          <div class="mg-ico">👥</div>
+          <div class="mg-val" style="color:${subsDelta>=0?'var(--gr)':'var(--rd)'}">${subsDelta>=0?'+':''}${fmtN(subsDelta)}</div>
+          <div class="mg-lbl">Subscriber Change</div>
+        </div>`:''}
+      </div>`;
+  }catch(e){el.style.display='none';}
+}
+
+async function loadFastestGrowing(channels){
+  const el=document.getElementById('dashFastGrow');
+  if(!el||channels.length<2){if(el)el.style.display='none';return;}
+  try{
+    const srs=await Promise.all(channels.map(ch=>fetch(`/api/snapshots/${ch.id}`).then(r=>r.json()).catch(()=>[])));
+    const withGain=channels.map((ch,i)=>{
+      const ss=(srs[i]||[]).sort((a,b)=>a.date.localeCompare(b.date));
+      if(ss.length<2)return{...ch,gain:0,pct:0};
+      const gain=(ss[ss.length-1].views||0)-(ss[ss.length-2].views||0);
+      const pct=ss[ss.length-2].views>0?parseFloat(((gain/ss[ss.length-2].views)*100).toFixed(2)):0;
+      return{...ch,gain,pct};
+    }).sort((a,b)=>b.pct-a.pct);
+    if(withGain.every(c=>c.gain===0)){el.style.display='none';return;}
+    const maxPct=Math.max(...withGain.map(c=>c.pct),0.001);
+    const primary=channels.find(c=>c.is_primary);
+    const rows=withGain.map((ch,i)=>{
+      const mine=primary&&ch.id===primary.id;
+      const barPct=Math.max(2,Math.round((ch.pct/maxPct)*100));
+      const bc=mine?'var(--gold)':i===0?'var(--gr)':'var(--pr)';
+      return `<div class="fg-row${mine?' fg-mine':''}" onclick="openDrawer('${esc(ch.id)}')">
+        <div class="fg-rk">${['🥇','🥈','🥉'][i]||i+1}</div>
+        <div class="fg-ch">
+          ${ch.logo_url?`<img class="fg-logo" src="${esc(ch.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`:``+`<div class="fg-logo" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
+          <div style="flex:1;min-width:0">
+            <div class="fg-name">${esc(ch.name)}${mine?'<span class="lb-you">⭐ You</span>':''}</div>
+            <div class="fg-bar-wrap"><div class="fg-bar" style="width:${barPct}%;background:${bc}"></div></div>
+          </div>
+        </div>
+        <div class="fg-val">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:${bc}">${ch.pct>=0?'+':''}${ch.pct}%</div>
+          <div style="font-size:10px;color:var(--t3)">${ch.gain>=0?'+':''}${fmtN(ch.gain)} views</div>
+        </div>
+      </div>`;
+    }).join('');
+    el.innerHTML=`<div class="sl d1">Fastest Growing <em>view gain since last snapshot</em></div><div class="fg-card d2">${rows}</div>`;
+  }catch(e){el.style.display='none';}
+}
+
+async function loadUploadVelocity(channels){
+  const el=document.getElementById('dashVelocity');
+  if(!el||channels.length<1){if(el)el.style.display='none';return;}
+  try{
+    const now=new Date();
+    const months=[];
+    for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);}
+    const vrs=await Promise.all(channels.map(ch=>fetch(`/api/channels/${ch.id}/videos?max=100`).then(r=>r.json()).catch(()=>[])));
+    const data=channels.map((ch,i)=>({ch,color:CH_COLORS[i%CH_COLORS.length],counts:months.map(m=>(vrs[i]||[]).filter(v=>(v.published_at||v.date||'').startsWith(m)).length)}));
+    const maxC=Math.max(...data.flatMap(d=>d.counts),1);
+    const bW=10,bGap=2,gGap=20;
+    const gW=channels.length*(bW+bGap)+gGap;
+    const cW=months.length*gW+60,cH=160,pH=cH-40;
+    let bars='';
+    months.forEach((m,mi)=>{
+      const gx=30+mi*gW;
+      data.forEach((d,ci)=>{
+        const c=d.counts[mi];
+        if(c===0)return;
+        const h=Math.max(8,Math.round((c/maxC)*pH));
+        const x=gx+ci*(bW+bGap),y=cH-30-h;
+        bars+=`<rect x="${x}" y="${y}" width="${bW}" height="${h}" rx="3" fill="${d.color}" opacity=".82"><title>${esc(d.ch.name)}: ${c} video${c!==1?'s':''}</title></rect>`;
+        bars+=`<text x="${x+bW/2}" y="${y-3}" text-anchor="middle" font-size="8" fill="${d.color}" font-family="DM Sans">${c}</text>`;
+      });
+      const shortM=m.slice(5)+"\u2019"+m.slice(2,4);
+      bars+=`<text x="${gx+data.length*(bW+bGap)/2}" y="${cH-8}" text-anchor="middle" font-size="9.5" fill="rgba(186,201,204,.7)" font-family="DM Sans">${shortM}</text>`;
+    });
+    const legend=data.map(d=>`<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2)"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${d.color};flex-shrink:0"></span>${esc(d.ch.name)}</span>`).join('');
+    el.innerHTML=`<div class="sl d1">Monthly Upload Velocity <em>last 6 months</em></div>
+      <div class="fg-card d2" style="overflow-x:auto">
+        <svg width="${cW}" height="${cH}" style="display:block;min-width:${cW}px">${bars}</svg>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">${legend}</div>
+      </div>`;
+  }catch(e){el.style.display='none';}
 }
 
 /* ════════════════════════════════════════════════════════

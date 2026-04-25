@@ -868,4 +868,57 @@ body>nav.topnav::after{
   .am-tab{padding:6px 10px;font-size:12px}
   .am-panel{padding:16px}
   .am-stat-row,.am-month-summary{grid-template-columns:repeat(2,1fr)}
-}
+}
+
+/* ══════════════════════════════════════════════════════
+   FEATURE 4 — DASHBOARD PANELS
+══════════════════════════════════════════════════════ */
+
+/* 4A: This Month at a Glance */
+.dash-mg-wrap{
+  background:var(--sf);border:1px solid var(--bd);border-radius:16px;
+  padding:20px 24px;margin-bottom:0;
+  border-image:linear-gradient(135deg,rgba(0,229,255,.3),rgba(86,255,167,.15),rgba(255,213,79,.15)) 1;
+  position:relative;overflow:hidden;
+}
+.dash-mg-wrap::before{
+  content:'';position:absolute;inset:0;border-radius:16px;
+  background:linear-gradient(135deg,rgba(0,229,255,.04) 0%,transparent 60%);
+  pointer-events:none;
+}
+.d-mg{margin-bottom:16px!important}
+.d-mg2{margin-bottom:0!important}
+.mg-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;
+}
+.mg-item{
+  background:var(--sf-low);border:1px solid var(--bd);border-radius:12px;
+  padding:16px 18px;display:flex;flex-direction:column;align-items:center;
+  text-align:center;gap:3px;transition:border-color .15s,transform .15s;
+}
+.mg-item:hover{border-color:var(--bd2);transform:translateY(-1px)}
+.mg-ico{font-size:18px;margin-bottom:2px}
+.mg-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:800;line-height:1}
+.mg-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--t3);margin-top:2px}
+.mg-delta{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;margin-top:4px}
+
+/* 4B: Fastest Growing leaderboard */
+.fg-card{
+  background:var(--sf);border:1px solid var(--bd);border-radius:14px;
+  overflow:hidden;padding:4px 0;
+}
+.fg-row{
+  display:flex;align-items:center;gap:10px;padding:10px 16px;
+  cursor:pointer;transition:background .12s;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.fg-row:last-child{border-bottom:none}
+.fg-row:hover{background:rgba(255,255,255,.03)}
+.fg-mine{background:rgba(255,213,79,.04)!important}
+.fg-mine:hover{background:rgba(255,213,79,.07)!important}
+.fg-rk{font-size:16px;width:28px;text-align:center;flex-shrink:0}
+.fg-ch{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.fg-logo{width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--sf-highest);border:1px solid rgba(255,255,255,.08)}
+.fg-name{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fg-bar-wrap{height:4px;background:var(--sf-highest);border-radius:2px;overflow:hidden}
+.fg-bar{height:100%;border-radius:2px;transition:width .6s var(--e)}
+.fg-val{flex-shrink:0;text-align:right;min-width:80px}
