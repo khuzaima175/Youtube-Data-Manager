@@ -8,9 +8,10 @@ import re
 import json
 import time
 import tempfile
+import urllib.request
 from pathlib import Path
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, Response
 from flask_cors import CORS
 from googleapiclient.discovery import build
 
@@ -25,11 +26,29 @@ app = Flask(__name__, static_folder="static")
 # Restrict CORS to localhost only in dev; tighten for production
 CORS(app, origins=["http://localhost:5000", "http://127.0.0.1:5000"])
 
-DATA_FILE = Path(__file__).parent / "channels.json"
+DATA_FILE      = Path(__file__).parent / "channels.json"
+SNAPSHOTS_FILE = Path(__file__).parent / "snapshots.json"
 
 # Simple in-memory rate limiter: {ip: last_add_timestamp}
 _last_add: dict[str, float] = {}
 ADD_THROTTLE_SECS = 5   # minimum seconds between add requests per IP
+
+# ── Server-side video caches ──────────────────────────────────────────────────
+# Short cache for recent-videos endpoint (15 min)
+_video_cache: dict[str, dict] = {}   # { channel_id: { "data": [...], "ts": float } }
+VIDEO_CACHE_TTL = 15 * 60            # 15 minutes
+
+# Long cache for full video list (4 hours)
+_full_cache: dict[str, dict] = {}    # { channel_id: { "data": [...], "ts": float } }
+FULL_CACHE_TTL = 4 * 60 * 60         # 4 hours
+
+# Image proxy cache (1 hour) — stores raw bytes keyed by URL
+_img_cache: dict[str, dict] = {}     # { url: { "data": bytes, "mime": str, "ts": float } }
+IMG_CACHE_TTL = 60 * 60             # 1 hour
+
+# Search suggestion cache (5 min) — keyed by lowercase query
+_suggest_cache: dict[str, dict] = {}  # { q: { "data": [...], "ts": float } }
+SUGGEST_CACHE_TTL = 5 * 60           # 5 minutes
 
 
 # ─── Utilities ────────────────────────────────────────────────────────────────
@@ -98,6 +117,40 @@ def save_channels(channels: list) -> None:
         if tmp.exists():
             tmp.unlink(missing_ok=True)
         raise
+
+
+def load_snapshots() -> dict:
+    """Load snapshots from JSON file. Returns empty dict on error."""
+    try:
+        if SNAPSHOTS_FILE.exists():
+            with open(SNAPSHOTS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        pass
+    return {}
+
+
+def save_snapshot(channel_id: str, subscribers: int, total_views: int) -> None:
+    """Append a daily snapshot entry for a channel (one per day, upsert)."""
+    snaps = load_snapshots()
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    entry = {"date": today, "subscribers": subscribers, "views": total_views}
+    if channel_id not in snaps:
+        snaps[channel_id] = []
+    # Upsert: replace existing entry for today if present
+    snaps[channel_id] = [s for s in snaps[channel_id] if s.get("date") != today]
+    snaps[channel_id].append(entry)
+    # Keep only last 365 entries per channel
+    snaps[channel_id] = sorted(snaps[channel_id], key=lambda s: s["date"])[-365:]
+
+    tmp = SNAPSHOTS_FILE.with_suffix(".tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(snaps, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, SNAPSHOTS_FILE)
+    except OSError:
+        if tmp.exists():
+            tmp.unlink(missing_ok=True)
 
 
 def build_yt():
@@ -246,6 +299,69 @@ def fetch_recent_videos(youtube, channel_id: str, n: int = 6) -> list:
     return result
 
 
+def fetch_all_videos(youtube, channel_id: str, max_videos: int = 500) -> list:
+    """
+    Fetch ALL videos for a channel (paginated, up to max_videos).
+    Each page = 1 playlistItems.list + 1 videos.list = 2 units/page.
+    50 items/page → 500 videos ≈ 20 pages ≈ 40 units total.
+    """
+    cr = youtube.channels().list(part="contentDetails", id=channel_id).execute()
+    if not cr.get("items"):
+        return []
+    uploads_pid = cr["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+
+    all_items = []
+    page_token = None
+
+    while len(all_items) < max_videos:
+        kwargs = dict(part="snippet", playlistId=uploads_pid, maxResults=50)
+        if page_token:
+            kwargs["pageToken"] = page_token
+        pl = youtube.playlistItems().list(**kwargs).execute()
+        all_items.extend(pl.get("items", []))
+        page_token = pl.get("nextPageToken")
+        if not page_token:
+            break
+
+    all_items = all_items[:max_videos]
+    if not all_items:
+        return []
+
+    # Batch video stats (50 per request)
+    result = []
+    for batch_start in range(0, len(all_items), 50):
+        batch = all_items[batch_start:batch_start + 50]
+        ids   = [i["snippet"]["resourceId"]["videoId"] for i in batch]
+        vr    = youtube.videos().list(part="statistics,contentDetails", id=",".join(ids)).execute()
+        sm_st = {v["id"]: v.get("statistics", {})     for v in vr.get("items", [])}
+        sm_cd = {v["id"]: v.get("contentDetails", {}) for v in vr.get("items", [])}
+
+        for item in batch:
+            sn     = item["snippet"]
+            vid_id = sn["resourceId"]["videoId"]
+            vs     = sm_st.get(vid_id, {})
+            cd     = sm_cd.get(vid_id, {})
+            dur_s  = parse_duration(cd.get("duration", ""))
+            result.append({
+                "id":            vid_id,
+                "title":         sn.get("title", ""),
+                "date":          sn.get("publishedAt", "")[:10],
+                "published_at":  sn.get("publishedAt", ""),
+                "url":           f"https://youtube.com/watch?v={vid_id}",
+                "thumb":         best_thumb(sn.get("thumbnails", {})),
+                "views":         fmt(vs.get("viewCount", 0)),
+                "views_raw":     int(vs.get("viewCount", 0)),
+                "view_count":    int(vs.get("viewCount", 0)),
+                "likes":         fmt(vs.get("likeCount", 0)),
+                "like_count":    int(vs.get("likeCount", 0)),
+                "comments":      fmt(vs.get("commentCount", 0)),
+                "comment_count": int(vs.get("commentCount", 0)),
+                "duration_secs": dur_s,
+                "duration":      fmt_duration(dur_s),
+            })
+    return result
+
+
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -271,10 +387,106 @@ def search_channel_route():
         return api_error("Failed to fetch channel data", 500)
 
 
+@app.route("/api/channel-by-id/<channel_id>")
+def get_channel_by_id(channel_id):
+    """
+    Fetch a channel by its known YouTube channel ID.
+    Uses channels.list (1 unit) — quota-safe for autocomplete suggestion selection.
+    """
+    if not channel_id:
+        return api_error("Channel ID is required", 400)
+    try:
+        yt = build_yt()
+        d, e = fetch_full_channel(yt, channel_id=channel_id)
+        if e:
+            return api_error(e, 404)
+        return jsonify(d)
+    except ValueError as ex:
+        return api_error(str(ex), 503)
+    except Exception:
+        return api_error("Failed to fetch channel data", 500)
+
+
 @app.route("/api/channels", methods=["GET"])
 def get_channels():
     """Return all saved channels."""
     return jsonify(load_channels())
+
+
+@app.route("/api/channels/search-suggest")
+def search_suggest():
+    """
+    Return up to 5 channel suggestions for autocomplete.
+    Uses forHandle (1 unit) if query starts with @, else search.list (100 units).
+    Results are cached in-memory for 5 minutes to reduce quota burn on repeat queries.
+    """
+    q = request.args.get("q", "").strip()
+    if len(q) < 2:
+        return jsonify([])
+
+    # Cache check (case-insensitive key)
+    cache_key = q.lower()
+    now = time.time()
+    cached = _suggest_cache.get(cache_key)
+    if cached and (now - cached["ts"]) < SUGGEST_CACHE_TTL:
+        return jsonify(cached["data"])
+
+    try:
+        yt = build_yt()
+        suggestions = []
+
+        if q.startswith("@"):
+            # Exact handle lookup — costs only 1 unit
+            handle = q if q.startswith("@") else "@" + q
+            cr = yt.channels().list(
+                part="snippet,statistics",
+                forHandle=handle,
+            ).execute()
+            for item in cr.get("items", [])[:5]:
+                sn = item["snippet"]
+                st = item.get("statistics", {})
+                subs = int(st.get("subscriberCount", 0))
+                suggestions.append({
+                    "id":          item["id"],
+                    "name":        sn.get("title", ""),
+                    "handle":      sn.get("customUrl", ""),
+                    "logo_url":    best_thumb(sn.get("thumbnails", {})),
+                    "subscribers": fmt(subs),
+                    "subscribers_raw": subs,
+                })
+        else:
+            # Full text search — costs 100 units
+            sr = yt.search().list(
+                part="snippet", q=q, type="channel", maxResults=5
+            ).execute()
+            channel_ids = [item["snippet"]["channelId"] for item in sr.get("items", [])]
+            if channel_ids:
+                cr = yt.channels().list(
+                    part="snippet,statistics",
+                    id=",".join(channel_ids),
+                ).execute()
+                id_order = {cid: i for i, cid in enumerate(channel_ids)}
+                items = sorted(cr.get("items", []), key=lambda x: id_order.get(x["id"], 99))
+                for item in items:
+                    sn = item["snippet"]
+                    st = item.get("statistics", {})
+                    subs = int(st.get("subscriberCount", 0))
+                    suggestions.append({
+                        "id":          item["id"],
+                        "name":        sn.get("title", ""),
+                        "handle":      sn.get("customUrl", ""),
+                        "logo_url":    best_thumb(sn.get("thumbnails", {})),
+                        "subscribers": fmt(subs),
+                        "subscribers_raw": subs,
+                    })
+
+        # Store in cache
+        _suggest_cache[cache_key] = {"data": suggestions, "ts": now}
+        return jsonify(suggestions)
+    except ValueError as ex:
+        return api_error(str(ex), 503)
+    except Exception:
+        return api_error("Failed to fetch suggestions", 500)
 
 
 @app.route("/api/channels/add", methods=["POST"])
@@ -352,6 +564,16 @@ def refresh_channel(channel_id):
                 channels[i]        = d
                 break
         save_channels(channels)
+
+        # Auto-save a daily snapshot for growth timeline
+        try:
+            save_snapshot(channel_id, d["subscribers_raw"], d["total_views_raw"])
+        except Exception:
+            pass  # snapshot failure is non-fatal
+
+        # Invalidate caches for this channel
+        _video_cache.pop(channel_id, None)
+
         return jsonify({"success": True, "channel": d})
     except ValueError as ex:
         return api_error(str(ex), 503)
@@ -376,15 +598,84 @@ def set_primary(channel_id):
 
 @app.route("/api/channels/<channel_id>/videos")
 def channel_videos(channel_id):
-    """Return recent videos for a channel."""
+    """Return recent videos for a channel (server-side cached 15 min)."""
+    now = time.time()
+    cached = _video_cache.get(channel_id)
+    if cached and (now - cached["ts"]) < VIDEO_CACHE_TTL:
+        return jsonify(cached["data"])
+
     try:
         n  = min(int(request.args.get("max", 6)), 20)
         yt = build_yt()
-        return jsonify(fetch_recent_videos(yt, channel_id, n))
+        data = fetch_recent_videos(yt, channel_id, n)
+        _video_cache[channel_id] = {"data": data, "ts": now}
+        return jsonify(data)
     except ValueError as ex:
         return api_error(str(ex), 503)
     except Exception:
         return api_error("Failed to fetch videos", 500)
+
+
+@app.route("/api/channels/<channel_id>/videos/full")
+def channel_videos_full(channel_id):
+    """
+    Return ALL videos for a channel (paginated, up to 500).
+    Server-side cached for 4 hours to protect quota.
+    """
+    now = time.time()
+    cached = _full_cache.get(channel_id)
+    if cached and (now - cached["ts"]) < FULL_CACHE_TTL:
+        return jsonify(cached["data"])
+
+    try:
+        yt   = build_yt()
+        data = fetch_all_videos(yt, channel_id, max_videos=500)
+        _full_cache[channel_id] = {"data": data, "ts": now}
+        return jsonify(data)
+    except ValueError as ex:
+        return api_error(str(ex), 503)
+    except Exception:
+        return api_error("Failed to fetch full video list", 500)
+
+
+@app.route("/api/snapshots/<channel_id>")
+def get_snapshots(channel_id):
+    """Return growth snapshot history for a channel."""
+    snaps = load_snapshots()
+    return jsonify(snaps.get(channel_id, []))
+
+
+@app.route("/api/img-proxy")
+def img_proxy():
+    """
+    Proxy YouTube / ggpht thumbnail images so the browser never hits the CDN
+    directly (which blocks non-YouTube referrers). Caches in-memory for 1 hour.
+    """
+    url = request.args.get("url", "").strip()
+    # Only allow yt3.ggpht.com and googleusercontent.com origins
+    if not url or not ("ggpht.com" in url or "googleusercontent.com" in url or "ytimg.com" in url):
+        return Response(status=400)
+
+    cache_key = url
+    cached = _img_cache.get(cache_key)
+    now = time.time()
+    if cached and (now - cached["ts"]) < IMG_CACHE_TTL:
+        return Response(cached["data"], mimetype=cached["mime"],
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0",
+            # No Referer — that's the whole point
+        })
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = resp.read()
+            mime = resp.headers.get("Content-Type", "image/jpeg").split(";")[0]
+        _img_cache[cache_key] = {"data": data, "ts": now, "mime": mime}
+        return Response(data, mimetype=mime,
+                        headers={"Cache-Control": "public, max-age=3600"})
+    except Exception:
+        return Response(status=502)
 
 
 @app.route("/api/export/csv")

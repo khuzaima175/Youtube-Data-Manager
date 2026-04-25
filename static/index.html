@@ -24,6 +24,78 @@
   <div class="drw-body" id="drwBody"></div>
 </div>
 
+<!-- ═══════════════════════════════════════
+     MY CHANNEL ANALYTICS MODAL
+════════════════════════════════════════ -->
+<div class="am-ovrl" id="amOvrl" onclick="closeAnalyticsModal()"></div>
+<div class="am" id="analyticsModal">
+  <!-- Header -->
+  <div class="am-hdr">
+    <div class="am-hdr-l">
+      <div class="am-hdr-logo" id="amLogo"></div>
+      <div>
+        <div class="am-hdr-name" id="amName">Channel Analytics</div>
+        <div class="am-hdr-sub" id="amSub"></div>
+      </div>
+    </div>
+    <button class="am-close" onclick="closeAnalyticsModal()">close</button>
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="am-tabs">
+    <button class="am-tab on" id="amTab-overview"   onclick="switchAnalyticsTab('overview')">
+      <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">dashboard</span> Overview
+    </button>
+    <button class="am-tab" id="amTab-monthly"    onclick="switchAnalyticsTab('monthly')">
+      <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">bar_chart</span> Monthly
+    </button>
+    <button class="am-tab" id="amTab-growth"     onclick="switchAnalyticsTab('growth')">
+      <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">rocket_launch</span> Growth Speed
+    </button>
+    <button class="am-tab" id="amTab-compare"    onclick="switchAnalyticsTab('compare')">
+      <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">compare_arrows</span> vs Competitors
+    </button>
+    <button class="am-tab" id="amTab-timeline"   onclick="switchAnalyticsTab('timeline')">
+      <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">show_chart</span> Timeline
+    </button>
+  </div>
+
+  <!-- Tab Panels -->
+  <div class="am-body">
+    <!-- Overview panel — populated by openAnalyticsModal() -->
+    <div class="am-panel on" id="amPanel-overview"></div>
+
+    <!-- Monthly Performance panel -->
+    <div class="am-panel" id="amPanel-monthly">
+      <div class="am-loading" id="amMonthlyLoading">
+        <div class="spin"></div><span>Loading all videos…</span>
+      </div>
+      <div id="amMonthlyContent" style="display:none"></div>
+    </div>
+
+    <!-- Growth Speed panel -->
+    <div class="am-panel" id="amPanel-growth">
+      <div class="am-loading" id="amGrowthLoading">
+        <div class="spin"></div><span>Calculating growth velocity…</span>
+      </div>
+      <div id="amGrowthContent" style="display:none"></div>
+    </div>
+
+    <!-- vs Competitors panel -->
+    <div class="am-panel" id="amPanel-compare">
+      <div id="amCompareContent"></div>
+    </div>
+
+    <!-- Growth Timeline panel -->
+    <div class="am-panel" id="amPanel-timeline">
+      <div class="am-loading" id="amTimelineLoading">
+        <div class="spin"></div><span>Loading snapshot history…</span>
+      </div>
+      <div id="amTimelineContent" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Top Nav -->
 <nav class="topnav">
   <div class="topnav-inner">
@@ -99,7 +171,12 @@
     <div class="add-panel" id="addPanel">
       <div class="add-hd">Search and add a YouTube channel to track</div>
       <div class="add-row">
-        <input class="add-inp" id="addInput" type="text" placeholder="Channel name… e.g. SolidWorks, SourceCAD, Cadable" autocomplete="off" onkeydown="if(event.key==='Enter')addCh()"/>
+        <div class="add-inp-wrap">
+          <input class="add-inp" id="addInput" type="text" placeholder="Channel name or @handle…" autocomplete="off"
+            onkeydown="if(event.key==='Enter'){closeAddSuggestions();addCh();}"/>
+          <!-- Autocomplete dropdown for Add Channel -->
+          <div id="addDropdown" class="add-dropdown" style="display:none"></div>
+        </div>
         <button class="btn btn-pr" id="addBtn" onclick="addCh()">Add</button>
         <button class="btn btn-gh" onclick="toggleAdd()">Cancel</button>
       </div>
@@ -117,10 +194,14 @@
       </div>
     </div>
     <div class="sr-wrap">
-      <div class="sr-bar">
-        <span style="font-family:'Material Symbols Outlined';font-size:20px;color:var(--t3);line-height:1">search</span>
-        <input class="sr-inp" id="srInput" type="text" placeholder="Search for a YouTube channel… (or press / from anywhere)" autocomplete="off"/>
-        <button class="btn btn-pr" id="srBtn" onclick="doSearch()">Search</button>
+      <div class="sr-input-wrap">
+        <div class="sr-bar">
+          <span style="font-family:'Material Symbols Outlined';font-size:20px;color:var(--t3);line-height:1">search</span>
+          <input class="sr-inp" id="srInput" type="text" placeholder="Search for a YouTube channel… (or press / from anywhere)" autocomplete="off"/>
+          <button class="btn btn-pr" id="srBtn" onclick="doSearch()">Search</button>
+        </div>
+        <!-- Autocomplete dropdown —  anchored to .sr-input-wrap -->
+        <div id="srDropdown" class="sr-dropdown" style="display:none"></div>
       </div>
       <div class="err" id="srErr"></div>
       <!-- skeleton -->

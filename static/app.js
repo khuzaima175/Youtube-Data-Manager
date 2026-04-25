@@ -84,8 +84,19 @@ let sort='subscribers_raw';
 let chSort='subscribers_raw';
 const _enrichCache={};
 const ENRICH_TTL=30*60*1000;
+let _amChannelId=null;        // Currently open analytics modal channel id
+let _amFullVideos=null;       // Cached full video list for modal
+let _amSnapshots=null;        // Cached snapshots for modal
 
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// Route YouTube CDN images through our proxy to avoid hotlink-block
+function proxyImg(url){
+  if(!url) return '';
+  if(url.includes('ggpht.com')||url.includes('ytimg.com')||url.includes('googleusercontent.com'))
+    return '/api/img-proxy?url='+encodeURIComponent(url);
+  return url;
+}
 
 function toast(msg,t=''){
   const el=document.getElementById('toast');
@@ -97,7 +108,7 @@ function hideErr(id){document.getElementById(id).style.display='none';}
 
 function logoImg(url,name,cls){
   const fb=(name||'?')[0].toUpperCase();
-  if(url)return `<img class="${cls}" src="${esc(url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`;
+  if(url)return `<img class="${cls}" src="${esc(proxyImg(url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`;
   return `<div class="${cls}-fb" style="display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;color:var(--t3)">${fb}</div>`;
 }
 
@@ -151,7 +162,7 @@ async function renderDash(){
     } else {
       const v=primary.video||{};
       html+=`
-      <div class="my-hero au" onclick="openDrawer('${esc(primary.id)}')">
+      <div class="my-hero au" onclick="openAnalyticsModal('${esc(primary.id)}')">
         <div class="my-hero-top">
           <div class="my-hero-l">
             ${primary.logo_url
@@ -164,7 +175,7 @@ async function renderDash(){
                 ${primary.country?`<span>·</span><span>${esc(primary.country)}</span>`:''}
                 ${primary.created?`<span>·</span><span>Since ${primary.created}</span>`:''}
               </div>
-              <div class="my-hero-hint">Click to view full details →</div>
+              <div class="my-hero-hint">Click to view full analytics →</div>
             </div>
           </div>
           ${v.title?`
@@ -223,16 +234,12 @@ async function renderDash(){
 
     el.innerHTML=html;
     if(all.length>1)setTimeout(animateBars,60);
-    // Animate stat number counters on hero card
     setTimeout(()=>{
       document.querySelectorAll('.count-up').forEach(el=>{
         const target=parseFloat(el.dataset.target||0);
         const suffix=el.dataset.suffix||'';
-        const dur=1200;
-        const step=16;
-        const steps=dur/step;
-        let cur=0;
-        const inc=target/steps;
+        const dur=1200;const step=16;const steps=dur/step;
+        let cur=0;const inc=target/steps;
         const t=setInterval(()=>{
           cur=Math.min(cur+inc,target);
           const v=target>=10?Math.round(cur):cur.toFixed(1);
@@ -254,7 +261,11 @@ async function renderDash(){
             <img class="ru-thumb" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
             <div class="ru-body">
               <div class="ru-title">${esc(v.title)}</div>
-              <div class="ru-meta">👁 ${esc(v.views)} · 👍 ${esc(v.likes)} · ${v.date}</div>
+              <div class="ru-meta">
+                <span class="ru-stat" style="color:var(--pr)">👁 ${esc(v.views)}</span>
+                <span class="ru-stat" style="color:var(--gr)">👍 ${esc(v.likes)}</span>
+                <span style="font-size:11px;color:var(--t3);margin-left:auto">${v.date}</span>
+              </div>
             </div>
           </a>`).join('');
       }catch{
@@ -328,7 +339,6 @@ function animateBars(){document.querySelectorAll('.lb-bar').forEach(b=>b.style.w
    DRAWER ANALYTICS HELPERS
 ════════════════════════════════════════════════════════ */
 
-// Views trend mini bar chart
 function buildViewsTrend(vids){
   if(!vids||vids.length<3)return '';
   const sorted=[...vids].sort((a,b)=>new Date(a.published_at||a.date)-new Date(b.published_at||b.date));
@@ -353,7 +363,6 @@ function buildViewsTrend(vids){
   </div>`;
 }
 
-// 12-week upload calendar grid
 function buildCalendar(vids){
   if(!vids||!vids.length)return '';
   const cells=[];
@@ -363,7 +372,6 @@ function buildCalendar(vids){
     const lbl=w===0?'This week':w===1?'Last week':`${w}w ago`;
     cells.push(`<div title="${lbl}: ${wv.length?wv.length+' video(s)':'No upload'}" style="width:20px;height:20px;border-radius:4px;background:${wv.length?'var(--gr)':'var(--sf-highest)'};border:1px solid rgba(255,255,255,.05);opacity:${wv.length?1:.45};cursor:default"></div>`);
   }
-  // streak calc
   const sorted=[...vids].sort((a,b)=>new Date(b.published_at||b.date)-new Date(a.published_at||a.date));
   let streak=0,lastW=-1;
   for(const v of sorted){
@@ -381,7 +389,6 @@ function buildCalendar(vids){
   </div>`;
 }
 
-// Engagement trend bars
 function buildEngTrend(vids){
   if(!vids||vids.length<4)return '';
   const rates=vids.slice(0,10).map(v=>calcEngagementRate(v.like_count??0,v.comment_count??0,v.view_count??v.views_raw??0)??0).filter(r=>r>0);
@@ -411,7 +418,6 @@ function buildEngTrend(vids){
   </div>`;
 }
 
-// Topic word frequency cloud
 function buildWordCloud(vids){
   if(!vids||vids.length<2)return '';
   const stop=new Set(['the','and','for','with','how','that','this','from','your','more','have','will','are','can','all','not','into','what','when','make','were','been','its','was','but','our','you','they','their','has','had','also','about','some','after','using','use','tutorial','video','part','best','full','guide','new','top','most','these','then','than','very','just','out','get','let','now','see','too','over','back','even','each','does','off','again','here','two','into','take','much','well','made']);
@@ -431,7 +437,6 @@ function buildWordCloud(vids){
   </div>`;
 }
 
-// Video duration stats
 function buildDuration(vids){
   const wd=vids.filter(v=>v.duration_secs>0);
   if(!wd.length)return '';
@@ -458,7 +463,6 @@ async function enrichCards(){
   const now=Date.now();
   const promises=all.map(async ch=>{
     try{
-      // Use cache if still fresh
       const cached=_enrichCache[ch.id];
       const vids=cached&&(now-cached.ts)<ENRICH_TTL
         ? cached.vids
@@ -474,7 +478,6 @@ async function enrichCards(){
       if(!card)return;
       const sorted=[...vids].sort((a,b)=>new Date(b.published_at||b.date)-new Date(a.published_at||a.date));
 
-      // Upload streak
       let streak=0,lastW=-1;
       for(const v of sorted){
         const wa=Math.floor((now-new Date(v.published_at||v.date).getTime())/(7*864e5));
@@ -490,7 +493,6 @@ async function enrichCards(){
         else if(daysSince>28){streakEl.textContent=`⚠ ${daysSince}d gap`;streakEl.className='badge bdg-rd';streakEl.style.display='';}
       }
 
-      // Best this month
       const mVids=vids.filter(v=>{const t=new Date(v.published_at||v.date).getTime();return !isNaN(t)&&(now-t)<30*864e5;});
       if(mVids.length>1){
         const best=mVids.reduce((a,b)=>(b.view_count??b.views_raw??0)>(a.view_count??a.views_raw??0)?b:a);
@@ -509,9 +511,15 @@ async function enrichCards(){
 }
 
 /* ════════════════════════════════════════════════════════
-   OPEN DRAWER
+   OPEN DRAWER (competitor channels)
 ════════════════════════════════════════════════════════ */
 function openDrawer(id){
+  // Close analytics modal first if it's showing — avoids z-index conflicts
+  const modal=document.getElementById('analyticsModal');
+  if(modal&&modal.classList.contains('open')){
+    modal.classList.remove('open');
+    document.getElementById('amOvrl').classList.remove('open');
+  }
   const ch=all.find(c=>c.id===id);
   if(!ch)return;
   const v=ch.video||{};
@@ -589,7 +597,6 @@ function openDrawer(id){
       const subEl=document.getElementById('drwSubRatio');
       if(subEl){subEl.textContent=drwSub!==null?drwSub+'%':'—';subEl.style.cssText=subEl.style.cssText.replace(/color:[^;]+/,subViewRatioColor(drwSub));}
 
-      // Best / Worst for table highlighting
       const tbl10=vids.slice(0,10);
       const vcs=tbl10.map(v=>v.view_count??v.views_raw??0);
       const maxVc=Math.max(...vcs),minVc=Math.min(...vcs);
@@ -597,43 +604,29 @@ function openDrawer(id){
       const bestIdx=hasDiff?vcs.indexOf(maxVc):-1;
       const worstIdx=hasDiff?vcs.lastIndexOf(minVc):-1;
 
-      const tableRows=tbl10.map((v,ri)=>{
+      const vidCards=tbl10.map((v,ri)=>{
         const vVc=v.view_count??v.views_raw??0;
         const vLc=v.like_count??0;
         const vCc=v.comment_count??0;
         const eng=calcEngagementRate(vLc,vCc,vVc);
         const isBest=ri===bestIdx,isWorst=ri===worstIdx&&worstIdx!==bestIdx;
-        const rowBg=isBest?'background:rgba(86,255,167,.04);':isWorst?'background:rgba(255,180,171,.04);':'';
-        return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${rowBg}">
-          <td style="padding:8px 10px;max-width:200px">
-            ${isBest?'<span style="color:var(--gr);font-size:9px;font-weight:700;display:block;letter-spacing:.4px;margin-bottom:1px">🏆 BEST</span>':''}
-            ${isWorst?'<span style="color:var(--rd);font-size:9px;font-weight:700;display:block;letter-spacing:.4px;margin-bottom:1px">📉 WORST</span>':''}
-            <a href="${esc(v.url)}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--t1);text-decoration:none">${esc(v.title)}</a>
-          </td>
-          <td style="padding:8px 6px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;white-space:nowrap;color:${isBest?'var(--gr)':isWorst?'var(--rd)':'var(--t1)'}">${esc(v.views)}</td>
-          <td style="padding:8px 6px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2);white-space:nowrap">${esc(v.likes)}</td>
-          <td style="padding:8px 6px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2);white-space:nowrap">${esc(v.comments||'—')}</td>
-          <td style="padding:8px 10px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:700;white-space:nowrap;${engagementColor(eng)}">${eng!==null?eng+'%':'—'}</td>
-          <td style="padding:8px 6px;text-align:right;font-size:11px;color:var(--t3);white-space:nowrap">${v.duration||'—'}</td>
-          <td style="padding:8px 6px;text-align:right;font-size:11px;color:var(--t3);white-space:nowrap">${v.date}</td>
-        </tr>`;
+        const engC=eng===null?'var(--t3)':eng>=4?'var(--gr)':eng>=2?'var(--gold)':'var(--rd)';
+        return `<a href="${esc(v.url)}" target="_blank" rel="noopener"
+          style="display:block;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05);text-decoration:none;color:inherit">
+          ${isBest?'<div style="font-size:9px;font-weight:800;color:var(--gr);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">🏆 BEST</div>':''}
+          ${isWorst?'<div style="font-size:9px;font-weight:800;color:var(--rd);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">📉 LOWEST</div>':''}
+          <div style="font-size:13px;font-weight:600;line-height:1.42;color:var(--t1);margin-bottom:7px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(v.title)}</div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:var(--pr)">👁 ${esc(v.views)}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--t2)">👍 ${esc(v.likes)}</span>
+            ${eng!==null?`<span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${engC};background:rgba(255,255,255,.05);padding:2px 7px;border-radius:5px">${eng}%</span>`:''}
+            <span style="font-size:11px;color:var(--t3);margin-left:auto">${v.date}</span>
+          </div>
+        </a>`;
       }).join('');
 
       s.innerHTML=`<div class="drw-sh">Recent Uploads</div>
-        <div style="overflow-x:auto;margin:0 -2px">
-          <table style="width:100%;border-collapse:collapse">
-            <thead><tr style="border-bottom:1px solid var(--bd)">
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3)">Title</th>
-              <th style="padding:6px 6px;text-align:right;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3)">Views</th>
-              <th style="padding:6px 6px;text-align:right;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3)">Likes</th>
-              <th style="padding:6px 6px;text-align:right;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3)">Cmts</th>
-              <th style="padding:6px 10px;text-align:right;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3)">Eng %</th>
-              <th style="padding:6px 6px;text-align:right;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3)">Len</th>
-              <th style="padding:6px 6px;text-align:right;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3)">Date</th>
-            </tr></thead>
-            <tbody>${tableRows}</tbody>
-          </table>
-        </div>
+        <div style="padding:0 2px">${vidCards}</div>
         ${buildViewsTrend(vids)}
         ${buildCalendar(vids)}
         ${buildEngTrend(vids)}
@@ -653,6 +646,606 @@ function closeDrawer(){
 }
 
 /* ════════════════════════════════════════════════════════
+   MY CHANNEL ANALYTICS MODAL — 5 Tabs
+════════════════════════════════════════════════════════ */
+
+async function openAnalyticsModal(channelId){
+  const ch=all.find(c=>c.id===channelId);
+  if(!ch)return;
+  _amChannelId=channelId;
+  _amFullVideos=null;
+  _amSnapshots=null;
+
+  // Populate header
+  const logoEl=document.getElementById('amLogo');
+  logoEl.innerHTML=ch.logo_url
+    ?`<img src="${esc(ch.logo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
+    :`<div style="display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--t3)">${(ch.name||'?')[0].toUpperCase()}</div>`;
+  document.getElementById('amName').textContent=ch.name||'';
+  document.getElementById('amSub').textContent=`${ch.handle||''} · ${ch.subscribers} subscribers · ${ch.total_videos} videos`;
+
+  // Reset to overview tab
+  switchAnalyticsTab('overview', true);
+
+  // Populate overview panel with existing drawer-style content
+  renderAmOverview(ch);
+
+  // Show modal
+  document.getElementById('analyticsModal').classList.add('open');
+  document.getElementById('amOvrl').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+
+function closeAnalyticsModal(){
+  document.getElementById('analyticsModal').classList.remove('open');
+  document.getElementById('amOvrl').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+function switchAnalyticsTab(tab, skipLoad){
+  document.querySelectorAll('.am-tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.am-panel').forEach(p=>p.classList.remove('on'));
+  const tabEl=document.getElementById('amTab-'+tab);
+  const panelEl=document.getElementById('amPanel-'+tab);
+  if(tabEl)tabEl.classList.add('on');
+  if(panelEl)panelEl.classList.add('on');
+  if(skipLoad)return;
+  if(tab==='monthly')renderAmMonthly();
+  else if(tab==='growth')renderAmGrowth();
+  else if(tab==='compare')renderAmCompare();
+  else if(tab==='timeline')renderAmTimeline();
+}
+
+function renderAmOverview(ch){
+  const v=ch.video||{};
+  const subRatio=calcSubViewRatio(ch.subscriber_count??ch.subscribers_raw??0, ch.total_views_raw??0);
+  const panel=document.getElementById('amPanel-overview');
+  panel.innerHTML=`
+    <div class="am-overview-grid">
+      <!-- Stats row -->
+      <div class="am-stat-row">
+        <div class="am-stat am-stat-gold"><div class="am-stat-val">${esc(ch.subscribers)}</div><div class="am-stat-lbl">Subscribers</div></div>
+        <div class="am-stat"><div class="am-stat-val">${esc(ch.total_views)}</div><div class="am-stat-lbl">Total Views</div></div>
+        <div class="am-stat am-stat-cyan"><div class="am-stat-val">${esc(ch.total_videos)}</div><div class="am-stat-lbl">Videos</div></div>
+        <div class="am-stat am-stat-green"><div class="am-stat-val">${esc(ch.avg_views)}</div><div class="am-stat-lbl">Avg Views/Video</div></div>
+        <div class="am-stat" style="${subViewRatioColor(subRatio)}"><div class="am-stat-val">${subRatio!==null?subRatio+'%':'—'}</div><div class="am-stat-lbl">Audience %</div></div>
+        ${ch.created?`<div class="am-stat"><div class="am-stat-val" style="font-size:14px">${ch.created}</div><div class="am-stat-lbl">Channel Since</div></div>`:''}
+      </div>
+
+      ${ch.description?`
+      <div class="am-sep-sect">
+        <div class="am-sect-lbl">About</div>
+        <div style="font-size:13px;color:var(--t2);line-height:1.7">${esc(ch.description)}${ch.description.length>=300?'…':''}</div>
+      </div>`:''}
+
+      ${v.title?`
+      <div class="am-sep-sect">
+        <div class="am-sect-lbl">Latest Upload</div>
+        <a class="drw-lv" href="${esc(v.url)}" target="_blank" rel="noopener">
+          <img class="drw-lv-img" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
+          <div class="drw-lv-body">
+            <div class="drw-lv-title">${esc(v.title)}</div>
+            <div class="drw-lv-date">📅 ${v.date}</div>
+            <div class="drw-lv-stats"><span>👁 ${esc(v.views)}</span><span>👍 ${esc(v.likes)}</span><span>💬 ${esc(v.comments||'—')}</span></div>
+          </div>
+        </a>
+      </div>`:''}
+
+      <div class="am-sep-sect" id="amOvRecent">
+        <div class="am-sect-lbl">Recent Uploads</div>
+        <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px"><div class="spin"></div>Loading…</div>
+      </div>
+    </div>`;
+
+  // Load recent videos async
+  fetch(`/api/channels/${ch.id}/videos?max=20`)
+    .then(r=>r.json())
+    .then(vids=>{
+      const el=document.getElementById('amOvRecent');
+      if(!el)return;
+      if(!vids.length){el.innerHTML='<div class="am-sect-lbl">Recent Uploads</div><p style="color:var(--t3)">No uploads found.</p>';return;}
+      const tbl10=vids.slice(0,10);
+      const vcs=tbl10.map(v=>v.view_count??v.views_raw??0);
+      const maxVc=Math.max(...vcs),minVc=Math.min(...vcs);
+      const hasDiff=maxVc!==minVc;
+      const bestIdx=hasDiff?vcs.indexOf(maxVc):-1;
+      const worstIdx=hasDiff?vcs.lastIndexOf(minVc):-1;
+      const vidCards=tbl10.map((v,ri)=>{
+        const vc=v.view_count??v.views_raw??0;
+        const eng=calcEngagementRate(v.like_count??0,v.comment_count??0,vc);
+        const isBest=ri===bestIdx,isWorst=ri===worstIdx&&worstIdx!==bestIdx;
+        const engC=eng===null?'var(--t3)':eng>=4?'var(--gr)':eng>=2?'var(--gold)':'var(--rd)';
+        return `<a href="${esc(v.url)}" target="_blank" rel="noopener"
+          style="display:block;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.05);text-decoration:none;color:inherit;transition:background .12s;border-radius:6px">
+          ${isBest?'<div style="font-size:9px;font-weight:800;color:var(--gr);letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px">🏆 BEST VIDEO</div>':''}
+          ${isWorst?'<div style="font-size:9px;font-weight:800;color:var(--rd);letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px">📉 LOWEST</div>':''}
+          <div style="font-size:14px;font-weight:600;line-height:1.45;color:var(--t1);margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(v.title)}</div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:var(--pr)">👁 ${esc(v.views)}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--t2)">👍 ${esc(v.likes)}</span>
+            ${eng!==null?`<span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${engC};background:rgba(255,255,255,.05);padding:2px 8px;border-radius:5px">${eng}% eng</span>`:''}
+            <span style="font-size:12px;color:var(--t3);margin-left:auto">${v.date}</span>
+          </div>
+        </a>`;
+      }).join('');
+      el.innerHTML=`<div class="am-sect-lbl">Recent Uploads</div>
+        <div style="padding:0 2px">${vidCards}</div>
+        ${buildViewsTrend(vids)}
+        ${buildCalendar(vids)}
+        ${buildEngTrend(vids)}
+        ${buildWordCloud(vids)}
+        ${buildDuration(vids)}`;
+    })
+    .catch(()=>{
+      const el=document.getElementById('amOvRecent');
+      if(el)el.innerHTML='<div class="am-sect-lbl">Recent Uploads</div><p style="color:var(--t3)">Could not load.</p>';
+    });
+}
+
+/* ── Tab 2: Monthly Performance ─────────────────────── */
+async function renderAmMonthly(){
+  if(!_amChannelId)return;
+  const loadEl=document.getElementById('amMonthlyLoading');
+  const contEl=document.getElementById('amMonthlyContent');
+  loadEl.style.display='flex';
+  contEl.style.display='none';
+
+  try{
+    if(!_amFullVideos){
+      const r=await fetch(`/api/channels/${_amChannelId}/videos/full`);
+      _amFullVideos=await r.json();
+    }
+    const vids=_amFullVideos;
+    if(!vids||!vids.length){
+      contEl.innerHTML='<p style="color:var(--t3);padding:24px">No video data available.</p>';
+      loadEl.style.display='none';contEl.style.display='block';return;
+    }
+
+    // Group by YYYY-MM
+    const byMonth={};
+    vids.forEach(v=>{
+      const m=v.published_at?v.published_at.slice(0,7):v.date?v.date.slice(0,7):null;
+      if(!m)return;
+      if(!byMonth[m])byMonth[m]={month:m,views:0,count:0,likes:0,comments:0};
+      byMonth[m].views+=(v.view_count||v.views_raw||0);
+      byMonth[m].count++;
+      byMonth[m].likes+=(v.like_count||0);
+      byMonth[m].comments+=(v.comment_count||0);
+    });
+    const months=Object.values(byMonth).sort((a,b)=>a.month.localeCompare(b.month));
+    if(!months.length){
+      contEl.innerHTML='<p style="color:var(--t3);padding:24px">No monthly data available.</p>';
+      loadEl.style.display='none';contEl.style.display='block';return;
+    }
+
+    const maxViews=Math.max(...months.map(m=>m.views),1);
+    const totalMonthlyViews=months.reduce((s,m)=>s+m.views,0);
+    const avgMonthlyViews=totalMonthlyViews/months.length;
+    const bestM=months.reduce((a,b)=>b.views>a.views?b:a);
+    const worstM=months.reduce((a,b)=>b.views<a.views?b:a);
+    const totalV=totalMonthlyViews;
+    const avgV=Math.round(avgMonthlyViews);
+
+    // Build SVG bar chart
+    const barW=38;
+    const gap=8;
+    const chartW=Math.max(months.length*(barW+gap),500);
+    const chartH=280;
+    const plotH=chartH-52; // reserve space for labels
+    const now=new Date();
+    const thisMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    // Average line Y position
+    const avgY=chartH-52-((avgMonthlyViews/maxViews)*plotH);
+
+    const bars=months.map((m,i)=>{
+      const h=Math.max(6,Math.round((m.views/maxViews)*plotH));
+      const x=i*(barW+gap);
+      const y=chartH-52-h;
+      const isBest=m.month===bestM.month;
+      const isCurrent=m.month===thisMonth;
+      const isHigh=m.views>avgMonthlyViews*1.25;
+      const isLow=m.views<avgMonthlyViews*0.75;
+      let fillId;
+      if(isBest) fillId='url(#barGold)';
+      else if(isCurrent) fillId='url(#barCyan)';
+      else if(isHigh) fillId='url(#barGreen)';
+      else if(isLow) fillId='url(#barRed)';
+      else fillId='url(#barSlate)';
+      const shortM=m.month.slice(5)+"\u2019"+m.month.slice(2,4);
+      const tipData=JSON.stringify({month:m.month,views:fmtN(m.views),count:m.count,likes:m.likes?fmtN(m.likes):'—'}).replace(/"/g,'&quot;');
+      return `
+        <g class="am-bar-g" data-tip="${tipData}">
+          <rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="5" fill="${fillId}"
+            style="transition:opacity .15s,filter .15s"/>
+          ${isBest?`<text x="${x+barW/2}" y="${y-8}" text-anchor="middle" font-size="10" fill="#FFD54F" font-weight="800" font-family="DM Sans">★</text>`:''}
+          ${isCurrent?`<text x="${x+barW/2}" y="${y-8}" text-anchor="middle" font-size="9" fill="#00E5FF" font-weight="700" font-family="DM Sans">NOW</text>`:''}
+          <text x="${x+barW/2}" y="${chartH-32}" text-anchor="middle" font-size="9.5" fill="rgba(186,201,204,.8)" font-family="DM Sans">${shortM}</text>
+          <text x="${x+barW/2}" y="${chartH-18}" text-anchor="middle" font-size="9" fill="rgba(132,147,150,.6)" font-family="DM Sans">${m.count}v</text>
+        </g>`;
+    }).join('');
+
+    // Recent 12 months for this-month panel
+    const thisMonthData=byMonth[thisMonth]||null;
+    const lastMonthKey=new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7);
+    const lastMonthData=byMonth[lastMonthKey]||null;
+    const momDiff=thisMonthData&&lastMonthData&&lastMonthData.views>0
+      ?Math.round(((thisMonthData.views-lastMonthData.views)/lastMonthData.views)*100):null;
+
+    contEl.innerHTML=`
+      <!-- This Month Card -->
+      <div class="am-month-summary">
+        <div class="am-ms-item">
+          <div class="am-ms-val" style="color:var(--gold)">${thisMonthData?fmtN(thisMonthData.views):'—'}</div>
+          <div class="am-ms-lbl">Views This Month</div>
+          ${momDiff!==null?`<div class="am-ms-delta" style="color:${momDiff>=0?'var(--gr)':'var(--rd)'};font-size:11px;margin-top:3px">${momDiff>=0?'+':''}${momDiff}% vs last month</div>`:''}
+        </div>
+        <div class="am-ms-item">
+          <div class="am-ms-val" style="color:var(--pr)">${thisMonthData?thisMonthData.count:0}</div>
+          <div class="am-ms-lbl">Videos This Month</div>
+        </div>
+        <div class="am-ms-item">
+          <div class="am-ms-val" style="color:var(--gr)">${fmtN(bestM.views)}</div>
+          <div class="am-ms-lbl">Best Month</div>
+          <div style="font-size:10px;color:var(--t3);margin-top:2px">${bestM.month}</div>
+        </div>
+        <div class="am-ms-item">
+          <div class="am-ms-val">${fmtN(avgV)}</div>
+          <div class="am-ms-lbl">Monthly Avg Views</div>
+        </div>
+      </div>
+
+      <!-- SVG Bar Chart -->
+      <div class="am-sep-sect">
+        <div class="am-sect-lbl">Views by Month — ${vids.length} total videos · ${months.length} months</div>
+        <div class="am-chart-scroll">
+          <svg width="${chartW}" height="${chartH}" class="am-chart" id="amMonthChart">
+            <defs>
+              <linearGradient id="barGold" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#FFD54F" stop-opacity=".9"/>
+                <stop offset="100%" stop-color="#FFD54F" stop-opacity=".45"/>
+              </linearGradient>
+              <linearGradient id="barCyan" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#00E5FF" stop-opacity=".9"/>
+                <stop offset="100%" stop-color="#00E5FF" stop-opacity=".45"/>
+              </linearGradient>
+              <linearGradient id="barGreen" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#56ffa7" stop-opacity=".85"/>
+                <stop offset="100%" stop-color="#56ffa7" stop-opacity=".35"/>
+              </linearGradient>
+              <linearGradient id="barRed" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ffb4ab" stop-opacity=".7"/>
+                <stop offset="100%" stop-color="#ffb4ab" stop-opacity=".25"/>
+              </linearGradient>
+              <linearGradient id="barSlate" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#849396" stop-opacity=".6"/>
+                <stop offset="100%" stop-color="#849396" stop-opacity=".2"/>
+              </linearGradient>
+            </defs>
+            <!-- Average reference line -->
+            <line x1="0" y1="${avgY.toFixed(1)}" x2="${chartW}" y2="${avgY.toFixed(1)}"
+              stroke="rgba(255,255,255,.2)" stroke-width="1" stroke-dasharray="4,4"/>
+            <text x="4" y="${(avgY-4).toFixed(1)}" font-size="9" fill="rgba(255,255,255,.4)" font-family="DM Sans">avg</text>
+            ${bars}
+          </svg>
+        </div>
+        <!-- Tooltip -->
+        <div id="amBarTip" style="margin-top:10px;padding:10px 16px;
+          background:var(--sf-high);border:1px solid var(--bd2);border-radius:10px;
+          opacity:0;transition:opacity .2s;pointer-events:none;
+          display:flex;align-items:center;gap:20px;flex-wrap:wrap;"></div>
+        <!-- Legend -->
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:11px;color:var(--t3)">
+          <span><span style="display:inline-block;width:10px;height:10px;background:#FFD54F;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Best month</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:#00E5FF;border-radius:2px;margin-right:4px;vertical-align:middle"></span>This month</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:#56ffa7;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Above avg</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:#ffb4ab;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Below avg</span>
+          <span style="margin-left:auto;opacity:.6">${months.length} months tracked</span>
+        </div>
+      </div>`;
+
+    loadEl.style.display='none';
+    contEl.style.display='block';
+
+    // Tooltip hover logic
+    document.querySelectorAll('.am-bar-g').forEach(g=>{
+      g.addEventListener('mouseenter',()=>{
+        const tip=document.getElementById('amBarTip');
+        if(!tip)return;
+        try{
+          const d=JSON.parse(g.dataset.tip);
+          tip.innerHTML=`
+            <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--t1)">${d.month}</span>
+            <span style="display:flex;flex-direction:column;align-items:center">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--pr)">${d.views}</span>
+              <span style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-top:1px">Views</span>
+            </span>
+            <span style="display:flex;flex-direction:column;align-items:center">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--gold)">${d.count}</span>
+              <span style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-top:1px">Video${d.count!==1?'s':''}</span>
+            </span>
+            <span style="display:flex;flex-direction:column;align-items:center">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--gr)">${d.likes}</span>
+              <span style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-top:1px">Likes</span>
+            </span>`;
+        }catch{tip.textContent=g.dataset.tip;}
+        tip.style.opacity='1';
+      });
+      g.addEventListener('mouseleave',()=>{
+        const tip=document.getElementById('amBarTip');
+        if(tip){tip.style.opacity='0';}
+      });
+    });
+  }catch(ex){
+    contEl.innerHTML=`<div class="am-err">Failed to load monthly data: ${esc(String(ex))}</div>`;
+    loadEl.style.display='none';contEl.style.display='block';
+  }
+}
+
+/* ── Tab 3: Growth Speed ────────────────────────────── */
+async function renderAmGrowth(){
+  if(!_amChannelId)return;
+  const loadEl=document.getElementById('amGrowthLoading');
+  const contEl=document.getElementById('amGrowthContent');
+  loadEl.style.display='flex';
+  contEl.style.display='none';
+
+  try{
+    if(!_amFullVideos){
+      const r=await fetch(`/api/channels/${_amChannelId}/videos/full`);
+      _amFullVideos=await r.json();
+    }
+    const vids=_amFullVideos;
+    if(!vids||!vids.length){
+      contEl.innerHTML='<p style="color:var(--t3);padding:24px">No video data available.</p>';
+      loadEl.style.display='none';contEl.style.display='block';return;
+    }
+
+    // Calculate views/day for each video
+    const withVpd=vids
+      .filter(v=>(v.published_at||v.date)&&(v.view_count||v.views_raw||0)>0)
+      .map(v=>{
+        const vpd=viewsPerDay(v.view_count||v.views_raw||0, v.published_at||v.date);
+        const daysLive=Math.max(1,Math.floor((Date.now()-new Date(v.published_at||v.date).getTime())/864e5));
+        return {...v,vpd,daysLive};
+      })
+      .sort((a,b)=>(b.vpd||0)-(a.vpd||0));
+
+    const maxVpd=Math.max(...withVpd.map(v=>v.vpd||0),1);
+    const topRows=withVpd.slice(0,50).map((v,i)=>{
+      const vpd=v.vpd||0;
+      const isHot=vpd>=1000;
+      const isGood=vpd>=200&&vpd<1000;
+      const isWeak=vpd<50;
+      const color=isHot?'var(--gr)':isGood?'var(--gold)':isWeak?'var(--rd)':'var(--t3)';
+      const badgeStyle=isHot
+        ?'background:rgba(86,255,167,.1);color:var(--gr);border:1px solid rgba(86,255,167,.25)'
+        :isGood
+        ?'background:rgba(255,213,79,.1);color:var(--gold);border:1px solid rgba(255,213,79,.25)'
+        :isWeak
+        ?'background:rgba(255,180,171,.08);color:var(--rd);border:1px solid rgba(255,180,171,.2)'
+        :'background:rgba(255,255,255,.05);color:var(--t3);border:1px solid var(--bd)';
+      const badgeTxt=isHot?'HOT':isGood?'GOOD':isWeak?'SLOW':'AVG';
+      const barPct=Math.round((vpd/maxVpd)*100);
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.03);transition:background .12s" onmouseover="this.style.background='rgba(255,255,255,.025)'" onmouseout="this.style.background=''">
+        <td style="padding:9px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3);width:28px;text-align:center">${i+1}</td>
+        <td style="padding:9px 10px;max-width:0;width:99%">
+          <a href="${esc(v.url)}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;color:var(--t1);text-decoration:none">${esc(v.title)}</a>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
+            <div style="flex:1;height:4px;background:var(--sf-highest);border-radius:2px;overflow:hidden">
+              <div style="height:100%;width:${barPct}%;background:${color};border-radius:2px;transition:width .6s"></div>
+            </div>
+          </div>
+        </td>
+        <td style="padding:9px 8px;white-space:nowrap">
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.4px;padding:3px 8px;border-radius:6px;${badgeStyle}">${badgeTxt}</span>
+        </td>
+        <td style="padding:9px 8px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:${color};white-space:nowrap">${fmtN(vpd)}<span style="font-size:9px;font-weight:400;color:var(--t3);margin-left:2px">/day</span></td>
+        <td style="padding:9px 8px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2);white-space:nowrap">${fmtN(v.view_count||v.views_raw||0)}</td>
+        <td style="padding:9px 8px;text-align:right;font-size:11px;color:var(--t3);white-space:nowrap">${v.daysLive}d old</td>
+      </tr>`;
+    }).join('');
+
+    const avgVpd=withVpd.reduce((s,v)=>s+(v.vpd||0),0)/Math.max(withVpd.length,1);
+    const hotCount=withVpd.filter(v=>(v.vpd||0)>=1000).length;
+    const goodCount=withVpd.filter(v=>(v.vpd||0)>=200&&(v.vpd||0)<1000).length;
+
+    contEl.innerHTML=`
+      <div class="am-month-summary">
+        <div class="am-ms-item"><div class="am-ms-val" style="color:var(--gr)">${hotCount}</div><div class="am-ms-lbl">🔥 Hot (&gt;1K/day)</div></div>
+        <div class="am-ms-item"><div class="am-ms-val" style="color:var(--gold)">${goodCount}</div><div class="am-ms-lbl">✅ Good (&gt;200/day)</div></div>
+        <div class="am-ms-item"><div class="am-ms-val">${fmtN(avgVpd)}</div><div class="am-ms-lbl">Avg Views/Day</div></div>
+        <div class="am-ms-item"><div class="am-ms-val">${fmtN(withVpd[0]?.vpd||0)}</div><div class="am-ms-lbl">Fastest Video</div></div>
+      </div>
+      <div class="am-sep-sect">
+        <div class="am-sect-lbl">Top 50 Videos by Growth Speed</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="border-bottom:1px solid var(--bd)">
+              <th style="padding:6px 10px;text-align:left;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">#</th>
+              <th style="padding:6px 10px;text-align:left;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Title</th>
+              <th style="padding:6px 6px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Views/Day</th>
+              <th style="padding:6px 6px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Total Views</th>
+              <th style="padding:6px 6px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Age</th>
+              <th style="padding:6px 6px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Date</th>
+            </tr></thead>
+            <tbody>${topRows}</tbody>
+          </table>
+        </div>
+      </div>`;
+    loadEl.style.display='none';contEl.style.display='block';
+  }catch(ex){
+    contEl.innerHTML=`<div class="am-err">Failed: ${esc(String(ex))}</div>`;
+    loadEl.style.display='none';contEl.style.display='block';
+  }
+}
+
+/* ── Tab 4: vs Competitors ──────────────────────────── */
+function renderAmCompare(){
+  const contEl=document.getElementById('amCompareContent');
+  if(!all.length){contEl.innerHTML='<p style="color:var(--t3);padding:24px">No channels to compare.</p>';return;}
+
+  const primary=all.find(c=>c.is_primary)||all[0];
+  const sorted=[...all].sort((a,b)=>(b.subscribers_raw||0)-(a.subscribers_raw||0));
+
+  const metrics=[
+    {key:'subscribers',     raw:'subscribers_raw',   label:'Subscribers',     fmt:v=>fmtN(v),  higher:true},
+    {key:'total_views',     raw:'total_views_raw',   label:'Total Views',     fmt:v=>fmtN(v),  higher:true},
+    {key:'avg_views',       raw:'avg_views_raw',     label:'Avg Views/Video', fmt:v=>fmtN(v),  higher:true},
+    {key:'total_videos',    raw:'total_videos_raw',  label:'Videos',          fmt:v=>fmtN(v),  higher:true},
+  ];
+
+  // Header row with channel names
+  const headCells=sorted.map(ch=>`
+    <th style="padding:10px 12px;text-align:center;min-width:100px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+        ${ch.logo_url?`<img src="${esc(ch.logo_url)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid ${ch.id===primary.id?'var(--gold)':'var(--bd2)'}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+          :`<div style="width:32px;height:32px;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">${(ch.name||'?')[0]}</div>`}
+        <div style="font-size:11px;font-weight:600;color:${ch.id===primary.id?'var(--gold)':'var(--t2)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px" title="${esc(ch.name)}">${esc(ch.name.length>12?ch.name.slice(0,12)+'…':ch.name)}</div>
+        ${ch.id===primary.id?'<span class="badge bdg-gd" style="font-size:9px">⭐ You</span>':''}
+      </div>
+    </th>`).join('');
+
+  const metricRows=metrics.map(m=>{
+    const vals=sorted.map(ch=>ch[m.raw]||0);
+    const best=Math.max(...vals);
+    const cells=sorted.map((ch,i)=>{
+      const v=ch[m.raw]||0;
+      const isBest=v===best&&best>0;
+      const isMine=ch.id===primary.id;
+      const rank=vals.filter(x=>x>v).length+1;
+      return `<td style="padding:10px 12px;text-align:center;background:${isMine?'rgba(255,213,79,.03)':'transparent'}">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${isBest?'var(--gr)':isMine?'var(--gold)':'var(--t1)'}">${m.fmt(v)}</div>
+        <div style="font-size:9px;color:var(--t3);margin-top:2px">#${rank}</div>
+        ${isBest?'<span style="font-size:9px;color:var(--gr)">▲ Best</span>':''}
+      </td>`;
+    }).join('');
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+      <td style="padding:10px 16px;font-size:12px;font-weight:600;color:var(--t2);white-space:nowrap">${m.label}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  contEl.innerHTML=`
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--bd)">
+          <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--t3)">Metric</th>
+          ${headCells}
+        </tr></thead>
+        <tbody>${metricRows}</tbody>
+      </table>
+    </div>`;
+}
+
+/* ── Tab 5: Growth Timeline ─────────────────────────── */
+async function renderAmTimeline(){
+  if(!_amChannelId)return;
+  const loadEl=document.getElementById('amTimelineLoading');
+  const contEl=document.getElementById('amTimelineContent');
+  loadEl.style.display='flex';
+  contEl.style.display='none';
+
+  try{
+    if(!_amSnapshots){
+      const r=await fetch(`/api/snapshots/${_amChannelId}`);
+      _amSnapshots=await r.json();
+    }
+    const snaps=_amSnapshots;
+
+    if(!snaps||snaps.length<2){
+      contEl.innerHTML=`
+        <div style="text-align:center;padding:48px 24px">
+          <div style="font-size:32px;margin-bottom:12px">📈</div>
+          <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:8px">Building your timeline…</div>
+          <div style="font-size:13px;color:var(--t3);line-height:1.6;max-width:320px;margin:0 auto">
+            The growth timeline needs at least 2 data points.<br>
+            Hit <strong>Refresh</strong> on your channel today, then again tomorrow — your trajectory will appear here.
+          </div>
+          ${snaps.length===1?`<div style="margin-top:16px;font-size:12px;color:var(--pr)">✅ First snapshot recorded on ${snaps[0].date}</div>`:''}
+        </div>`;
+      loadEl.style.display='none';contEl.style.display='block';return;
+    }
+
+    const sorted=[...snaps].sort((a,b)=>a.date.localeCompare(b.date));
+    const maxSubs=Math.max(...sorted.map(s=>s.subscribers||0),1);
+    const minSubs=Math.min(...sorted.map(s=>s.subscribers||0),0);
+    const rangeS=Math.max(maxSubs-minSubs,1);
+
+    const W=600,H=140,pad=32;
+    const ptSubs=sorted.map((s,i)=>{
+      const x=pad+(i/(sorted.length-1))*(W-pad*2);
+      const y=H-pad-((s.subscribers-minSubs)/rangeS)*(H-pad*2);
+      return `${x},${y}`;
+    }).join(' ');
+
+    const maxViews=Math.max(...sorted.map(s=>s.views||0),1);
+    const minViews=Math.min(...sorted.map(s=>s.views||0),0);
+    const rangeV=Math.max(maxViews-minViews,1);
+    const ptViews=sorted.map((s,i)=>{
+      const x=pad+(i/(sorted.length-1))*(W-pad*2);
+      const y=H-pad-((s.views-minViews)/rangeV)*(H-pad*2);
+      return `${x},${y}`;
+    }).join(' ');
+
+    const subsGain=(sorted[sorted.length-1].subscribers||0)-(sorted[0].subscribers||0);
+    const viewsGain=(sorted[sorted.length-1].views||0)-(sorted[0].views||0);
+    const trackingDays=Math.max(1,Math.floor((new Date(sorted[sorted.length-1].date)-new Date(sorted[0].date))/864e5)+1);
+
+    contEl.innerHTML=`
+      <div class="am-month-summary">
+        <div class="am-ms-item"><div class="am-ms-val" style="color:${subsGain>=0?'var(--gr)':'var(--rd)'}">${subsGain>=0?'+':''}${fmtN(subsGain)}</div><div class="am-ms-lbl">Subscriber Change</div></div>
+        <div class="am-ms-item"><div class="am-ms-val" style="color:${viewsGain>=0?'var(--gr)':'var(--rd)'}">${viewsGain>=0?'+':''}${fmtN(viewsGain)}</div><div class="am-ms-lbl">View Change</div></div>
+        <div class="am-ms-item"><div class="am-ms-val">${trackingDays}</div><div class="am-ms-lbl">Days Tracked</div></div>
+        <div class="am-ms-item"><div class="am-ms-val">${sorted.length}</div><div class="am-ms-lbl">Snapshots</div></div>
+      </div>
+      <div class="am-sep-sect">
+        <div class="am-sect-lbl">Subscriber Growth</div>
+        <svg width="100%" viewBox="0 0 ${W} ${H}" class="am-sparkline">
+          <defs>
+            <linearGradient id="subsFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--gold)" stop-opacity=".25"/>
+              <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <polygon points="${ptSubs} ${pad+(sorted.length-1)/(sorted.length-1)*(W-pad*2)},${H-pad} ${pad},${H-pad}" fill="url(#subsFill)"/>
+          <polyline points="${ptSubs}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          ${sorted.map((s,i)=>{
+            const x=pad+(i/(sorted.length-1))*(W-pad*2);
+            const y=H-pad-((s.subscribers-minSubs)/rangeS)*(H-pad*2);
+            return `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--gold)" stroke="var(--sf-low)" stroke-width="2"/>`;
+          }).join('')}
+          <text x="${pad}" y="${H-4}" font-size="10" fill="rgba(255,255,255,.35)">${sorted[0].date}</text>
+          <text x="${W-pad}" y="${H-4}" font-size="10" text-anchor="end" fill="rgba(255,255,255,.35)">${sorted[sorted.length-1].date}</text>
+        </svg>
+      </div>
+      <div class="am-sep-sect">
+        <div class="am-sect-lbl">Total Views Growth</div>
+        <svg width="100%" viewBox="0 0 ${W} ${H}" class="am-sparkline">
+          <defs>
+            <linearGradient id="viewsFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--pr)" stop-opacity=".2"/>
+              <stop offset="100%" stop-color="var(--pr)" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <polygon points="${ptViews} ${pad+(sorted.length-1)/(sorted.length-1)*(W-pad*2)},${H-pad} ${pad},${H-pad}" fill="url(#viewsFill)"/>
+          <polyline points="${ptViews}" fill="none" stroke="var(--pr)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          ${sorted.map((s,i)=>{
+            const x=pad+(i/(sorted.length-1))*(W-pad*2);
+            const y=H-pad-((s.views-minViews)/rangeV)*(H-pad*2);
+            return `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--pr)" stroke="var(--sf-low)" stroke-width="2"/>`;
+          }).join('')}
+          <text x="${pad}" y="${H-4}" font-size="10" fill="rgba(255,255,255,.35)">${sorted[0].date}</text>
+          <text x="${W-pad}" y="${H-4}" font-size="10" text-anchor="end" fill="rgba(255,255,255,.35)">${sorted[sorted.length-1].date}</text>
+        </svg>
+      </div>`;
+    loadEl.style.display='none';contEl.style.display='block';
+  }catch(ex){
+    contEl.innerHTML=`<div class="am-err">Failed: ${esc(String(ex))}</div>`;
+    loadEl.style.display='none';contEl.style.display='block';
+  }
+}
+
+/* ════════════════════════════════════════════════════════
    MY CHANNELS
 ════════════════════════════════════════════════════════ */
 async function renderChannels(){
@@ -669,7 +1262,6 @@ async function renderChannels(){
     </div>`;
     return;
   }
-  // Pin "My Channel" to the top; sort only competitors
   const primary=all.find(c=>c.is_primary);
   const competitors=all.filter(c=>!c.is_primary).sort((a,b)=>(b[chSort]||0)-(a[chSort]||0));
   const sortedAll=primary?[primary,...competitors]:competitors;
@@ -681,21 +1273,18 @@ async function renderChannels(){
     const cardVcount=v.view_count??v.views_raw??0;
     const cardLcount=v.like_count??0;
     const cardCcount=v.comment_count??0;
-    const vidDateStr=v.published_at||v.date;  // use ISO timestamp OR YYYY-MM-DD
+    const vidDateStr=v.published_at||v.date;
     const cardVpd=vidDateStr?viewsPerDay(cardVcount,vidDateStr):null;
     const cardHot=isHotVideo(cardVpd,chTotViews,chVidCnt);
     const cardEngRate=calcEngagementRate(cardLcount,cardCcount,cardVcount);
     const cardSubRatio=calcSubViewRatio(chSub,chTotViews);
-    const cardInactiveDays=calcInactiveDays(vidDateStr);
-    // vs avg: compare latest video views to channel all-time avg per video
     const chAvgRaw=ch.avg_views_raw??0;
     const cardVsAvg=(chAvgRaw>0&&cardVcount>0)?Math.round(((cardVcount-chAvgRaw)/chAvgRaw)*100):null;
-    // relative date for display
     const relDays=vidDateStr?Math.floor((Date.now()-new Date(vidDateStr).getTime())/(864e5)):null;
     const relDate=relDays===null?'—':relDays===0?'Today':relDays===1?'1d ago':relDays<30?`${relDays}d ago`:relDays<365?`${Math.floor(relDays/30)}mo ago`:`${Math.floor(relDays/365)}y ago`;
     return `
     <div class="ch-card ${ch.is_primary?'mine':''}" id="ctr-${esc(ch.id)}"
-      onclick="openDrawer('${esc(ch.id)}')"
+      onclick="${ch.is_primary?`openAnalyticsModal('${esc(ch.id)}')`:`openDrawer('${esc(ch.id)}')`}"
       style="animation:fadeUp .38s var(--e) ${i*.06}s both">
       <div class="cc-top">
         <div class="cc-av">
@@ -751,13 +1340,13 @@ async function renderChannels(){
       </div>
       <div class="cc-foot" style="justify-content:space-between;align-items:center">
         ${ch.last_refreshed?`<span style="font-size:10px;color:var(--t3)" title="Last refreshed">🔄 ${(()=>{const d=Math.floor((Date.now()-new Date(ch.last_refreshed).getTime())/60000);return d<2?'Just now':d<60?d+'m ago':d<1440?Math.floor(d/60)+'h ago':Math.floor(d/1440)+'d ago';})()}</span>`:'<span></span>'}
-        <button class="cc-view-link" onclick="openDrawer('${esc(ch.id)}')">
-          View details <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">arrow_forward</span>
+        <button class="cc-view-link" onclick="${ch.is_primary?`openAnalyticsModal('${esc(ch.id)}')`:`openDrawer('${esc(ch.id)}')`}">
+          ${ch.is_primary?'Full Analytics':'View details'} <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">arrow_forward</span>
         </button>
       </div>
     </div>`;
   }).join('')}</div>`;
-  enrichCards(); // fire-and-forget async enrichment (streak, best-this-month)
+  enrichCards();
 }
 
 function toggleAdd(){
@@ -772,6 +1361,7 @@ function toggleAdd(){
 }
 
 async function addCh(){
+  closeAddSuggestions();
   const q=document.getElementById('addInput').value.trim();
   if(!q){showErr('addErr','Please enter a channel name.');return;}
   hideErr('addErr');
@@ -843,14 +1433,187 @@ async function refreshAll2(){
 }
 
 /* ════════════════════════════════════════════════════════
-   SEARCH
+   SEARCH — with AUTOCOMPLETE DROPDOWN
 ════════════════════════════════════════════════════════ */
-document.getElementById('srInput').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+let _srDebounce=null;
+let _srQuotaCount=0;
+let _srQuotaReset=Date.now();
+const SR_QUOTA_MAX=10;     // max autocomplete calls per minute
+const SR_QUOTA_WINDOW=60000; // 60 seconds
+
+// Replace the existing keydown‐only listener with full keyup debounce
+document.getElementById('srInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){closeSuggestions();doSearch();}
+  if(e.key==='Escape')closeSuggestions();
+});
+
+document.getElementById('srInput').addEventListener('keyup',e=>{
+  if(['Enter','Escape','ArrowDown','ArrowUp'].includes(e.key))return;
+  const q=document.getElementById('srInput').value.trim();
+  clearTimeout(_srDebounce);
+  if(q.length<2){closeSuggestions();return;}
+  _srDebounce=setTimeout(()=>doAutocomplete(q),500);
+});
+
+document.getElementById('srInput').addEventListener('blur',()=>{
+  // Delay to allow click on suggestion row
+  setTimeout(closeSuggestions,220);
+});
+
+async function doAutocomplete(q){
+  // Quota guard: max SR_QUOTA_MAX calls per SR_QUOTA_WINDOW ms
+  const now=Date.now();
+  if(now-_srQuotaReset>SR_QUOTA_WINDOW){_srQuotaCount=0;_srQuotaReset=now;}
+  if(_srQuotaCount>=SR_QUOTA_MAX){
+    showSuggestions([],true);return;
+  }
+  _srQuotaCount++;
+
+  try{
+    const r=await fetch('/api/channels/search-suggest?q='+encodeURIComponent(q));
+    if(!r.ok){closeSuggestions();return;}
+    const items=await r.json();
+    showSuggestions(items,false);
+  }catch{
+    closeSuggestions();
+  }
+}
+
+function showSuggestions(items, rateLimited){
+  const dd=document.getElementById('srDropdown');
+  if(!dd)return;
+  if(rateLimited){
+    dd.innerHTML=`<div class="sug-msg">⚡ Too many searches — please wait a moment</div>`;
+    dd.style.display='block';return;
+  }
+  if(!items||!items.length){dd.style.display='none';return;}
+  dd.innerHTML=items.map(ch=>`
+    <div class="sug-row" onclick="selectSuggestion('${esc(ch.id)}')">
+      <div class="sug-avatar">
+        ${ch.logo_url
+          ?`<img src="${esc(ch.logo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
+          :`<div style="width:100%;height:100%;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
+      </div>
+      <div class="sug-info">
+        <div class="sug-name">${esc(ch.name)}</div>
+        <div class="sug-handle">${esc(ch.handle||'')} · ${esc(ch.subscribers)} subs</div>
+      </div>
+      <div class="sug-select">Select</div>
+    </div>`).join('');
+  dd.style.display='block';
+}
+
+async function selectSuggestion(channelId){
+  closeSuggestions();
+  // Fetch full channel by ID using channels.list (1 unit, NOT search.list which is 100 units)
+  document.getElementById('srRes').style.display='none';
+  document.getElementById('srSkel').style.display='block';
+  document.getElementById('srBtn').disabled=true;
+  try{
+    const r=await fetch('/api/channel-by-id/'+encodeURIComponent(channelId));
+    const d=await r.json();
+    if(!r.ok){showErr('srErr',d.error||'Not found.');return;}
+    renderSearch(d);
+  }catch{showErr('srErr','Network error.');}
+  finally{document.getElementById('srSkel').style.display='none';document.getElementById('srBtn').disabled=false;}
+}
+
+function closeSuggestions(){
+  const dd=document.getElementById('srDropdown');
+  if(dd)dd.style.display='none';
+}
+
+/* ════════════════════════════════════════════════════════
+   ADD CHANNEL PANEL — AUTOCOMPLETE
+════════════════════════════════════════════════════════ */
+let _addDebounce=null;
+
+// Attach listeners directly — app.js uses defer so DOM is already ready when this runs
+(function initAddAutocomplete(){
+  const inp=document.getElementById('addInput');
+  if(!inp)return;
+  inp.addEventListener('keyup',e=>{
+    if(['Enter','Escape','ArrowDown','ArrowUp'].includes(e.key)){if(e.key==='Escape')closeAddSuggestions();return;}
+    const q=inp.value.trim();
+    clearTimeout(_addDebounce);
+    if(q.length<2){closeAddSuggestions();return;}
+    _addDebounce=setTimeout(()=>doAddAutocomplete(q),380);
+  });
+  inp.addEventListener('blur',()=>setTimeout(closeAddSuggestions,220));
+})();
+
+async function doAddAutocomplete(q){
+  // Reuse the same quota guard as the search page
+  const now=Date.now();
+  if(now-_srQuotaReset>SR_QUOTA_WINDOW){_srQuotaCount=0;_srQuotaReset=now;}
+  if(_srQuotaCount>=SR_QUOTA_MAX){showAddSuggestions([],true);return;}
+  _srQuotaCount++;
+  try{
+    const r=await fetch('/api/channels/search-suggest?q='+encodeURIComponent(q));
+    if(!r.ok){closeAddSuggestions();return;}
+    const items=await r.json();
+    showAddSuggestions(items,false);
+  }catch{closeAddSuggestions();}
+}
+
+function showAddSuggestions(items,rateLimited){
+  const dd=document.getElementById('addDropdown');
+  if(!dd)return;
+  if(rateLimited){
+    dd.innerHTML=`<div class="sug-msg">⚡ Too many searches — please wait</div>`;
+    dd.style.display='block';return;
+  }
+  if(!items||!items.length){dd.style.display='none';return;}
+  dd.innerHTML=items.map(ch=>`
+    <div class="sug-row" onclick="selectAddSuggestion('${esc(ch.id)}','${esc(ch.name)}')">
+      <div class="sug-avatar">
+        ${ch.logo_url
+          ?`<img src="${esc(ch.logo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
+          :`<div style="width:100%;height:100%;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
+      </div>
+      <div class="sug-info">
+        <div class="sug-name">${esc(ch.name)}</div>
+        <div class="sug-handle">${esc(ch.handle||'')} · ${esc(ch.subscribers)} subs</div>
+      </div>
+      <div class="sug-select">+ Add</div>
+    </div>`).join('');
+  dd.style.display='block';
+}
+
+async function selectAddSuggestion(channelId, channelName){
+  closeAddSuggestions();
+  const inp=document.getElementById('addInput');
+  if(inp)inp.value=channelName||channelId;
+  hideErr('addErr');
+  const btn=document.getElementById('addBtn');
+  if(btn){btn.disabled=true;btn.textContent='Adding…';}
+  try{
+    const r=await fetch('/api/channels/add',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({channel_id:channelId})
+    });
+    const res=await r.json();
+    if(r.status===409){showErr('addErr','Already in your list.');return;}
+    if(!r.ok){showErr('addErr',res.error||'Could not add.');return;}
+    if(inp)inp.value='';
+    toggleAdd();
+    await renderChannels();
+    toast('Channel added!','s');
+  }catch{showErr('addErr','Network error.');}
+  finally{if(btn){btn.disabled=false;btn.textContent='Add';}}
+}
+
+function closeAddSuggestions(){
+  const dd=document.getElementById('addDropdown');
+  if(dd)dd.style.display='none';
+}
 
 async function doSearch(){
   const q=document.getElementById('srInput').value.trim();
   if(!q){showErr('srErr','Please enter a channel name.');return;}
   hideErr('srErr');
+  closeSuggestions();
   document.getElementById('srRes').style.display='none';
   document.getElementById('srRes').innerHTML='';
   document.getElementById('srSkel').style.display='block';
@@ -923,7 +1686,6 @@ async function toggleSave(d){
   }else{
     if(btn){btn.disabled=true;btn.textContent='Adding…';}
     try{
-      // Add by channel_id directly for accuracy (avoids name mismatch)
       const r=await fetch('/api/channels/add',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -939,9 +1701,8 @@ async function toggleSave(d){
   }
 }
 
-/* ══ Export CSV ══════════════════════════════════════════════ */
+/* ══ Export CSV ══════════════════════════════════════ */
 function exportCSV(){
-  // Use server endpoint for clean CSV
   const a=document.createElement('a');
   a.href='/api/export/csv';
   a.download='yt_tracker_channels.csv';
@@ -949,13 +1710,13 @@ function exportCSV(){
   toast('Exporting CSV…','s');
 }
 
-/* ══ Sort Channels (My Channels page) ══════════════════════════ */
+/* ══ Sort Channels ══════════════════════════════════ */
 function setChSort(f){
   chSort=f;
   renderChannels();
 }
 
-/* ── Init ─────────────────────────────────────────────── */
+/* ── Init ─────────────────────────────────────────── */
 (async()=>{
   await fetchAll();
   renderDash();
