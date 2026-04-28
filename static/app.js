@@ -323,6 +323,7 @@ function buildLB(primary,comps){
       </div>
       <div class="lb-num ${mine?'hi':''}">${esc(dispV)}</div>
       <div class="lb-num lo">${esc(ch[fld2])}</div>
+      <div class="lb-upload" style="font-size:11px;color:var(--t3);text-align:right;white-space:nowrap">${ch.video?.date ? ch.video.date : '—'}</div>
       <div class="lb-arr">›</div>
     </div>`;
   });
@@ -340,7 +341,7 @@ function buildLB(primary,comps){
     <div class="lb-head">
       <span class="lh">#</span><span class="lh" style="text-align:left">Channel</span>
       <span class="lh">Bar</span><span class="lh">${lbl}</span>
-      <span class="lh">${lbl2}</span><span class="lh"></span>
+      <span class="lh">${lbl2}</span><span class="lh">Last Upload</span><span class="lh"></span>
     </div>
     ${rows}
   </div>`;
@@ -492,6 +493,33 @@ async function enrichCards(){
       if(!card)return;
       const sorted=[...vids].sort((a,b)=>new Date(b.published_at||b.date)-new Date(a.published_at||a.date));
 
+      // Add sparkline bars
+      const sparkEl = document.getElementById('cc-spark-'+ch.id);
+      if(sparkEl && vids.length >= 2){
+        const last8 = [...vids]
+          .sort((a,b) => new Date(a.published_at||a.date) - new Date(b.published_at||b.date))
+          .slice(-8);
+        const maxV = Math.max(...last8.map(v => v.view_count ?? v.views_raw ?? 0), 1);
+        sparkEl.innerHTML = last8.map(v => {
+          const vc = v.view_count ?? v.views_raw ?? 0;
+          const pct = Math.max(8, Math.round((vc/maxV)*100));
+          const c = vc >= (maxV*0.7) ? 'var(--pr)' : 'var(--t3)';
+          return `<div class="cc-spark-bar" style="height:${pct}%;background:${c}" title="${v.views||vc} views"></div>`;
+        }).join('');
+      }
+
+      // Fill engagement rate
+      const recent5 = vids.slice(0,5);
+      const avgEng = recent5.reduce((sum,v) => {
+        const r = calcEngagementRate(v.like_count??0, v.comment_count??0, v.view_count??v.views_raw??0);
+        return sum + (r ?? 0);
+      }, 0) / recent5.length;
+      const engEl = document.getElementById('cc-eng-'+ch.id);
+      if(engEl && avgEng > 0){
+        engEl.textContent = avgEng.toFixed(1)+'%';
+        engEl.style.color = avgEng >= 4 ? 'var(--gr)' : avgEng >= 2 ? 'var(--gold)' : 'var(--rd)';
+      }
+
       let streak=0,lastW=-1;
       for(const v of sorted){
         const wa=Math.floor((now-new Date(v.published_at||v.date).getTime())/(7*864e5));
@@ -556,13 +584,31 @@ function openDrawer(id){
         </div>
       </div>
     </div>
-    <div class="drw-sg">
-      <div class="drw-st"><div class="drw-stv" style="color:var(--gold)">${esc(ch.subscribers)}</div><div class="drw-stl">Subscribers</div></div>
-      <div class="drw-st"><div class="drw-stv">${esc(ch.total_views)}</div><div class="drw-stl">Views</div></div>
-      <div class="drw-st"><div class="drw-stv" style="color:var(--pr)">${esc(ch.total_videos)}</div><div class="drw-stl">Videos</div></div>
-      <div class="drw-st"><div class="drw-stv" style="color:var(--gr)">${esc(ch.avg_views)}</div><div class="drw-stl">Avg Views</div></div>
-      <div class="drw-st"><div class="drw-stv" id="drwSubRatio" style="color:var(--t3)">—</div><div class="drw-stl">Audience</div></div>
-      <div class="drw-st"><div class="drw-stv" id="drwRecentVsAvg" style="color:var(--t3)">—</div><div class="drw-stl">vs ch avg</div></div>
+    <div class="drw-bento">
+      <div class="drw-bento-main" style="color:var(--gold)">
+        <div class="drw-bento-lbl">Subscribers</div>
+        <div class="drw-bento-val">${esc(ch.subscribers)}</div>
+      </div>
+      <div class="drw-bento-cell">
+        <div class="drw-bento-lbl">Total Views</div>
+        <div class="drw-bento-val">${esc(ch.total_views)}</div>
+      </div>
+      <div class="drw-bento-cell">
+        <div class="drw-bento-lbl">Videos</div>
+        <div class="drw-bento-val" style="color:var(--pr)">${esc(ch.total_videos)}</div>
+      </div>
+      <div class="drw-bento-cell">
+        <div class="drw-bento-lbl">Avg Views</div>
+        <div class="drw-bento-val" style="color:var(--gr)">${esc(ch.avg_views)}</div>
+      </div>
+      <div class="drw-bento-cell">
+        <div class="drw-bento-lbl">Audience</div>
+        <div class="drw-bento-val" id="drwSubRatio" style="color:var(--t3)">—</div>
+      </div>
+      <div class="drw-bento-cell">
+        <div class="drw-bento-lbl">vs ch avg</div>
+        <div class="drw-bento-val" id="drwRecentVsAvg" style="color:var(--t3)">—</div>
+      </div>
     </div>
     ${ch.description?`
     <div class="drw-sect">
@@ -625,15 +671,13 @@ function openDrawer(id){
         const eng=calcEngagementRate(vLc,vCc,vVc);
         const isBest=ri===bestIdx,isWorst=ri===worstIdx&&worstIdx!==bestIdx;
         const engC=eng===null?'var(--t3)':eng>=4?'var(--gr)':eng>=2?'var(--gold)':'var(--rd)';
-        return `<a href="${esc(v.url)}" target="_blank" rel="noopener"
-          style="display:block;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05);text-decoration:none;color:inherit">
-          ${isBest?'<div style="font-size:9px;font-weight:800;color:var(--gr);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">🏆 BEST</div>':''}
-          ${isWorst?'<div style="font-size:9px;font-weight:800;color:var(--rd);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">📉 LOWEST</div>':''}
-          <div style="font-size:13px;font-weight:600;line-height:1.42;color:var(--t1);margin-bottom:7px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(v.title)}</div>
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:var(--pr)">👁 ${esc(v.views)}</span>
-            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--t2)">👍 ${esc(v.likes)}</span>
-            ${eng!==null?`<span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${engC};background:rgba(255,255,255,.05);padding:2px 7px;border-radius:5px">${eng}%</span>`:''}
+        return `<a href="${esc(v.url)}" target="_blank" rel="noopener" class="drw-vid-row">
+          ${isBest?'<span class="drw-vid-badge best">🏆 BEST</span>':''}
+          <div class="drw-vid-title">${esc(v.title)}</div>
+          <div class="drw-vid-meta">
+            <span style="font-family:'JetBrains Mono',monospace;color:var(--pr);font-size:12px;font-weight:700">👁 ${esc(v.views)}</span>
+            <span style="font-family:'JetBrains Mono',monospace;color:var(--t2);font-size:12px">👍 ${esc(v.likes)}</span>
+            ${eng!==null?`<span class="drw-vid-eng" style="color:${engC}">${eng}%</span>`:''}
             <span style="font-size:11px;color:var(--t3);margin-left:auto">${v.date}</span>
           </div>
         </a>`;
@@ -717,13 +761,32 @@ function renderAmOverview(ch){
   panel.innerHTML=`
     <div class="am-overview-grid">
       <!-- Stats row -->
-      <div class="am-stat-row">
-        <div class="am-stat am-stat-gold"><div class="am-stat-val">${esc(ch.subscribers)}</div><div class="am-stat-lbl">Subscribers</div></div>
-        <div class="am-stat"><div class="am-stat-val">${esc(ch.total_views)}</div><div class="am-stat-lbl">Total Views</div></div>
-        <div class="am-stat am-stat-cyan"><div class="am-stat-val">${esc(ch.total_videos)}</div><div class="am-stat-lbl">Videos</div></div>
-        <div class="am-stat am-stat-green"><div class="am-stat-val">${esc(ch.avg_views)}</div><div class="am-stat-lbl">Avg Views/Video</div></div>
-        <div class="am-stat" style="${subViewRatioColor(subRatio)}"><div class="am-stat-val">${subRatio!==null?subRatio+'%':'—'}</div><div class="am-stat-lbl">Audience %</div></div>
-        ${ch.created?`<div class="am-stat"><div class="am-stat-val" style="font-size:14px">${ch.created}</div><div class="am-stat-lbl">Channel Since</div></div>`:''}
+      <div class="am-bento-grid">
+        <div class="am-bento-hero">
+          <div class="am-bento-lbl">Subscribers</div>
+          <div class="am-bento-val gold">${esc(ch.subscribers)}</div>
+        </div>
+        <div class="am-bento-cell">
+          <div class="am-bento-lbl">Total Views</div>
+          <div class="am-bento-val">${esc(ch.total_views)}</div>
+        </div>
+        <div class="am-bento-cell">
+          <div class="am-bento-lbl">Videos</div>
+          <div class="am-bento-val cyan">${esc(ch.total_videos)}</div>
+        </div>
+        <div class="am-bento-cell">
+          <div class="am-bento-lbl">Avg Views/Video</div>
+          <div class="am-bento-val green">${esc(ch.avg_views)}</div>
+        </div>
+        <div class="am-bento-cell" style="${subViewRatioColor(subRatio)}">
+          <div class="am-bento-lbl">Audience %</div>
+          <div class="am-bento-val">${subRatio!==null?subRatio+'%':'—'}</div>
+        </div>
+        ${ch.created?`
+        <div class="am-bento-cell">
+          <div class="am-bento-lbl">Channel Since</div>
+          <div class="am-bento-val" style="font-size:13px">${ch.created}</div>
+        </div>`:''}
       </div>
 
       ${ch.description?`
@@ -1262,7 +1325,32 @@ async function renderAmTimeline(){
 /* ════════════════════════════════════════════════════════
    MY CHANNELS
 ════════════════════════════════════════════════════════ */
+function renderChannelSkeletons(n=6){
+  const tbl = document.getElementById('chTbl');
+  if(!tbl) return;
+  tbl.innerHTML = `<div class="ch-grid">${
+    Array.from({length: n}, () => `
+      <div class="ch-card-skel">
+        <div class="sk ch-skel-av"></div>
+        <div class="ch-skel-lines">
+          <div class="sk" style="height:14px;width:55%"></div>
+          <div class="sk" style="height:10px;width:35%"></div>
+        </div>
+        <div class="sk ch-skel-num"></div>
+      </div>`).join('')
+  }</div>`;
+}
+
+function handleCardClick(event, channelId){
+  if(event.target.closest('.cc-acts') || event.target.closest('.cc-expand-vid') || event.target.closest('.cc-view-link')) return;
+  const ch = all.find(c => c.id === channelId);
+  if(!ch) return;
+  if(ch.is_primary) openAnalyticsModal(channelId);
+  else openDrawer(channelId);
+}
+
 async function renderChannels(){
+  renderChannelSkeletons(all.length || 6);
   await fetchAll();
   const el=document.getElementById('chTbl');
   const cnt=document.getElementById('chCntLbl');
@@ -1279,86 +1367,120 @@ async function renderChannels(){
   const primary=all.find(c=>c.is_primary);
   const competitors=all.filter(c=>!c.is_primary).sort((a,b)=>(b[chSort]||0)-(a[chSort]||0));
   const sortedAll=primary?[primary,...competitors]:competitors;
-  el.innerHTML=`<div class="ch-grid">${sortedAll.map((ch,i)=>{
-    const v=ch.video||{};
-    const chSub=ch.subscriber_count??ch.subscribers_raw??0;
-    const chVidCnt=ch.video_count??ch.total_videos_raw??0;
-    const chTotViews=ch.total_views_raw??0;
-    const cardVcount=v.view_count??v.views_raw??0;
-    const cardLcount=v.like_count??0;
-    const cardCcount=v.comment_count??0;
-    const vidDateStr=v.published_at||v.date;
+  el.innerHTML=`<div class="ch-grid">${sortedAll.map((ch,index)=>{
+    const isMine=ch.is_primary;
+    
+    // Determine status indicator color
+    const daysSinceUpload = ch.video?.date 
+      ? Math.floor((Date.now() - new Date(ch.video.date).getTime()) / 864e5)
+      : 999;
+
+    const isStale = daysSinceUpload > 30;
+    
+    const recentVideos = typeof _enrichCache !== 'undefined' ? _enrichCache[ch.id]?.vids || [] : [];
+    const vsAvgDiff = calcRecentVsAvg(recentVideos, ch.total_views_raw, ch.total_videos_raw);
+
+    let statusClass = 'status-neutral';
+    if (isStale) statusClass = 'status-stale';
+    else if (vsAvgDiff !== null && vsAvgDiff > 10) statusClass = 'status-growing';
+    else if (vsAvgDiff !== null && vsAvgDiff < -10) statusClass = 'status-declining';
+
+    const cardVcount=ch.video?.view_count??ch.video?.views_raw??0;
+    const vidDateStr=ch.video?.published_at||ch.video?.date;
     const cardVpd=vidDateStr?viewsPerDay(cardVcount,vidDateStr):null;
-    const cardHot=isHotVideo(cardVpd,chTotViews,chVidCnt);
-    const cardEngRate=calcEngagementRate(cardLcount,cardCcount,cardVcount);
-    const cardSubRatio=calcSubViewRatio(chSub,chTotViews);
-    const chAvgRaw=ch.avg_views_raw??0;
-    const cardVsAvg=(chAvgRaw>0&&cardVcount>0)?Math.round(((cardVcount-chAvgRaw)/chAvgRaw)*100):null;
-    const relDays=vidDateStr?Math.floor((Date.now()-new Date(vidDateStr).getTime())/(864e5)):null;
-    const relDate=relDays===null?'—':relDays===0?'Today':relDays===1?'1d ago':relDays<30?`${relDays}d ago`:relDays<365?`${Math.floor(relDays/30)}mo ago`:`${Math.floor(relDays/365)}y ago`;
+    const vpdDisplay = cardVpd ? fmtN(cardVpd) : '—';
+
     return `
-    <div class="ch-card ${ch.is_primary?'mine':''}" id="ctr-${esc(ch.id)}"
-      onclick="${ch.is_primary?`openAnalyticsModal('${esc(ch.id)}')`:`openDrawer('${esc(ch.id)}')`}"
-      style="animation:fadeUp .38s var(--e) ${i*.06}s both">
-      <div class="cc-top">
-        <div class="cc-av">
-          ${ch.logo_url
-            ?`<img class="cc-logo" src="${esc(ch.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`
-            :`<div class="cc-logo-fb">${(ch.name||'?')[0].toUpperCase()}</div>`}
-          ${ch.is_primary?'<div class="cc-crown">⭐</div>':''}
+<div class="ch-card au ${isMine?'mine':''} ${isStale?'stale':''}"
+     id="ctr-${esc(ch.id)}"
+     onclick="handleCardClick(event,'${esc(ch.id)}')"
+     style="animation-delay:${index * 0.05}s">
+
+  <!-- STATUS INDICATOR BAR -->
+  <div class="cc-status-bar ${statusClass}"></div>
+
+  <!-- MAIN ROW -->
+  <div class="cc-row">
+    <div class="cc-av">
+      <div class="cc-logo-wrap">
+        ${ch.logo_url
+          ?`<img class="cc-logo" src="${esc(ch.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+          :`<div class="cc-logo-fb">${(ch.name||'?')[0].toUpperCase()}</div>`}
+        ${isMine ? '<div class="cc-crown">⭐</div>' : ''}
+      </div>
+    </div>
+
+    <div class="cc-ident">
+      <div class="cc-name">${esc(ch.name)}</div>
+      <div class="cc-handle">${esc(ch.handle||'')}</div>
+      <div class="cc-tags">
+        ${isMine ? '<span class="badge bdg-gd">My Channel</span>' : '<span class="badge bdg-dim">Competitor</span>'}
+        ${ch.country ? `<span class="badge bdg-dim">${esc(ch.country)}</span>` : ''}
+        <span id="cc-streak-${esc(ch.id)}" class="badge" style="display:none"></span>
+      </div>
+    </div>
+
+    <div class="cc-primary-metric">
+      <div class="cc-pm-val gold">${esc(ch.subscribers)}</div>
+      <div class="cc-pm-lbl">subscribers</div>
+    </div>
+
+    <div class="cc-secondary-metrics">
+      <div class="cc-sm-item">
+        <span class="cc-sm-val">${esc(ch.avg_views)}</span>
+        <span class="cc-sm-lbl">avg views</span>
+      </div>
+      <div class="cc-sm-item">
+        <span class="cc-sm-val">${esc(ch.total_videos)}</span>
+        <span class="cc-sm-lbl">videos</span>
+      </div>
+    </div>
+
+    <div class="cc-acts" onclick="event.stopPropagation()">
+      ${!isMine?`<button class="cc-act gold" title="Set as mine" onclick="setPrimary('${esc(ch.id)}')">star</button>`:''}
+      <button class="cc-act" title="Refresh" onclick="ref1('${esc(ch.id)}')">refresh</button>
+      <button class="cc-act danger" title="Remove" onclick="rmCh('${esc(ch.id)}')">delete</button>
+    </div>
+  </div>
+
+  <!-- HOVER EXPANSION -->
+  <div class="cc-expand">
+    <div class="cc-expand-inner">
+      <div class="cc-sparkline" id="cc-spark-${esc(ch.id)}"></div>
+
+      <div class="cc-expand-metrics">
+        <div class="cc-em-item">
+          <span class="cc-em-val">${vpdDisplay}</span>
+          <span class="cc-em-lbl">views/day</span>
         </div>
-        <div class="cc-ident">
-          <div class="cc-name">${esc(ch.name)}</div>
-          ${ch.handle?`<div class="cc-handle">${esc(ch.handle)}</div>`:''}
-          <div class="cc-tags">
-            ${ch.is_primary?'<span class="badge bdg-gd">⭐ My Channel</span>':'<span class="badge bdg-dim">Competitor</span>'}
-            ${ch.country?`<span class="badge bdg-dim">${esc(ch.country)}</span>`:''}
-            ${cardHot?'<span class="badge bdg-rd">🔥 Hot</span>':''}
-            <span class="badge" id="cc-streak-${esc(ch.id)}" style="display:none"></span>
-          </div>
+        <div class="cc-em-item">
+          <span class="cc-em-val" id="cc-eng-${esc(ch.id)}" style="color:var(--t3)">—</span>
+          <span class="cc-em-lbl">engagement</span>
         </div>
-        <div class="cc-acts" onclick="event.stopPropagation()">
-          ${!ch.is_primary?`<button class="cc-act gold" onclick="setPrimary('${esc(ch.id)}')" title="Set as My Channel">star</button>`:''}
-          <button class="cc-act" id="ref-${esc(ch.id)}" onclick="ref1('${esc(ch.id)}')" title="Refresh">refresh</button>
-          <button class="cc-act danger" onclick="rmCh('${esc(ch.id)}')" title="Remove">delete</button>
+        <div class="cc-em-item">
+          <span class="cc-em-val" id="cc-lastup-${esc(ch.id)}">${daysSinceUpload === 999 ? '—' : daysSinceUpload === 0 ? 'Today' : daysSinceUpload + 'd ago'}</span>
+          <span class="cc-em-lbl">last upload</span>
         </div>
       </div>
-      <div class="cc-stats">
-        <div class="cc-sb"><div class="cc-sb-lbl">Subscribers</div><div class="cc-sb-val gold">${esc(ch.subscribers)}</div></div>
-        <div class="cc-sb"><div class="cc-sb-lbl">Audience</div><div class="cc-sb-val" style="${subViewRatioColor(cardSubRatio)}">${cardSubRatio!==null?cardSubRatio+'%':'—'}</div></div>
-        <div class="cc-sb"><div class="cc-sb-lbl">Videos</div><div class="cc-sb-val cyan">${esc(ch.total_videos)}</div></div>
-      </div>
-      ${v.title?`
-      <div class="cc-vid" onclick="event.stopPropagation();window.open('${esc(v.url)}','_blank')">
-        <img class="cc-vthumb" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
-        <div class="cc-vinfo">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
-            <div class="cc-vlbl">Latest Upload</div>
-            <div style="font-size:10px;color:var(--t3)">${relDate}</div>
-          </div>
-          <div class="cc-vtitle">${esc(v.title)}</div>
-          <div class="cc-vfoot">
-            <div class="cc-vnum"><span class="cc-vnum-v">${esc(v.views)}</span><span class="cc-vnum-l">Views</span></div>
-            <div class="cc-vnum"><span class="cc-vnum-v">${esc(v.likes)}</span><span class="cc-vnum-l">Likes</span></div>
-            <div class="cc-vnum"><span class="cc-vnum-v">${esc(v.comments||'0')}</span><span class="cc-vnum-l">Cmts</span></div>
-            ${cardEngRate!==null?`<div class="cc-eng" style="${engagementColor(cardEngRate)}">${cardEngRate}% eng</div>`:''}
-          </div>
-          <div id="cc-best-${esc(ch.id)}"></div>
+
+      ${ch.video && ch.video.title ? `
+      <div class="cc-expand-vid" onclick="event.stopPropagation();window.open('${esc(ch.video.url)}','_blank')">
+        <img class="cc-expand-thumb" src="${esc(ch.video.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
+        <div class="cc-expand-vid-info">
+          <div class="cc-expand-vid-title">${esc(ch.video.title)}</div>
+          <div class="cc-expand-vid-meta">👁 ${esc(ch.video.views)} · ${ch.video.date||''}</div>
         </div>
-      </div>`:''}
-      <div class="cc-metrics">
-        <div class="cc-met"><div class="cc-met-lbl">Last Upload</div><div class="cc-met-val">${relDate}</div></div>
-        <div class="cc-met"><div class="cc-met-lbl">Avg Views</div><div class="cc-met-val">${esc(ch.avg_views)||'—'}</div></div>
-        <div class="cc-met"><div class="cc-met-lbl">Views/Day</div><div class="cc-met-val" style="${cardVpd&&cardVpd>1000?'color:var(--pr)':''}">${cardVpd?fmtN(cardVpd):'—'}</div></div>
-        <div class="cc-met"><div class="cc-met-lbl">vs Avg</div><div class="cc-met-val" style="${cardVsAvg!==null?(cardVsAvg>10?'color:var(--gr)':cardVsAvg<-10?'color:var(--rd)':'color:var(--t3)'):'color:var(--t3)'}">${cardVsAvg!==null?(cardVsAvg>-10&&cardVsAvg<10?'~avg':cardVsAvg>0?'+'+cardVsAvg+'%':cardVsAvg+'%'):'—'}</div></div>
-      </div>
-      <div class="cc-foot" style="justify-content:space-between;align-items:center">
-        ${ch.last_refreshed?`<span style="font-size:10px;color:var(--t3)" title="Last refreshed">🔄 ${(()=>{const d=Math.floor((Date.now()-new Date(ch.last_refreshed).getTime())/60000);return d<2?'Just now':d<60?d+'m ago':d<1440?Math.floor(d/60)+'h ago':Math.floor(d/1440)+'d ago';})()}</span>`:'<span></span>'}
-        <button class="cc-view-link" onclick="${ch.is_primary?`openAnalyticsModal('${esc(ch.id)}')`:`openDrawer('${esc(ch.id)}')`}">
-          ${ch.is_primary?'Full Analytics':'View details'} <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">arrow_forward</span>
-        </button>
-      </div>
-    </div>`;
+      </div>` : ''}
+
+      <div id="cc-best-${esc(ch.id)}"></div>
+
+      <button class="cc-view-link" onclick="event.stopPropagation();${isMine?`openAnalyticsModal('${esc(ch.id)}')`:`openDrawer('${esc(ch.id)}')`}">
+        ${isMine ? 'Full Analytics' : 'View Details'} <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+
+</div>`;
   }).join('')}</div>`;
   enrichCards();
 }

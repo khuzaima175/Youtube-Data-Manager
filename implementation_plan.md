@@ -1,536 +1,1255 @@
-# YTTracker — Phase 2 Full Implementation Plan
+# YT Tracker — Pure UI & Design Upgrade Plan
+## "Terminal Luxe" Aesthetic Direction
 
-## Overview
-
-This plan covers every requested feature upgrade across **seven areas**:
-1. **My Channel Deep Analytics** — expanded dashboard with 5-tab modal
-2. **Real-time Search Autocomplete** — live dropdown as you type
-3. **API Quota Management & Caching** — keep the free tier sustainable
-4. **Growth & Multi-channel Insights** — month-wise data, video growth speed
-5. **Supabase Integration** — cloud database replacing JSON files (since this is for your friend)
-6. **Vercel Deployment** — host it publicly so your friend can access it from anywhere
-7. **YouTube Analytics API (OAuth)** — unlock private studio data (watch time, CTR, impressions)
-8. **Gemini AI Chat** — ask questions about your channel data in natural language
+> **Design philosophy**: Think Bloomberg Terminal meets Linear.app. Every number is data, every pixel earns its place. Dark, dense, precise — but with moments of unexpected color that feel earned, not decorative. The vibe is "a senior engineer built this for themselves and it happens to look incredible."
 
 ---
 
-## 📊 YouTube API v3 Free Tier — Honest Assessment
+## Section 0 — Design Tokens (CSS Variables Update)
 
-| Operation | Cost (units) | Your Current Usage |
-|---|---|---|
-| `search.list` (search by name) | **100 units** | Used when adding a channel by name |
-| `channels.list` | **1 unit** | Used everywhere — very cheap |
-| `playlistItems.list` | **1 unit** | Used for latest video / recent videos |
-| `videos.list` | **1 unit** | Used for video stats |
-| **Daily budget** | **10,000 units** | Resets midnight Pacific time |
+These are the foundation. Replace the existing `:root` block entirely in `style.css`.
 
-### Current Cost Per Full Refresh (1 channel)
-- `channels.list` = 1
-- `playlistItems.list` = 1
-- `videos.list` = 1
-- **Total ≈ 3 units/channel**
-
-With 5 channels → **~15 units for a full refresh**. You can do ~660 full refreshes/day. Even with autocomplete search (100 units per typed query), 50 typed searches = 5,000 units — still within budget.
-
-### ⚠️ Quota Risk Areas
-- **Real-time autocomplete search**: If every keystroke fires `search.list`, you burn 100 units per character. **Must debounce** (500ms minimum) and use `channels.list?forHandle=@username` (1 unit) when the user types an `@handle`.
-- **Historical monthly data**: The API does NOT provide historical view-count timeseries. You must **store snapshots** yourself to compute month-over-month growth.
-- **Video upload dates by month**: Only available for videos you fetch. To get all 465 CADable videos with dates, you'd need ~50+ page calls to the uploads playlist (max 50 items/page) = ~50 units total. Very feasible.
-
-### ✅ Verdict: Free Tier Is Enough — With Smart Caching
-You do **not** need Supabase or a paid database for current scale (5 channels, personal use). The right approach is:
-
-- **Server-side in-memory cache** (already partially done with `_enrichCache` client-side)
-- **Persistent JSON snapshot store** for monthly growth data (no DB needed)
-- **Supabase is optional** — only worth it if you want: multi-device sync, data history going back months, or sharing with a team
-
----
-
-## 🗺️ Feature Breakdown
-
----
-
-## Feature 1 — My Channel Deep-Dive Analytics (Dashboard → "More Details")
-
-### What It Adds
-Clicking the CADable hero card opens a **full-screen analytics modal** (replacing the existing side drawer for your own channel) with 5 tabs:
-
-#### Tab 1: Overview
-All existing drawer content — stats, latest video, description, etc.
-
-#### Tab 2: Monthly Performance 📅
-- Fetch all videos (paginated, up to 500) and group by `publishedAt` month
-- Render an **SVG bar chart** (no external libraries) — each bar = one calendar month, height = total views in that month
-- Shows: best month 🏆, worst month 📉, YoY trend arrow
-- Add a channel selector so you can toggle between your channel and competitors
-- Reveals seasonality (e.g., "June always slower for CAD content")
-
-#### Tab 3: Video Growth Speed 🚀
-- All recent videos sorted by **views per day since upload**
-- Color-coded rows: 🔥 >1K/day · ✅ >200/day · ⚠️ <50/day
-- Columns: Thumbnail, Title, Days Live, Total Views, Views/Day, Trend
-- This is the single best indicator of which content is resonating RIGHT NOW
-
-#### Tab 4: vs. Competitors 📊
-- Side-by-side comparison table for all tracked channels
-- Metrics: Subscribers, Avg Views, Engagement Rate, Views/Day (latest), Upload Frequency, Audience %
-- Your channel row is highlighted gold
-- Each metric shows your rank position (1st, 2nd, etc.)
-
-#### Tab 5: Growth Timeline 📈
-- Line chart showing subscriber & total-view growth over time
-- Powered by `snapshots.json` — a new daily snapshot file
-- Shows "Tracking since April 20" with data points accumulating daily
-- After a week you'll see a real trend line
-
----
-
-## Feature 2 — Real-Time Search Autocomplete Dropdown
-
-### What It Adds
-As you type "mr beast" in the Search box, a dropdown instantly appears beneath the input showing up to **5 channel suggestions**:
-
-```
-┌─────────────────────────────────────────┐
-│ [avatar] MrBeast           102M subs  [Select] │
-│ [avatar] MrBeast Gaming     42M subs  [Select] │
-│ [avatar] MrBeast2           14M subs  [Select] │
-└─────────────────────────────────────────┘
-```
-
-Clicking **Select** immediately loads that channel's full details card below — no Enter press needed.
-
-### How It Works (Quota-Safe)
-- **500ms debounce** on `keyup` — only fires after you stop typing for half a second
-- Skip queries ≤ 2 characters to avoid thrashing
-- Calls `/api/channels/search-suggest?q=...` → backend calls `search.list(maxResults=5)` = **100 units**
-- Clicking a suggestion fetches by Channel ID using `channels.list` = **1 unit** (not another search.list)
-- **Quota guard**: if user does >8 autocomplete searches in 60 seconds, pause with a friendly message
-
-### Special case: `@handle` input
-If the user types `@cadable` (starts with `@`), use `channels.list?forHandle=@cadable` instead of `search.list` — costs only **1 unit** and is exact.
-
----
-
-## Feature 3 — Caching Layer (Server-Side)
-
-### 3A. `/api/channels/<id>/videos` — Add TTL Cache (15 min)
-```python
-_video_cache = {}  # { channel_id: { "data": [...], "ts": float } }
-VIDEO_CACHE_TTL = 15 * 60  # 15 minutes
-```
-If cached data is fresh, return instantly (0 API units). Only re-fetch after TTL.
-
-### 3B. New: `/api/channels/<id>/videos/full` — Paginated Full Fetch (4hr cache)
-Fetches ALL videos (up to 500) by paginating the uploads playlist 50 at a time.  
-Each page = 1 `playlistItems.list` call + 1 `videos.list` call = 2 units.  
-500 videos = ~20 pages = **~40 units total**. Cached for 4 hours.
-
-### 3C. New: `snapshots.json` — Persistent Growth History
-```json
-{
-  "UCd5nH2Uusr0TA075ZW8R1zg": [
-    { "date": "2026-04-20", "subscribers": 23700, "views": 3424470 },
-    { "date": "2026-04-19", "subscribers": 23650, "views": 3419200 }
-  ]
-}
-```
-- Auto-saved every time **Refresh All** or **Refresh** is called
-- Deduplicates by date (one entry per day per channel)
-- No database needed — plain JSON, checked into git if you want version history
-
----
-
-## Feature 4 — Monthly Watch Data & Cross-Channel Growth
-
-### 4A. "This Month at a Glance" Panel (Dashboard, primary channel)
-A new card on the Dashboard directly below the hero card:
-- Videos uploaded this month: **X**
-- Total views earned this month: **Y** (sum from full video list)
-- Engagement rate this month: **Z%**
-- Month-over-month delta: **↑ +12%** or **↓ -5%** (from snapshot diffs)
-
-### 4B. "Fastest Growing This Month" Leaderboard (All channels)
-New section below the Competitor Leaderboard:
-- Ranks all channels by **view gain since last snapshot**
-- Shows a sparkline progress bar
-- Highlights if you're outgrowing competitors despite having fewer subs
-
-### 4C. "Monthly Upload Velocity" Grouped Bar Chart (All channels)
-- X-axis: last 6 months
-- Each month has one bar per channel (color-coded)
-- Shows who is publishing more/less over time
-- Pure SVG — no Chart.js or D3 needed
-
----
-
-## 🏗️ Proposed Changes
-
----
-
-### Component 1: Backend
-
-#### [MODIFY] [server.py](file:///g:/Youtube%20Data%20Manager/server.py)
-
-1. Add `_video_cache` dict + `VIDEO_CACHE_TTL` constant (15 min)
-2. Add `_full_cache` dict + `FULL_CACHE_TTL` constant (4 hr)
-3. Modify existing `/api/channels/<id>/videos` to use `_video_cache`
-4. Add `GET /api/channels/<id>/videos/full` — paginated, up to 500 videos
-5. Add `SNAPSHOTS_FILE = Path(__file__).parent / "snapshots.json"`
-6. Add `load_snapshots()` / `save_snapshot(channel_id, subs, views)` helpers
-7. Modify `refresh_channel` to auto-call `save_snapshot()` after each refresh
-8. Add `GET /api/snapshots/<channel_id>` — returns snapshot list
-9. Add `GET /api/channels/search-suggest?q=` — returns 5 channel suggestions
-
----
-
-### Component 2: Frontend Search Autocomplete
-
-#### [MODIFY] [app.js](file:///g:/Youtube%20Data%20Manager/static/app.js)
-
-1. Add `let _srDebounce = null; let _srQuotaCount = 0; let _srQuotaReset = Date.now();` globals
-2. Replace `keydown` Enter handler with full `keyup` debounce handler
-3. Add `doAutocomplete(q)` function
-4. Add `renderSuggestions(items)` function — builds `#srDropdown` HTML
-5. Add `selectSuggestion(channelId)` function — fetches by ID, calls `renderSearch()`
-6. Add `closeSuggestions()` function
-7. Handle Escape key and input blur (200ms delay before closing)
-
----
-
-### Component 3: My Channel Analytics Modal
-
-#### [MODIFY] [index.html](file:///g:/Youtube%20Data%20Manager/static/index.html)
-
-Add a new `<div id="analyticsModal" class="analytics-modal">` to the body (hidden by default) with:
-- Close button (×)
-- Tab bar: Overview | Monthly | Growth Speed | vs Competitors | Timeline
-- 5 `<div class="analytics-panel">` content areas
-
-#### [MODIFY] [app.js](file:///g:/Youtube%20Data%20Manager/static/app.js)
-
-1. Add `openAnalyticsModal(channelId)` function
-2. Add `closeAnalyticsModal()` function
-3. Add `switchAnalyticsTab(tabName)` function
-4. Add `renderMonthlyChart(channelId)` — fetches `/videos/full`, builds SVG bar chart
-5. Add `renderGrowthSpeed(channelId)` — builds sortable views/day table
-6. Add `renderVsCompetitors()` — builds comparison table for all channels
-7. Add `renderGrowthTimeline(channelId)` — fetches `/api/snapshots/<id>`, builds SVG line chart
-8. Modify the "Click to view full details →" link on the hero card to call `openAnalyticsModal()` for primary channel
-
----
-
-### Component 4: Dashboard Enhancements
-
-#### [MODIFY] [app.js](file:///g:/Youtube%20Data%20Manager/static/app.js)
-
-1. Add `buildThisMonthPanel(primary, fullVideos)` function
-2. Add `buildFastestGrowing(snapshots)` function  
-3. Add `buildUploadVelocity(channelVideoMap)` function with SVG grouped bar chart
-4. Call these in `renderDash()` after the leaderboard section
-
----
-
-### Component 5: Styles
-
-#### [MODIFY] [style.css](file:///g:/Youtube%20Data%20Manager/static/style.css)
-
-New CSS blocks:
-- **Search dropdown**: `.sr-wrap { position: relative }` · `#srDropdown` (glassmorphism card, absolute, z-index 200) · `.sug-row` (flex, hover glow) · `.sug-avatar` (28px circle)
-- **Analytics modal**: `.analytics-modal` (fixed full-screen overlay, z-index 500, backdrop blur) · `.am-header` · `.am-tabs` (pill-style tab bar) · `.am-tab.on` (active gradient glow) · `.am-panel` (fade-in animation)
-- **Charts**: `.svg-chart` · `.chart-bar-label` · `.chart-bar-tooltip` (hover tooltip)
-- **Dashboard new cards**: `.month-card` (gradient border card) · `.fgrow-row` · `.velocity-chart`
-
----
-
-## 📋 Implementation Sequence
-
-```
-Phase A — Backend (server.py only):
-  Step 1. Add _video_cache + modify /videos endpoint
-  Step 2. Add /videos/full endpoint
-  Step 3. Add snapshot helpers + auto-save on refresh
-  Step 4. Add /api/snapshots/<id> endpoint
-  Step 5. Add /api/channels/search-suggest endpoint
-
-Phase B — Search Autocomplete (app.js + style.css):
-  Step 6. Add debounce + quota guard globals
-  Step 7. Add doAutocomplete() + renderSuggestions()
-  Step 8. Add selectSuggestion() + closeSuggestions()
-  Step 9. Add dropdown CSS
-
-Phase C — Analytics Modal (index.html + app.js + style.css):
-  Step 10. Add modal HTML to index.html
-  Step 11. Add openAnalyticsModal / closeAnalyticsModal / switchTab
-  Step 12. Implement Monthly Performance tab (SVG bar chart)
-  Step 13. Implement Growth Speed tab (views/day table)
-  Step 14. Implement vs Competitors tab
-  Step 15. Implement Growth Timeline tab (SVG line chart)
-  Step 16. Wire hero card → openAnalyticsModal
-  Step 17. Add all modal + chart CSS
-
-Phase D — Dashboard Enhancements (app.js + style.css):
-  Step 18. Add "This Month at a Glance" panel
-  Step 19. Add "Fastest Growing This Month" leaderboard
-  Step 20. Add "Monthly Upload Velocity" grouped bar chart
-  Step 21. Add CSS for new dashboard cards
-```
-
----
-
----
-
-## 🗄️ Feature 5 — Supabase Integration
-
-Since you're building this **for your friend** (not just yourself), Supabase is now the right call. It replaces the JSON file store with a real cloud database your friend can access from any device/browser.
-
-### What Supabase Replaces
-| Current (JSON files) | Supabase replacement |
-|---|---|
-| `channels.json` | `channels` table |
-| `snapshots.json` | `snapshots` table |
-| In-memory video cache | `video_cache` table with `cached_at` column |
-
-### Database Schema
-
-```sql
--- Tracked channels
-CREATE TABLE channels (
-  id TEXT PRIMARY KEY,              -- YouTube channel ID
-  name TEXT,
-  handle TEXT,
-  country TEXT,
-  logo_url TEXT,
-  subscribers_raw BIGINT,
-  total_views_raw BIGINT,
-  total_videos_raw INT,
-  avg_views_raw INT,
-  is_primary BOOLEAN DEFAULT false,
-  added_at TIMESTAMPTZ DEFAULT now(),
-  last_refreshed TIMESTAMPTZ,
-  video_json JSONB                  -- latest video snapshot
-);
-
--- Daily growth snapshots (one row per channel per day)
-CREATE TABLE snapshots (
-  id SERIAL PRIMARY KEY,
-  channel_id TEXT REFERENCES channels(id) ON DELETE CASCADE,
-  recorded_at DATE DEFAULT CURRENT_DATE,
-  subscribers BIGINT,
-  total_views BIGINT,
-  UNIQUE(channel_id, recorded_at)   -- one per day
-);
-
--- Cached full video lists (avoids re-fetching 500 videos)
-CREATE TABLE video_cache (
-  channel_id TEXT PRIMARY KEY REFERENCES channels(id) ON DELETE CASCADE,
-  videos JSONB,
-  cached_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### Backend Changes for Supabase
-- Replace `channels.json` read/write with `supabase-py` calls
-- Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` to `.env`
-- All existing API routes stay the same — only the storage layer changes
-- Snapshots table has a `UNIQUE(channel_id, recorded_at)` constraint — safe to call `upsert` on every refresh
-
-### Supabase Free Tier
-- **500MB DB storage** — overkill for this use case (you'll use <5MB)
-- **50,000 API calls/month** — easily sufficient
-- **No credit card required**
-
----
-
-## 🚀 Feature 6 — Vercel Deployment
-
-### ⚠️ Critical Issue: Vercel is Serverless
-
-Vercel runs **stateless serverless functions** — this means:
-- No persistent filesystem (can't write `channels.json` or `snapshots.json`)
-- Each request spins up a fresh container
-- In-memory caches are cleared between requests
-
-This is exactly why **Supabase is now required** — Vercel + Supabase perfectly complement each other.
-
-### Architecture on Vercel
-```
-User's Browser
-     │
-     ▼
- Vercel (Flask serverless via @vercel/python)
-     │  ← reads/writes
-     ▼
- Supabase (PostgreSQL)
-     │
-     ▼
- YouTube Data API v3  (API key in Vercel env vars)
-```
-
-### Vercel Config (`vercel.json`)
-```json
-{
-  "builds": [{ "src": "server.py", "use": "@vercel/python" }],
-  "routes": [{ "src": "/(.*)", "dest": "server.py" }]
+**Find:**
+```css
+:root{
+  --bg:#101418;--sf:#1c2024; ...
 }
 ```
 
-### Environment Variables on Vercel
-Set these in Vercel Dashboard → Settings → Environment Variables:
-- `YOUTUBE_API_KEY`
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `GEMINI_API_KEY`
+**Replace with:**
+```css
+:root{
+  /* ── Core Surfaces ── */
+  --bg:         #0c0e12;       /* deeper, richer black */
+  --sf:         #13171c;       /* card surface */
+  --sf-low:     #0f1318;       /* recessed surface */
+  --sf-lowest:  #090c10;       /* deepest inset */
+  --sf-high:    #1c2128;       /* raised surface */
+  --sf-highest: #252b33;       /* topmost raised */
 
-### Deployment Steps
-1. Push code to GitHub (already done)
-2. Create Vercel account → Import the GitHub repo
-3. Set environment variables in Vercel dashboard
-4. Every `git push` auto-deploys — your friend gets the latest version instantly
+  /* ── Brand Accents ── */
+  --pr:         #00d4ff;       /* cyan — slightly less saturated, more refined */
+  --pr-dim:     #7ee8fa;
+  --pr-glow:    rgba(0,212,255,0.15);
+  --gr:         #3ddc84;       /* green — more muted, less neon */
+  --gr-glow:    rgba(61,220,132,0.12);
+  --rd:         #ff6b6b;       /* red — warmer, less harsh */
+  --rd-glow:    rgba(255,107,107,0.1);
+  --gold:       #f5c842;       /* gold — slightly warmer */
+  --gold-glow:  rgba(245,200,66,0.12);
 
-### Vercel Limitations to Know
-- **Max function duration**: 10 seconds (free tier) — fetching 500 videos in one call might hit this. Solution: paginate and cache aggressively in Supabase
-- **Cold starts**: First request after inactivity takes ~2s — acceptable
-- **Static files**: The `static/` folder is served correctly by `send_from_directory`
+  /* ── Typography ── */
+  --t1:         #e8ecf0;       /* primary text — slightly cooler white */
+  --t2:         #8899a6;       /* secondary — blue-grey tint */
+  --t3:         #4a5568;       /* muted — noticeably dimmer */
+  --t4:         #2d3748;       /* barely visible — divider-level */
+
+  /* ── Borders ── */
+  --bd:         rgba(255,255,255,0.055);
+  --bd2:        rgba(255,255,255,0.11);
+  --bd3:        rgba(255,255,255,0.18);
+
+  /* ── Motion ── */
+  --e:          cubic-bezier(0.16, 1, 0.3, 1);   /* expo out — snappy */
+  --e-in:       cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast:   120ms;
+  --dur-mid:    220ms;
+  --dur-slow:   380ms;
+}
+```
 
 ---
 
-## 🔐 Feature 7 — YouTube Analytics API (OAuth) — Private Studio Data
+## Section 1 — Typography System Overhaul
 
-### Your Question: "Can I connect my friend's channel for private data?"
+### 1.1 — Font Import (in `index.html` `<head>`)
 
-**YES — 100% possible and it's the right approach.** Here's what this unlocks:
+**Replace existing Google Fonts import** with this refined selection:
 
-| Data | YouTube Data API v3 (current) | YouTube Analytics API (OAuth) |
+```html
+<!-- Remove old font links, add these: -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,300;400;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,300,0,0" rel="stylesheet"/>
+```
+
+- **Outfit** replaces DM Sans — same feel, more geometric, feels more "engineered"
+- **Fraunces** replaces Syne for display headings — a beautiful optical-size serif that adds unexpected editorial weight to titles. Use it ONLY for the page title and channel names in cards.
+- **JetBrains Mono** stays — it's perfect for data
+
+### 1.2 — Global Font Application
+
+**In `style.css`**, update `body`:
+```css
+body{
+  font-family: 'Outfit', system-ui, sans-serif;
+  /* rest stays same */
+}
+.mono{ font-family: 'JetBrains Mono', monospace; }
+/* Add new utility: */
+.serif{ font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; }
+```
+
+### 1.3 — Typographic Scale for Cards
+
+The current problem: every label, value, and handle is the same visual weight. Here is the precise scale to apply:
+
+| Element | Font | Size | Weight | Color | Letter-spacing |
+|---|---|---|---|---|---|
+| Channel name | Outfit | 14.5px | 600 | `--t1` | -0.2px |
+| Handle | Outfit | 11px | 400 | `--t3` | 0 |
+| Primary metric value (subs) | JetBrains Mono | 22px | 700 | `--gold` | -1px |
+| Primary metric label | Outfit | 9px | 600 uppercase | `--t3` | 1.2px |
+| Secondary metric value | JetBrains Mono | 12px | 600 | `--t2` | -0.3px |
+| Secondary metric label | Outfit | 9px | 500 uppercase | `--t4` | 0.8px |
+| Badge text | Outfit | 10px | 600 | varies | 0.3px |
+| Page title | Fraunces | 30px | 400 | `--t1` | -0.5px |
+| Section labels | Outfit | 10px | 700 uppercase | `--t3` | 1.5px |
+
+Apply these via the CSS rules in Section 2 below.
+
+---
+
+## Section 2 — Channel Card Visual Redesign
+
+### 2.1 — Card Container: Depth & Atmosphere
+
+**In `style.css`**, find and replace `.ch-card`:
+
+```css
+.ch-card{
+  background: var(--sf);
+  border-radius: 10px;
+  /* Layered border: inner subtle line + outer near-invisible */
+  border: 1px solid var(--bd);
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,0.04) inset, /* top inner highlight */
+    0 0 0 0 transparent;                     /* placeholder for hover glow */
+  overflow: hidden; /* keep for border-radius clipping */
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+
+  /* Staggered entrance */
+  opacity: 0;
+  transform: translateY(12px);
+  animation: cardIn var(--dur-slow) var(--e) both;
+
+  transition:
+    border-color var(--dur-mid) var(--e),
+    box-shadow var(--dur-mid) var(--e),
+    transform var(--dur-fast) var(--e);
+}
+
+/* Hover state: feels like it's lifting off the surface */
+.ch-card:hover{
+  border-color: var(--bd2);
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,0.06) inset,
+    0 8px 32px rgba(0,0,0,0.4),
+    0 2px 8px rgba(0,0,0,0.3);
+  transform: translateY(-2px);
+}
+
+/* Press feedback */
+.ch-card:active{
+  transform: translateY(0px) scale(0.992);
+  transition-duration: var(--dur-fast);
+}
+
+/* Mine: gold atmospheric glow */
+.ch-card.mine{
+  border-color: rgba(245,200,66,0.18);
+  background: linear-gradient(
+    160deg,
+    rgba(245,200,66,0.03) 0%,
+    var(--sf) 40%
+  );
+  box-shadow:
+    0 1px 0 0 rgba(245,200,66,0.08) inset,
+    0 0 0 0 transparent;
+}
+.ch-card.mine:hover{
+  border-color: rgba(245,200,66,0.35);
+  box-shadow:
+    0 1px 0 0 rgba(245,200,66,0.1) inset,
+    0 8px 32px rgba(0,0,0,0.4),
+    0 0 40px rgba(245,200,66,0.05);
+}
+
+/* Stale: barely-there red tint, not alarming */
+.ch-card.stale{
+  border-color: rgba(255,107,107,0.12);
+}
+
+@keyframes cardIn{
+  from{ opacity:0; transform:translateY(12px); }
+  to{   opacity:1; transform:translateY(0); }
+}
+```
+
+### 2.2 — Status Left Bar: Thinner, More Refined
+
+```css
+.cc-status-bar{
+  position: absolute;
+  left: 0; top: 12px; bottom: 12px; /* doesn't go full height — floats */
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: transparent;
+  transition: background var(--dur-mid);
+}
+.cc-status-bar.status-growing{
+  background: linear-gradient(to bottom, transparent, var(--gr), transparent);
+}
+.cc-status-bar.status-declining{
+  background: linear-gradient(to bottom, transparent, var(--rd), transparent);
+}
+.cc-status-bar.status-stale{
+  background: linear-gradient(to bottom, transparent, rgba(255,107,107,0.4), transparent);
+}
+```
+
+### 2.3 — Main Row: Tighter, More Intentional Spacing
+
+```css
+.cc-row{
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 18px 15px 20px; /* 20px left clears status bar with breathing room */
+  min-height: 70px;
+}
+```
+
+### 2.4 — Avatar: Subtle Ring Treatment
+
+```css
+.cc-logo-wrap{
+  position: relative;
+  width: 40px; height: 40px;
+  flex-shrink: 0;
+}
+.cc-logo{
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--sf-highest);
+  display: block;
+  /* Subtle ring using box-shadow instead of border (doesn't affect layout) */
+  box-shadow: 0 0 0 1.5px var(--bd2), 0 2px 8px rgba(0,0,0,0.4);
+  transition: box-shadow var(--dur-mid);
+}
+.ch-card:hover .cc-logo{
+  box-shadow: 0 0 0 2px var(--bd3), 0 2px 8px rgba(0,0,0,0.4);
+}
+.ch-card.mine .cc-logo{
+  box-shadow: 0 0 0 2px rgba(245,200,66,0.4), 0 2px 8px rgba(0,0,0,0.4);
+}
+.cc-logo-fb{
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--sf-high);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px; font-weight: 700; color: var(--t3);
+  box-shadow: 0 0 0 1.5px var(--bd2);
+}
+.cc-crown{
+  position: absolute;
+  bottom: -2px; right: -2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--gold);
+  display: grid; place-items: center;
+  border: 1.5px solid var(--sf);
+  font-size: 6px;
+  box-shadow: 0 0 8px rgba(245,200,66,0.5);
+}
+```
+
+### 2.5 — Identity: Fraunces for Name, Dimmer Handle
+
+```css
+.cc-ident{
+  flex: 1;
+  min-width: 0;
+}
+.cc-name{
+  font-family: 'Outfit', sans-serif; /* could try Fraunces here for personality */
+  font-weight: 600;
+  font-size: 14.5px;
+  letter-spacing: -0.2px;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.cc-handle{
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--t3);
+  margin-top: 2px;
+  letter-spacing: 0;
+}
+.cc-tags{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+```
+
+### 2.6 — Badge Redesign: More Refined, Less "Bubbly"
+
+**In `style.css`**, replace all `.badge` and `.bdg-*` rules:
+
+```css
+.badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px 2px;
+  border-radius: 4px; /* rectangular, not pill — more data-viz feel */
+  font-family: 'Outfit', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1.6;
+}
+.bdg-pr{
+  background: rgba(0,212,255,0.08);
+  color: var(--pr);
+  border: 1px solid rgba(0,212,255,0.16);
+}
+.bdg-gr{
+  background: rgba(61,220,132,0.08);
+  color: var(--gr);
+  border: 1px solid rgba(61,220,132,0.16);
+}
+.bdg-rd{
+  background: rgba(255,107,107,0.08);
+  color: var(--rd);
+  border: 1px solid rgba(255,107,107,0.16);
+}
+.bdg-gd{
+  background: rgba(245,200,66,0.08);
+  color: var(--gold);
+  border: 1px solid rgba(245,200,66,0.16);
+}
+.bdg-dim{
+  background: rgba(255,255,255,0.04);
+  color: var(--t3);
+  border: 1px solid var(--bd);
+}
+```
+
+### 2.7 — Primary Metric: Bigger Contrast, Proper Hierarchy
+
+```css
+.cc-primary-metric{
+  flex-shrink: 0;
+  text-align: right;
+  min-width: 90px;
+}
+.cc-pm-val{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1;
+  color: var(--t1);
+  transition: color var(--dur-fast);
+}
+.cc-pm-val.gold{ color: var(--gold); }
+
+/* Label sits BELOW value, very dim */
+.cc-pm-lbl{
+  font-family: 'Outfit', sans-serif;
+  font-size: 8.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--t3);
+  margin-top: 4px;
+  text-align: right;
+}
+```
+
+### 2.8 — Secondary Metrics: Two-Column Info Block
+
+```css
+.cc-secondary-metrics{
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 80px;
+  padding-left: 14px;
+  /* Elegant divider using box-shadow instead of border */
+  box-shadow: -1px 0 0 0 var(--bd);
+}
+.cc-sm-item{
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cc-sm-val{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t2);
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+.cc-sm-lbl{
+  font-family: 'Outfit', sans-serif;
+  font-size: 8.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--t4);
+}
+```
+
+### 2.9 — Action Buttons: Appear on Hover, Not Cluttering Compact View
+
+```css
+.cc-acts{
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+  margin-left: 4px;
+
+  /* Hidden by default — revealed on card hover */
+  opacity: 0;
+  transform: translateX(6px);
+  transition:
+    opacity var(--dur-mid) var(--e),
+    transform var(--dur-mid) var(--e);
+}
+.ch-card:hover .cc-acts{
+  opacity: 1;
+  transform: translateX(0);
+}
+.cc-act{
+  width: 26px; height: 26px;
+  border: none; background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+  border-radius: 6px;
+  display: grid; place-items: center;
+  font-family: 'Material Symbols Outlined';
+  font-size: 15px; font-style: normal; line-height: 1;
+  transition: color var(--dur-fast), background var(--dur-fast);
+}
+.cc-act:hover{ color: var(--t1); background: rgba(255,255,255,0.07); }
+.cc-act.danger:hover{ color: var(--rd); background: var(--rd-glow); }
+.cc-act.gold:hover{ color: var(--gold); background: var(--gold-glow); }
+```
+
+---
+
+## Section 3 — Hover Expansion Panel
+
+### 3.1 — Expand Container: Glass Separator Feel
+
+```css
+.cc-expand{
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows var(--dur-mid) var(--e),
+    padding var(--dur-mid) var(--e);
+  padding: 0 20px;
+  /* Top border fades in with opacity trick */
+  border-top: 1px solid transparent;
+  transition:
+    grid-template-rows var(--dur-mid) var(--e),
+    padding var(--dur-mid) var(--e),
+    border-color var(--dur-mid) var(--e);
+}
+.ch-card:hover .cc-expand{
+  grid-template-rows: 1fr;
+  padding: 14px 20px 16px;
+  border-top-color: var(--bd);
+}
+.cc-expand-inner{
+  min-height: 0;
+  overflow: hidden;
+}
+```
+
+### 3.2 — Sparkline: Polished Mini Chart
+
+```css
+.cc-sparkline{
+  height: 36px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  margin-bottom: 12px;
+  position: relative;
+}
+/* Add a baseline rule under the bars */
+.cc-sparkline::after{
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--bd);
+}
+.cc-spark-bar{
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  min-height: 3px;
+  opacity: 0;
+  transform: scaleY(0);
+  transform-origin: bottom;
+  /* Bars animate IN when expand panel opens */
+  transition:
+    opacity 0.3s var(--e),
+    transform 0.3s var(--e),
+    height 0.4s var(--e);
+}
+/* Stagger each bar using nth-child */
+.cc-spark-bar:nth-child(1){ transition-delay: 0.02s; }
+.cc-spark-bar:nth-child(2){ transition-delay: 0.04s; }
+.cc-spark-bar:nth-child(3){ transition-delay: 0.06s; }
+.cc-spark-bar:nth-child(4){ transition-delay: 0.08s; }
+.cc-spark-bar:nth-child(5){ transition-delay: 0.10s; }
+.cc-spark-bar:nth-child(6){ transition-delay: 0.12s; }
+.cc-spark-bar:nth-child(7){ transition-delay: 0.14s; }
+.cc-spark-bar:nth-child(8){ transition-delay: 0.16s; }
+
+/* Trigger animation when card is hovered */
+.ch-card:hover .cc-spark-bar{
+  opacity: 0.85;
+  transform: scaleY(1);
+}
+```
+
+**In `app.js`**, when building sparkline bars, add inline CSS for height AND color directly:
+```javascript
+// High bars = cyan, middle = muted cyan, low = dim grey
+const c = vc >= maxV * 0.7 ? 'var(--pr)' 
+        : vc >= maxV * 0.35 ? 'rgba(0,212,255,0.4)' 
+        : 'var(--t4)';
+return `<div class="cc-spark-bar" style="height:${pct}%;background:${c}" title="${v.views||vc} views"></div>`;
+```
+
+### 3.3 — Expanded Metrics Row
+
+```css
+.cc-expand-metrics{
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  background: var(--sf-low);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cc-em-item{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-right: 1px solid var(--bd);
+}
+.cc-em-item:last-child{ border-right: none; }
+.cc-em-val{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.3px;
+  line-height: 1;
+}
+.cc-em-lbl{
+  font-family: 'Outfit', sans-serif;
+  font-size: 8.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--t3);
+}
+```
+
+### 3.4 — Latest Video Strip: Compact & Clean
+
+```css
+.cc-expand-vid{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--sf-lowest);
+  border: 1px solid var(--bd);
+  border-radius: 7px;
+  padding: 8px 10px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+  text-decoration: none;
+  color: inherit;
+}
+.cc-expand-vid:hover{
+  border-color: var(--bd2);
+  background: var(--sf-low);
+}
+.cc-expand-thumb{
+  width: 56px;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--sf-highest);
+  flex-shrink: 0;
+  display: block;
+}
+.cc-expand-vid-title{
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--t2);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+.cc-expand-vid-meta{
+  font-size: 10px;
+  color: var(--t3);
+  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
+```
+
+### 3.5 — "View Details" Link: Animated Arrow
+
+```css
+.cc-view-link{
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pr);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  letter-spacing: 0.2px;
+  /* Underline that slides in on hover */
+  position: relative;
+}
+.cc-view-link::after{
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0;
+  width: 0; height: 1px;
+  background: var(--pr);
+  transition: width var(--dur-mid) var(--e);
+}
+.cc-view-link:hover::after{ width: 100%; }
+/* Arrow character animates right */
+.cc-view-link .arrow{
+  display: inline-block;
+  transition: transform var(--dur-mid) var(--e);
+}
+.cc-view-link:hover .arrow{ transform: translateX(3px); }
+```
+
+In the JS template, update the link to:
+```html
+<button class="cc-view-link" ...>
+  ${isMine ? 'Full Analytics' : 'View Details'} <span class="arrow">→</span>
+</button>
+```
+
+---
+
+## Section 4 — Page-Level Polish
+
+### 4.1 — Page Header Upgrade
+
+**In `style.css`**, update `.pg-title`:
+```css
+.pg-title{
+  font-family: 'Fraunces', serif;
+  font-optical-sizing: auto;
+  font-weight: 400;          /* Fraunces looks best at regular weight — it's already heavy */
+  font-size: 28px;
+  letter-spacing: -0.5px;
+  color: var(--t1);
+  line-height: 1.1;
+}
+.pg-sub{
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--t3);
+  font-family: 'Outfit', sans-serif;
+}
+```
+
+### 4.2 — Section Labels: More Editorial
+
+```css
+.sl{
+  font-family: 'Outfit', sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.8px;
+  color: var(--t3);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 36px 0 14px;
+}
+.sl::after{
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--bd2), transparent);
+}
+.sl em{
+  color: var(--t2);
+  font-style: normal;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+```
+
+### 4.3 — Top Nav: Frosted Glass Refinement
+
+```css
+.topnav{
+  position: sticky; top: 0; z-index: 60;
+  background: rgba(12,14,18,0.8);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid var(--bd);
+  /* Subtle top highlight */
+  box-shadow: 0 1px 0 0 rgba(255,255,255,0.03) inset;
+}
+.nav-brand{
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--t1); /* not cyan — more sophisticated */
+  letter-spacing: -0.5px;
+  cursor: pointer;
+}
+.nav-brand span{
+  color: var(--pr); /* only the "Tracker" part gets color */
+}
+```
+
+### 4.4 — Buttons: Tighter, More Purposeful
+
+```css
+.btn-pr{
+  background: var(--pr);
+  color: #001a20;
+  padding: 7px 16px;
+  font-size: 12.5px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border-radius: 7px;
+  /* Glow on hover only */
+  transition: all var(--dur-mid) var(--e);
+}
+.btn-pr:hover{
+  background: var(--pr-dim);
+  box-shadow: 0 0 0 1px var(--pr), 0 4px 20px rgba(0,212,255,0.2);
+}
+.btn-gh{
+  background: rgba(255,255,255,0.04);
+  color: var(--t2);
+  border: 1px solid var(--bd);
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-family: 'Outfit', sans-serif;
+  border-radius: 7px;
+}
+.btn-gh:hover{
+  color: var(--t1);
+  border-color: var(--bd2);
+  background: rgba(255,255,255,0.07);
+}
+```
+
+### 4.5 — Background: More Depth
+
+**In `style.css`**, update `body`:
+```css
+body{
+  font-family: 'Outfit', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--t1);
+  min-height: 100vh;
+  overflow-x: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Subtle grid pattern — tighter, less visible */
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Ambient orbs — reposition and recolor */
+body::before{
+  content: '';
+  position: fixed;
+  top: -300px; left: -200px;
+  width: 700px; height: 700px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle, rgba(0,212,255,0.04) 0%, transparent 65%);
+  /* Slow drift animation */
+  animation: orb1 18s ease-in-out infinite alternate;
+}
+body::after{
+  content: '';
+  position: fixed;
+  bottom: -200px; right: -150px;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle, rgba(61,220,132,0.03) 0%, transparent 68%);
+  animation: orb2 22s ease-in-out infinite alternate;
+}
+@keyframes orb1{
+  from{ transform: translate(0,0) scale(1); }
+  to{   transform: translate(40px, 30px) scale(1.08); }
+}
+@keyframes orb2{
+  from{ transform: translate(0,0) scale(1); }
+  to{   transform: translate(-30px, -40px) scale(1.05); }
+}
+```
+
+---
+
+## Section 5 — Skeleton Loader Redesign
+
+The current skeleton is just grey boxes. Make it match the exact card structure:
+
+```css
+.ch-card-skel{
+  background: var(--sf);
+  border-radius: 10px;
+  border: 1px solid var(--bd);
+  height: 72px;
+  display: flex;
+  align-items: center;
+  padding: 15px 20px;
+  gap: 14px;
+  overflow: hidden;
+  position: relative;
+}
+/* Shimmer sweep */
+.ch-card-skel::after{
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.03) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: skelSwipe 1.8s ease-in-out infinite;
+}
+@keyframes skelSwipe{
+  from{ background-position: 200% 0; }
+  to{   background-position: -200% 0; }
+}
+.ch-skel-av{
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--sf-high);
+  flex-shrink: 0;
+}
+.ch-skel-lines{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ch-skel-name{
+  height: 13px;
+  width: 45%;
+  background: var(--sf-high);
+  border-radius: 3px;
+}
+.ch-skel-handle{
+  height: 10px;
+  width: 28%;
+  background: var(--sf-highest);
+  border-radius: 3px;
+  opacity: 0.6;
+}
+.ch-skel-num{
+  width: 76px; height: 24px;
+  background: var(--sf-high);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+```
+
+**Update the skeleton JS** to match new structure:
+```javascript
+function renderChannelSkeletons(n=6){
+  const tbl = document.getElementById('chTbl');
+  tbl.innerHTML = `<div class="ch-grid">${
+    Array.from({length: n}, (_,i) => `
+      <div class="ch-card-skel" style="animation-delay:${i*0.04}s">
+        <div class="ch-skel-av"></div>
+        <div class="ch-skel-lines">
+          <div class="ch-skel-name"></div>
+          <div class="ch-skel-handle"></div>
+        </div>
+        <div class="ch-skel-num"></div>
+      </div>`).join('')
+  }</div>`;
+}
+```
+
+---
+
+## Section 6 — Micro-Interaction Inventory
+
+These are small but they make the whole thing feel alive. Each is a targeted CSS addition.
+
+### 6.1 — Sort Dropdown: Styled to Match
+
+```css
+#chSortSel{
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  color: var(--t2);
+  padding: 7px 30px 7px 11px;
+  border-radius: 7px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 12.5px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  /* Custom arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234a5568'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+}
+#chSortSel:hover{
+  border-color: var(--bd2);
+  color: var(--t1);
+}
+```
+
+### 6.2 — Toast: More Polished
+
+```css
+#toast{
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  background: var(--sf-high);
+  border: 1px solid var(--bd2);
+  border-radius: 8px;        /* rectangular, not pill */
+  padding: 10px 18px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.04) inset;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s var(--e), transform 0.2s var(--e);
+  z-index: 999;
+}
+#toast.show{
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+#toast.s{ color: var(--gr); border-color: rgba(61,220,132,0.25); }
+#toast.e{ color: var(--rd); border-color: rgba(255,107,107,0.25); }
+```
+
+### 6.3 — Spinner: Thinner, More Elegant
+
+```css
+.spin{
+  width: 13px; height: 13px;
+  border: 1.5px solid rgba(255,255,255,0.08);
+  border-top-color: var(--pr);
+  border-radius: 50%;
+  animation: rot 0.6s linear infinite;
+  flex-shrink: 0;
+}
+```
+
+### 6.4 — Nav Link Active State: Underline Only (remove background box)
+
+```css
+.nav-link{
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Outfit', sans-serif;
+  color: var(--t3);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: color var(--dur-fast);
+  position: relative;
+}
+.nav-link:hover{ color: var(--t2); }
+.nav-link.on{ color: var(--t1); }
+.nav-link.on::after{
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 12px; right: 12px;
+  height: 1.5px;
+  background: var(--pr);
+  border-radius: 2px;
+  /* subtle glow on the underline */
+  box-shadow: 0 0 8px var(--pr);
+}
+/* Remove the background on .nav-link.on: */
+/* NO background: rgba(0,229,255,.08) — delete that */
+```
+
+### 6.5 — "Best This Month" Box: More Atmospheric
+
+In `app.js`, find the `cc-best-${ch.id}` innerHTML assignment. Update the styling in the template string:
+
+```javascript
+// Replace the existing bestEl.innerHTML with:
+bestEl.innerHTML = `
+  <div style="
+    background: linear-gradient(135deg, rgba(61,220,132,0.06), rgba(61,220,132,0.02));
+    border-radius: 7px;
+    padding: 9px 11px;
+    border: 1px solid rgba(61,220,132,0.12);
+    border-left: 2px solid var(--gr);
+    margin-top: 8px;
+  ">
+    <div style="
+      font-family:'Outfit',sans-serif;
+      font-size:8.5px;font-weight:700;
+      text-transform:uppercase;letter-spacing:1.2px;
+      color:var(--gr);margin-bottom:4px;
+    ">🏆 Best this month</div>
+    <div style="
+      font-family:'Outfit',sans-serif;
+      font-size:12px;font-weight:500;
+      line-height:1.35;
+      display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;
+      color:var(--t1);
+    ">${esc(best.title)}</div>
+    <div style="
+      font-family:'JetBrains Mono',monospace;
+      font-size:11px;color:var(--gr);
+      margin-top:3px;font-weight:600;
+    ">${best.views||''} views</div>
+  </div>`;
+```
+
+### 6.6 — Staggered Card Entrance: Precise Timing
+
+The `cardIn` keyframe is defined in Section 2.1. In `app.js`, ensure the stagger delay is applied with this formula:
+
+```javascript
+// In the renderChannels loop:
+const delay = Math.min(index * 0.06, 0.5); // cap at 0.5s so last card isn't too delayed
+// Apply as inline style on the card:
+style="animation-delay:${delay}s"
+```
+
+---
+
+## Section 7 — Drawer Panel Polish
+
+### 7.1 — Drawer Header: Full-bleed Avatar Treatment
+
+**In `style.css`**, update `.drw`:
+```css
+.drw{
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 400px;
+  background: var(--sf-low);
+  border-left: 1px solid var(--bd);
+  z-index: 80;
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform var(--dur-slow) var(--e);
+  /* Subtle shadow bleeding from left edge */
+  box-shadow: -20px 0 60px rgba(0,0,0,0.5);
+}
+.drw.open{ transform: translateX(0); }
+```
+
+Update `.drw-bar` (the "Channel Details" header bar):
+```css
+.drw-bar{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--bd);
+  background: var(--sf-lowest);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
+}
+.drw-bar-t{
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--t3);
+}
+```
+
+### 7.2 — Drawer Stats: Clean Grid
+
+```css
+.drw-bento{
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 6px;
+  padding: 16px;
+}
+.drw-bento-main{
+  grid-row: span 2;
+  background: linear-gradient(160deg, rgba(245,200,66,0.06), transparent);
+  border: 1px solid rgba(245,200,66,0.14);
+  border-radius: 9px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.drw-bento-cell{
+  background: var(--sf-lowest);
+  border: 1px solid var(--bd);
+  border-radius: 7px;
+  padding: 10px 12px;
+}
+.drw-bento-lbl{
+  font-family: 'Outfit', sans-serif;
+  font-size: 8.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--t3);
+  margin-bottom: 5px;
+}
+.drw-bento-val{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--t1);
+}
+.drw-bento-main .drw-bento-val{
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+```
+
+---
+
+## Section 8 — Complete Change Summary by File
+
+### `index.html`
+1. Replace Google Fonts `<link>` tags with Outfit + Fraunces + JetBrains Mono import (§1.1)
+2. Update Material Symbols import to use `wght:300` for thinner icons (§1.1)
+
+### `style.css`
+1. **`:root`** — replace entire block with new design tokens (§0)
+2. **`body`** — update font + background orb animations (§4.5)
+3. **`body::before` + `body::after`** — orb drift animations (§4.5)
+4. **`.topnav`** — frosted glass refinement (§4.3)
+5. **`.nav-brand`** — font update (§4.3)
+6. **`.nav-link`** — underline-only active state (§6.4)
+7. **`.btn-pr` `.btn-gh`** — tighter, more purposeful (§4.4)
+8. **`.badge` + all `.bdg-*`** — rectangular, less bubbly (§2.6)
+9. **`#toast`** — rectangular, more polished (§6.2)
+10. **`.spin`** — thinner (§6.3)
+11. **`.pg-title`** — Fraunces serif (§4.1)
+12. **`.sl`** — editorial section labels with gradient line (§4.2)
+13. **`.ch-grid`** — keep 2-column layout from previous plan
+14. **`.ch-card`** — full replacement (§2.1)
+15. **`.cc-status-bar`** — floating gradient bar (§2.2)
+16. **`.cc-row`** — spacing update (§2.3)
+17. **`.cc-logo-wrap` `.cc-logo` `.cc-logo-fb` `.cc-crown`** — ring treatment (§2.4)
+18. **`.cc-ident` `.cc-name` `.cc-handle` `.cc-tags`** — typography (§2.5)
+19. **`.cc-primary-metric` `.cc-pm-val` `.cc-pm-lbl`** — hierarchy (§2.7)
+20. **`.cc-secondary-metrics` `.cc-sm-item` `.cc-sm-val` `.cc-sm-lbl`** — two-col info (§2.8)
+21. **`.cc-acts` `.cc-act`** — slide-in on hover (§2.9)
+22. **`.cc-expand` `.cc-expand-inner`** — grid-rows transition (§3.1)
+23. **`.cc-sparkline` `.cc-spark-bar`** — staggered bar animations (§3.2)
+24. **`.cc-expand-metrics` `.cc-em-item` `.cc-em-val` `.cc-em-lbl`** — grouped metric panel (§3.3)
+25. **`.cc-expand-vid` + children** — compact video strip (§3.4)
+26. **`.cc-view-link`** — animated underline + arrow (§3.5)
+27. **`.ch-card-skel` + skeleton children** — shimmer sweep (§5)
+28. **`#chSortSel`** — styled dropdown (§6.1)
+29. **`.drw` `.drw-bar` `.drw-bar-t`** — drawer polish (§7.1)
+30. **`.drw-bento` + children** — stat grid (§7.2)
+31. **`@keyframes cardIn`** — card entrance (§2.1)
+32. **`@keyframes skelSwipe`** — skeleton shimmer (§5)
+33. **`@keyframes orb1` `@keyframes orb2`** — ambient drift (§4.5)
+
+### `app.js`
+1. **Sparkline bar color logic** — 3-tier cyan gradient (§3.2)
+2. **`renderChannelSkeletons()`** — new skeleton HTML (§5)
+3. **Best-this-month box** — refined green template (§6.5)
+4. **Card entrance delay formula** — capped stagger (§6.6)
+5. **`.cc-view-link` template** — add `.arrow` span (§3.5)
+
+---
+
+## Visual Before/After Summary
+
+| Element | Before | After |
 |---|---|---|
-| Subscriber count | ✅ Public | ✅ More accurate |
-| Total views | ✅ Public | ✅ With date breakdown |
-| **Watch Time (minutes)** | ❌ Not available | ✅ **YES** |
-| **Impressions** | ❌ Not available | ✅ **YES** |
-| **CTR (Click-Through Rate)** | ❌ Not available | ✅ **YES** |
-| **Avg View Duration** | ❌ Not available | ✅ **YES** |
-| **Traffic sources** | ❌ Not available | ✅ (search, browse, external) |
-| **Audience demographics** | ❌ Not available | ✅ (age, gender, country) |
-| **Revenue (if monetized)** | ❌ Not available | ✅ **YES** |
-| **Daily/weekly breakdown** | ❌ Not available | ✅ Any date range |
-
-### How OAuth Works for Your Use Case
-Your friend visits the app → clicks "Connect YouTube Channel" → logs in with Google → grants permission → the app gets a **refresh token** stored in Supabase → from then on it can pull their private analytics 24/7 without them logging in again.
-
-### Implementation Plan for OAuth
-1. Add `google-auth-oauthlib` and `google-auth-httplib2` to `requirements.txt`
-2. Create OAuth credentials (type: "Web Application") in Google Cloud Console
-3. Add route `GET /auth/youtube` → redirects to Google consent screen
-4. Add route `GET /auth/callback` → receives auth code → exchanges for tokens → stores `refresh_token` in Supabase
-5. Add route `GET /api/analytics/private` → uses stored refresh token to call YouTube Analytics API
-6. Show a "Connect Your Channel" button in the UI that triggers the OAuth flow
-
-### What You Can Then Show
-With private OAuth data, the "My Channel" tab becomes **dramatically more powerful**:
-- Real watch time per video (not just views)
-- Actual CTR heatmap (which months had best click rates)
-- Audience retention curves per video
-- Traffic source breakdown (how people find the channel)
-- Daily impression funnel: impressions → clicks → watches
-- Revenue timeline (if monetized)
-
-> **Note**: The OAuth token only gives access to the channel that consented. Competitor data still uses the public API. This is exactly how YouTube Studio itself works.
-
----
-
-## 🤖 Feature 8 — Gemini AI Chat Over Your Data
-
-### Your Question: "What if I connect Gemini and ask questions in real time?"
-
-**Brilliant idea — and very practical to implement.** Here's exactly how it works:
-
-### How It Works (No Fine-Tuning Required)
-Gemini doesn't need to "learn" your data. Instead, you **inject your channel data into each prompt** as context (this is called Retrieval-Augmented Generation / RAG). The model is already smart — it just needs the facts.
-
-```
-User types: "Which video has the best growth rate this month?"
-
-Server builds prompt:
-  "You are a YouTube analytics assistant. Here is the channel data:
-   [JSON of all videos with views, dates, likes, comments]
-   User question: Which video has the best growth rate this month?"
-
-Gemini answers: "Your video 'Model Flange Elbow' uploaded on Apr 17 
-  has gained 1,879 views in 3 days = ~626 views/day, making it..."
-```
-
-### What It Can Answer
-- "How is my channel performing compared to last month?"
-- "Which competitor is growing the fastest?"
-- "What type of videos get the most engagement on my channel?"
-- "When should I upload to maximize views?"
-- "How long will it take me to reach 50K subscribers at this rate?"
-- "Which of my videos underperformed and why might that be?"
-- "Compare my engagement rate vs SourceCAD's"
-
-### UI: Chat Panel
-A collapsible chat panel in the bottom-right corner (like a support chat widget):
-- Click the 🤖 button → panel slides up
-- Text input at the bottom
-- Chat history above (user messages right, AI messages left)
-- Shows which data it's referencing (e.g., "Based on your last 20 videos...")
-
-### Backend: `/api/ai/chat` Endpoint
-```python
-@app.route("/api/ai/chat", methods=["POST"])
-def ai_chat():
-    question = request.json.get("question", "")
-    channels = load_channels_from_supabase()
-    # Inject data as context
-    context = build_context(channels)  # JSON summary of all channel data
-    prompt = f"""You are a YouTube analytics expert assistant...
-    Channel data: {context}
-    User question: {question}"""
-    response = gemini_client.generate_content(prompt)
-    return jsonify({"answer": response.text})
-```
-
-### Gemini Model Choice
-- Use **`gemini-1.5-flash`** — fast, cheap, handles large context windows (up to 1M tokens)
-- Cost: ~$0.00 for personal/low-traffic use (generous free tier)
-- Add `google-generativeai` to `requirements.txt`
-
-### Privacy Note
-Only your channel's data (and the public data of tracked competitors) is sent to Gemini. No private YouTube OAuth data should be sent without explicit user consent.
-
----
-
----
-
-## ✅ Verification Plan
-
-### Backend Tests
-- `GET /api/channels/search-suggest?q=mr+beast` → 5 items with `id, name, logo_url, subscribers`
-- `GET /api/channels/<id>/videos/full` → 50+ videos with `published_at` dates
-- `POST /api/channels/<id>/refresh` → Supabase snapshots table has a new row
-- `GET /auth/youtube` → redirects to Google OAuth consent screen
-- `POST /api/ai/chat` with `{"question":"which video is growing fastest?"}` → natural language answer
-
-### UI Tests
-- Type "Sol" in Search → dropdown appears within ~600ms
-- Click a suggestion → result card fills instantly (no Enter needed)
-- Press Escape → dropdown closes
-- Click "View full details" on CADable hero → analytics modal opens with 5 tabs
-- Monthly Performance tab → SVG bar chart with month labels
-- Growth Speed tab → views/day table, color-coded rows
-- vs Competitors tab → all channels with rank column
-- Growth Timeline tab → line chart (after 2+ days of snapshots)
-- Click 🤖 AI button → chat panel opens, type question → Gemini answers with channel context
-- Connect YouTube Channel → OAuth flow completes → private analytics tab unlocks
-- Deploy to Vercel → friend can open the URL and use all features
-
----
-
-## 💡 Bonus Ideas & Recommendations
-
-1. **Best Upload Day/Time** — analyze 465 videos' publish timestamps vs 7-day view velocity → "Your best slot is Tuesday 2–5 PM PST" — Gemini can compute this!
-2. **Title Length vs. Views Scatter** — SVG scatter plot of title char count vs view count; often reveals a 50–70 char sweet spot
-3. **Hook Score** — views/day in first 48h is a reliable CTR proxy; Gemini can identify patterns
-4. **Competitor Gap Tracker** — "At current rate, you'll reach SourceCAD's subscribers in ~18 months" — computed from snapshot diffs
-5. **Weekly Gemini Report** — a Vercel cron job that runs every Sunday, asks Gemini to summarize the week, and emails it
-6. **Multi-user Support** — Supabase Row Level Security (RLS) lets you add multiple YouTube channels with separate OAuth tokens; each user sees only their own private data
+| Card background | flat `#1c2024` | `#13171c` + gold gradient for mine |
+| Card border | uniform `rgba(255,255,255,0.07)` | layered inner highlight + outer |
+| Card hover | `translateY(-2px)` | lift + shadow + glow for mine |
+| Card press | `scale(0.985)` | `scale(0.992)` + snap timing |
+| Status bar | solid color, full height | gradient, floats vertically |
+| Action buttons | fade in, static | slide-in from right |
+| Channel name | DM Sans 14px/700 | Outfit 14.5px/600 |
+| Subscriber value | JetBrains Mono 20px | JetBrains Mono 21px + letter-spacing -1px |
+| Labels | all same `var(--t3)` | tiered: `--t3` primary, `--t4` secondary |
+| Badges | pill-shaped, pill radius | 4px radius, more data-viz |
+| Sparkline bars | pop in all at once | staggered 20ms delay each, scaleY from 0 |
+| Expand panel | border-top pops in | fades in via `border-color: transparent → --bd` |
+| Background orbs | static | slow drift animation, 18-22s |
+| Skeleton | `.sk` shimmer sweep | exact card shape + sweep direction |
+| Section labels | solid rule line | gradient rule that fades right |
+| Nav active | background box + underline | underline only + subtle glow |
+| Page title | Syne sans-serif | Fraunces optical-size serif |
+| Buttons | generic rounded | tighter, glow on hover only |
