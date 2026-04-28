@@ -503,9 +503,11 @@ async function enrichCards(){
         sparkEl.innerHTML = last8.map(v => {
           const vc = v.view_count ?? v.views_raw ?? 0;
           const pct = Math.max(8, Math.round((vc/maxV)*100));
-          const c = vc >= (maxV*0.7) ? 'var(--pr)' : 'var(--t3)';
+          // Cyan for high performance, Muted for normal
+          const c = vc >= (maxV*0.8) ? 'var(--pr)' : 'var(--t4)';
           return `<div class="cc-spark-bar" style="height:${pct}%;background:${c}" title="${v.views||vc} views"></div>`;
         }).join('');
+
       }
 
       // Fill engagement rate
@@ -540,11 +542,12 @@ async function enrichCards(){
         const best=mVids.reduce((a,b)=>(b.view_count??b.views_raw??0)>(a.view_count??a.views_raw??0)?b:a);
         const bestEl=document.getElementById('cc-best-'+ch.id);
         if(bestEl&&best.title){
-          bestEl.innerHTML=`<div style="background:rgba(86,255,167,.05);border-radius:7px;padding:7px 9px;margin-top:7px;border:1px solid rgba(86,255,167,.12)">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gr);margin-bottom:2px">🏆 Best this month</div>
-            <div style="font-size:11.5px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden">${esc(best.title)}</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--gr);margin-top:2px">${best.views||''} views</div>
+          bestEl.innerHTML=`<div style="background:var(--gr-glow); border-radius:8px; padding:10px 12px; margin-top:12px; border:1px solid rgba(61,220,132,0.15)">
+            <div style="font-family:'Outfit',sans-serif; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--gr); margin-bottom:4px">🏆 Peak Performance</div>
+            <div style="font-family:'Outfit',sans-serif; font-size:12px; font-weight:500; line-height:1.4; color:var(--t1); display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden">${esc(best.title)}</div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gr); margin-top:3px">${best.views||''} views</div>
           </div>`;
+
         }
       }
     }catch{}
@@ -1329,17 +1332,18 @@ function renderChannelSkeletons(n=6){
   const tbl = document.getElementById('chTbl');
   if(!tbl) return;
   tbl.innerHTML = `<div class="ch-grid">${
-    Array.from({length: n}, () => `
-      <div class="ch-card-skel">
-        <div class="sk ch-skel-av"></div>
+    Array.from({length: n}, (_,i) => `
+      <div class="ch-card-skel" style="animation-delay:${i*0.04}s">
+        <div class="ch-skel-av"></div>
         <div class="ch-skel-lines">
-          <div class="sk" style="height:14px;width:55%"></div>
-          <div class="sk" style="height:10px;width:35%"></div>
+          <div class="ch-skel-name"></div>
+          <div class="ch-skel-handle"></div>
         </div>
-        <div class="sk ch-skel-num"></div>
+        <div class="ch-skel-num"></div>
       </div>`).join('')
   }</div>`;
 }
+
 
 function handleCardClick(event, channelId){
   if(event.target.closest('.cc-acts') || event.target.closest('.cc-expand-vid') || event.target.closest('.cc-view-link')) return;
@@ -1475,8 +1479,9 @@ async function renderChannels(){
       <div id="cc-best-${esc(ch.id)}"></div>
 
       <button class="cc-view-link" onclick="event.stopPropagation();${isMine?`openAnalyticsModal('${esc(ch.id)}')`:`openDrawer('${esc(ch.id)}')`}">
-        ${isMine ? 'Full Analytics' : 'View Details'} <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">arrow_forward</span>
+        ${isMine ? 'Full Terminal' : 'Analysis'} <span class="arrow">→</span>
       </button>
+
     </div>
   </div>
 
