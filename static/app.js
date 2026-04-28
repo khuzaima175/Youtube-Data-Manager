@@ -98,6 +98,23 @@ function proxyImg(url){
   return url;
 }
 
+/**
+ * Returns true if a video object is a YouTube Short.
+ * Checks: duration <= 62s, or URL contains /shorts/, or title has #shorts.
+ */
+function isYouTubeShort(v) {
+  if (!v) return false;
+  // Check URL
+  if (v.url && v.url.includes('/shorts/')) return true;
+  // Check duration (in seconds)
+  const dur = parseInt(v.duration ?? v.duration_seconds ?? 0);
+  if (dur > 0 && dur <= 62) return true;
+  // Check title for #shorts tag
+  const title = (v.title || '').toLowerCase();
+  if (title.includes('#shorts') || title.includes('#short')) return true;
+  return false;
+}
+
 function toast(msg,t=''){
   const el=document.getElementById('toast');
   el.textContent=msg;el.className='show '+t;
@@ -109,7 +126,7 @@ function hideErr(id){document.getElementById(id).style.display='none';}
 function logoImg(url,name,cls){
   const fb=(name||'?')[0].toUpperCase();
   if(url)return `<img class="${cls}" src="${esc(proxyImg(url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`;
-  return `<div class="${cls}-fb" style="display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;color:var(--t3)">${fb}</div>`;
+  return `<div class="${cls}-fb" style="display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-weight:800;color:var(--t3)">${fb}</div>`;
 }
 
 function greet(){
@@ -167,7 +184,7 @@ async function renderDash(){
           <div class="my-hero-l">
             ${primary.logo_url
               ?`<img class="my-hero-logo" src="${esc(primary.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`
-              :`<div class="my-hero-logo" style="display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--t3)">${(primary.name||'?')[0].toUpperCase()}</div>`}
+              :`<div class="my-hero-logo" style="display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;color:var(--t3)">${(primary.name||'?')[0].toUpperCase()}</div>`}
             <div class="my-hero-text">
               <div class="my-hero-name">${esc(primary.name)}</div>
               <div class="my-hero-meta">
@@ -503,9 +520,19 @@ async function enrichCards(){
         sparkEl.innerHTML = last8.map(v => {
           const vc = v.view_count ?? v.views_raw ?? 0;
           const pct = Math.max(8, Math.round((vc/maxV)*100));
-          // Cyan for high performance, Muted for normal
           const c = vc >= (maxV*0.8) ? 'var(--pr)' : 'var(--t4)';
-          return `<div class="cc-spark-bar" style="height:${pct}%;background:${c}" title="${v.views||vc} views"></div>`;
+          const isShort = isYouTubeShort(v);
+          const shortMark = isShort ? ' · Short' : '';
+          // Truncate title to 40 chars
+          const titleStr = v.title ? v.title.substring(0, 40) + (v.title.length > 40 ? '…' : '') : '';
+          const dateStr = v.published_at ? new Date(v.published_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : (v.date||'');
+          return `<div class="cc-spark-bar cc-spark-tip-wrap" style="height:${pct}%;background:${c}${isShort?';opacity:0.45':''}">
+            <div class="cc-spark-tooltip">
+              <div class="cc-spark-tip-title">${esc(titleStr)}${shortMark}</div>
+              <div class="cc-spark-tip-views">${fmtN(vc)} views</div>
+              <div class="cc-spark-tip-date">${dateStr}</div>
+            </div>
+          </div>`;
         }).join('');
 
       }
@@ -537,7 +564,7 @@ async function enrichCards(){
         else if(daysSince>28){streakEl.textContent=`⚠ ${daysSince}d gap`;streakEl.className='badge bdg-rd';streakEl.style.display='';}
       }
 
-      const mVids=vids.filter(v=>{const t=new Date(v.published_at||v.date).getTime();return !isNaN(t)&&(now-t)<30*864e5;});
+      const mVids=vids.filter(v=>{const t=new Date(v.published_at||v.date).getTime();return !isNaN(t)&&(now-t)<30*864e5 && !isYouTubeShort(v);});
       if(mVids.length>1){
         const best=mVids.reduce((a,b)=>(b.view_count??b.views_raw??0)>(a.view_count??a.views_raw??0)?b:a);
         const bestEl=document.getElementById('cc-best-'+ch.id);
@@ -555,8 +582,17 @@ async function enrichCards(){
   await Promise.all(promises);
 }
 
+/* Toggle accordion sections in Channel Detail Modal */
+function toggleAcc(id) {
+  const body = document.getElementById('drw-acc-body-' + id);
+  const arrow = document.getElementById('drw-acc-arrow-' + id);
+  if (!body || !arrow) return;
+  const isOpen = body.classList.toggle('open');
+  arrow.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+}
+
 /* ════════════════════════════════════════════════════════
-   OPEN DRAWER (competitor channels)
+   OPEN CHANNEL DETAILS (Modal)
 ════════════════════════════════════════════════════════ */
 function openDrawer(id){
   // Close analytics modal first if it's showing — avoids z-index conflicts
@@ -573,6 +609,7 @@ function openDrawer(id){
     ${ch.banner_url
       ?`<img class="drw-banner" src="${esc(ch.banner_url)}" onerror="this.outerHTML='<div class=drw-banner-ph></div>'" alt="">`
       :'<div class="drw-banner-ph"></div>'}
+    
     <div class="drw-head">
       ${ch.logo_url
         ?`<img class="drw-logo" src="${esc(ch.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`
@@ -580,64 +617,84 @@ function openDrawer(id){
       <div class="drw-info">
         <div class="drw-name">${esc(ch.name)}</div>
         <div class="drw-hdl">${esc(ch.handle||'')}</div>
-        <div class="drw-tags">
-          ${ch.is_primary?'<span class="badge bdg-gd">⭐ My Channel</span>':'<span class="badge bdg-dim">Competitor</span>'}
-          ${ch.country?`<span class="badge bdg-dim">${esc(ch.country)}</span>`:''}
-          ${ch.created?`<span class="badge bdg-dim">Since ${ch.created}</span>`:''}
-        </div>
+      </div>
+      <a class="btn btn-gh drw-save" href="https://www.youtube.com/${esc(ch.handle||'channel/'+ch.id)}" target="_blank" rel="noopener" style="margin-top:32px">
+        <svg viewBox="0 0 24 24" style="width:14px;fill:currentColor;margin-right:6px"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
+        YouTube
+      </a>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="drw-stats-grid">
+      <div class="drw-stat-hero">
+        <div class="drw-stat-lbl">Subscribers</div>
+        <div class="drw-stat-val gold">${esc(ch.subscribers)}</div>
+      </div>
+      <div class="drw-stat-cell">
+        <div class="drw-stat-lbl">Total Views</div>
+        <div class="drw-stat-val">${esc(ch.total_views)}</div>
+      </div>
+      <div class="drw-stat-cell">
+        <div class="drw-stat-lbl">Avg Views</div>
+        <div class="drw-stat-val cyan">${esc(ch.avg_views)}</div>
+      </div>
+      <div class="drw-stat-cell">
+        <div class="drw-stat-lbl">Engagement</div>
+        <div class="drw-stat-val green" id="drwSubRatio">—</div>
       </div>
     </div>
-    <div class="drw-bento">
-      <div class="drw-bento-main" style="color:var(--gold)">
-        <div class="drw-bento-lbl">Subscribers</div>
-        <div class="drw-bento-val">${esc(ch.subscribers)}</div>
-      </div>
-      <div class="drw-bento-cell">
-        <div class="drw-bento-lbl">Total Views</div>
-        <div class="drw-bento-val">${esc(ch.total_views)}</div>
-      </div>
+
+    <div class="drw-two-col">
       <div class="drw-bento-cell">
         <div class="drw-bento-lbl">Videos</div>
-        <div class="drw-bento-val" style="color:var(--pr)">${esc(ch.total_videos)}</div>
+        <div class="drw-bento-val">${esc(ch.total_videos)}</div>
       </div>
       <div class="drw-bento-cell">
-        <div class="drw-bento-lbl">Avg Views</div>
-        <div class="drw-bento-val" style="color:var(--gr)">${esc(ch.avg_views)}</div>
-      </div>
-      <div class="drw-bento-cell">
-        <div class="drw-bento-lbl">Audience</div>
-        <div class="drw-bento-val" id="drwSubRatio" style="color:var(--t3)">—</div>
-      </div>
-      <div class="drw-bento-cell">
-        <div class="drw-bento-lbl">vs ch avg</div>
-        <div class="drw-bento-val" id="drwRecentVsAvg" style="color:var(--t3)">—</div>
+        <div class="drw-bento-lbl">Performance vs Avg</div>
+        <div class="drw-bento-val" id="drwRecentVsAvg">—</div>
       </div>
     </div>
+
+    <!-- Accordion: About -->
     ${ch.description?`
-    <div class="drw-sect">
-      <div class="drw-sh">About</div>
-      <div class="drw-desc">${esc(ch.description)}${ch.description.length>=300?'…':''}</div>
+    <div class="drw-accordion">
+      <button class="drw-acc-hdr" onclick="toggleAcc('about')">
+        <span>About <em>— Channel Description</em></span>
+        <span class="drw-acc-arrow" id="drw-acc-arrow-about">expand_more</span>
+      </button>
+      <div class="drw-acc-body" id="drw-acc-body-about">
+        <div class="drw-desc">${esc(ch.description)}</div>
+      </div>
     </div>`:''}
+
+    <!-- Accordion: Latest Upload -->
     ${v.title?`
-    <div class="drw-sect">
-      <div class="drw-sh">Latest Upload</div>
-      <a class="drw-lv" href="${esc(v.url)}" target="_blank" rel="noopener">
-        <img class="drw-lv-img" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
-        <div class="drw-lv-body">
-          <div class="drw-lv-title">${esc(v.title)}</div>
-          <div class="drw-lv-date">📅 ${v.date}</div>
-          <div class="drw-lv-stats"><span>👁 ${esc(v.views)}</span><span>👍 ${esc(v.likes)}</span><span>💬 ${esc(v.comments||'—')}</span></div>
-        </div>
-      </a>
+    <div class="drw-accordion">
+      <button class="drw-acc-hdr" onclick="toggleAcc('latest')">
+        <span>Latest Upload <em>— ${v.date}</em></span>
+        <span class="drw-acc-arrow" id="drw-acc-arrow-latest">expand_more</span>
+      </button>
+      <div class="drw-acc-body open" id="drw-acc-body-latest">
+        <a class="drw-lv" href="${esc(v.url)}" target="_blank" rel="noopener">
+          <img class="drw-lv-img" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
+          <div class="drw-lv-body">
+            <div class="drw-lv-title">${esc(v.title)}</div>
+            <div class="drw-lv-stats"><span>👁 ${esc(v.views)}</span><span>👍 ${esc(v.likes)}</span><span>💬 ${esc(v.comments||'—')}</span></div>
+          </div>
+        </a>
+      </div>
     </div>`:''}
-    <div class="drw-sect" id="drwRecent">
-      <div class="drw-sh">Recent Uploads</div>
-      <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px"><div class="spin"></div>Loading…</div>
-    </div>
-    <a class="drw-yt" href="https://www.youtube.com/${esc(ch.handle||'channel/'+ch.id)}" target="_blank" rel="noopener">
-      <svg viewBox="0 0 24 24"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
-      Open on YouTube
-    </a>`;
+
+    <!-- Accordion: Recent Performance -->
+    <div class="drw-accordion" id="drwRecent">
+      <button class="drw-acc-hdr" onclick="toggleAcc('recent')">
+        <span>Recent Performance <em>— Last 10 Videos</em></span>
+        <span class="drw-acc-arrow" id="drw-acc-arrow-recent">expand_more</span>
+      </button>
+      <div class="drw-acc-body open" id="drw-acc-body-recent">
+        <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px;padding:20px 0"><div class="spin"></div>Loading insights…</div>
+      </div>
+    </div>`;
 
   document.getElementById('drw').classList.add('open');
   document.getElementById('ovrl').classList.add('open');
@@ -646,21 +703,31 @@ function openDrawer(id){
   fetch(`/api/channels/${id}/videos?max=20`)
     .then(r=>r.json())
     .then(vids=>{
-      const s=document.getElementById('drwRecent');
+      const s=document.getElementById('drw-acc-body-recent');
       const ch2=all.find(c=>c.id===id);
       if(!s)return;
-      if(!vids.length){s.innerHTML='<div class="drw-sh">Recent Uploads</div><p style="color:var(--t3);font-size:12.5px">No uploads found.</p>';return;}
+      if(!vids.length){s.innerHTML='<p style="color:var(--t3);font-size:12.5px">No uploads found.</p>';return;}
+
+      const latestNonShort = vids.find(v => !isYouTubeShort(v));
+      const longFormVids = vids.filter(v => !isYouTubeShort(v));
+      const shortsCount = vids.length - longFormVids.length;
+
       const chSub=ch2?(ch2.subscriber_count??ch2.subscribers_raw??0):0;
       const chViews=ch2?(ch2.total_views_raw??0):0;
       const chVids=ch2?(ch2.video_count??ch2.total_videos_raw??0):0;
-      const drwRva=calcRecentVsAvg(vids,chViews,chVids);
+      const drwRva=calcRecentVsAvg(longFormVids,chViews,chVids);
       const drwSub=calcSubViewRatio(chSub,chViews);
       const rvaEl=document.getElementById('drwRecentVsAvg');
       if(rvaEl){rvaEl.textContent=formatRecentVsAvg(drwRva);rvaEl.style.cssText=rvaEl.style.cssText.replace(/color:[^;]+/,recentVsAvgColor(drwRva));}
       const subEl=document.getElementById('drwSubRatio');
       if(subEl){subEl.textContent=drwSub!==null?drwSub+'%':'—';subEl.style.cssText=subEl.style.cssText.replace(/color:[^;]+/,subViewRatioColor(drwSub));}
 
-      const tbl10=vids.slice(0,10);
+      if (shortsCount > 0) {
+        const hdr = document.querySelector('#drwRecent .drw-acc-hdr span');
+        if (hdr) hdr.innerHTML += ` <span class="badge bdg-dim" style="font-size:8px;padding:0 4px;margin-left:4px;opacity:0.7">${shortsCount} Shorts hidden</span>`;
+      }
+
+      const tbl10=longFormVids.slice(0,10);
       const vcs=tbl10.map(v=>v.view_count??v.views_raw??0);
       const maxVc=Math.max(...vcs),minVc=Math.min(...vcs);
       const hasDiff=maxVc!==minVc;
@@ -686,17 +753,19 @@ function openDrawer(id){
         </a>`;
       }).join('');
 
-      s.innerHTML=`<div class="drw-sh">Recent Uploads</div>
+      s.innerHTML=`
         <div style="padding:0 2px">${vidCards}</div>
-        ${buildViewsTrend(vids)}
-        ${buildCalendar(vids)}
-        ${buildEngTrend(vids)}
-        ${buildWordCloud(vids)}
-        ${buildDuration(vids)}`;
+        <div style="margin-top:20px">
+          ${buildViewsTrend(longFormVids)}
+          ${buildCalendar(longFormVids)}
+          ${buildEngTrend(longFormVids)}
+          ${buildWordCloud(longFormVids)}
+          ${buildDuration(longFormVids)}
+        </div>`;
     })
     .catch(()=>{
-      const s=document.getElementById('drwRecent');
-      if(s)s.innerHTML='<div class="drw-sh">Recent Uploads</div><p style="color:var(--t3);font-size:12.5px">Could not load.</p>';
+      const s=document.getElementById('drw-acc-body-recent');
+      if(s)s.innerHTML='<p style="color:var(--t3);font-size:12.5px">Could not load recent uploads.</p>';
     });
 }
 
@@ -721,7 +790,7 @@ async function openAnalyticsModal(channelId){
   const logoEl=document.getElementById('amLogo');
   logoEl.innerHTML=ch.logo_url
     ?`<img src="${esc(ch.logo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
-    :`<div style="display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--t3)">${(ch.name||'?')[0].toUpperCase()}</div>`;
+    :`<div style="display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;color:var(--t3)">${(ch.name||'?')[0].toUpperCase()}</div>`;
   document.getElementById('amName').textContent=ch.name||'';
   document.getElementById('amSub').textContent=`${ch.handle||''} · ${ch.subscribers} subscribers · ${ch.total_videos} videos`;
 
@@ -758,7 +827,6 @@ function switchAnalyticsTab(tab, skipLoad){
 }
 
 function renderAmOverview(ch){
-  const v=ch.video||{};
   const subRatio=calcSubViewRatio(ch.subscriber_count??ch.subscribers_raw??0, ch.total_views_raw??0);
   const panel=document.getElementById('amPanel-overview');
   panel.innerHTML=`
@@ -768,6 +836,7 @@ function renderAmOverview(ch){
         <div class="am-bento-hero">
           <div class="am-bento-lbl">Subscribers</div>
           <div class="am-bento-val gold">${esc(ch.subscribers)}</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:8px">${ch.handle||''}</div>
         </div>
         <div class="am-bento-cell">
           <div class="am-bento-lbl">Total Views</div>
@@ -778,42 +847,18 @@ function renderAmOverview(ch){
           <div class="am-bento-val cyan">${esc(ch.total_videos)}</div>
         </div>
         <div class="am-bento-cell">
-          <div class="am-bento-lbl">Avg Views/Video</div>
+          <div class="am-bento-lbl">Avg Views</div>
           <div class="am-bento-val green">${esc(ch.avg_views)}</div>
         </div>
-        <div class="am-bento-cell" style="${subViewRatioColor(subRatio)}">
-          <div class="am-bento-lbl">Audience %</div>
-          <div class="am-bento-val">${subRatio!==null?subRatio+'%':'—'}</div>
-        </div>
-        ${ch.created?`
         <div class="am-bento-cell">
-          <div class="am-bento-lbl">Channel Since</div>
-          <div class="am-bento-val" style="font-size:13px">${ch.created}</div>
-        </div>`:''}
+          <div class="am-bento-lbl">Audience %</div>
+          <div class="am-bento-val" style="color:${subViewRatioColor(subRatio)}">${subRatio!==null?subRatio+'%':'—'}</div>
+        </div>
       </div>
 
-      ${ch.description?`
-      <div class="am-sep-sect">
-        <div class="am-sect-lbl">About</div>
-        <div style="font-size:13px;color:var(--t2);line-height:1.7">${esc(ch.description)}${ch.description.length>=300?'…':''}</div>
-      </div>`:''}
-
-      ${v.title?`
-      <div class="am-sep-sect">
-        <div class="am-sect-lbl">Latest Upload</div>
-        <a class="drw-lv" href="${esc(v.url)}" target="_blank" rel="noopener">
-          <img class="drw-lv-img" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
-          <div class="drw-lv-body">
-            <div class="drw-lv-title">${esc(v.title)}</div>
-            <div class="drw-lv-date">📅 ${v.date}</div>
-            <div class="drw-lv-stats"><span>👁 ${esc(v.views)}</span><span>👍 ${esc(v.likes)}</span><span>💬 ${esc(v.comments||'—')}</span></div>
-          </div>
-        </a>
-      </div>`:''}
-
       <div class="am-sep-sect" id="amOvRecent">
-        <div class="am-sect-lbl">Recent Uploads</div>
-        <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px"><div class="spin"></div>Loading…</div>
+        <div class="am-sect-lbl">Channel Insights <em>— Loading...</em></div>
+        <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px;padding:32px 0"><div class="spin"></div>Analyzing recent content…</div>
       </div>
     </div>`;
 
@@ -824,42 +869,46 @@ function renderAmOverview(ch){
       const el=document.getElementById('amOvRecent');
       if(!el)return;
       if(!vids.length){el.innerHTML='<div class="am-sect-lbl">Recent Uploads</div><p style="color:var(--t3)">No uploads found.</p>';return;}
-      const tbl10=vids.slice(0,10);
-      const vcs=tbl10.map(v=>v.view_count??v.views_raw??0);
-      const maxVc=Math.max(...vcs),minVc=Math.min(...vcs);
-      const hasDiff=maxVc!==minVc;
-      const bestIdx=hasDiff?vcs.indexOf(maxVc):-1;
-      const worstIdx=hasDiff?vcs.lastIndexOf(minVc):-1;
-      const vidCards=tbl10.map((v,ri)=>{
+
+      const longFormVids = vids.filter(v => !isYouTubeShort(v));
+      const shortsCount = vids.length - longFormVids.length;
+
+      const tbl5=longFormVids.slice(0,5);
+      const vidCards=tbl5.map((v,ri)=>{
         const vc=v.view_count??v.views_raw??0;
         const eng=calcEngagementRate(v.like_count??0,v.comment_count??0,vc);
-        const isBest=ri===bestIdx,isWorst=ri===worstIdx&&worstIdx!==bestIdx;
         const engC=eng===null?'var(--t3)':eng>=4?'var(--gr)':eng>=2?'var(--gold)':'var(--rd)';
         return `<a href="${esc(v.url)}" target="_blank" rel="noopener"
-          style="display:block;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.05);text-decoration:none;color:inherit;transition:background .12s;border-radius:6px">
-          ${isBest?'<div style="font-size:9px;font-weight:800;color:var(--gr);letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px">🏆 BEST VIDEO</div>':''}
-          ${isWorst?'<div style="font-size:9px;font-weight:800;color:var(--rd);letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px">📉 LOWEST</div>':''}
-          <div style="font-size:14px;font-weight:600;line-height:1.45;color:var(--t1);margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(v.title)}</div>
-          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:var(--pr)">👁 ${esc(v.views)}</span>
-            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--t2)">👍 ${esc(v.likes)}</span>
-            ${eng!==null?`<span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${engC};background:rgba(255,255,255,.05);padding:2px 8px;border-radius:5px">${eng}% eng</span>`:''}
-            <span style="font-size:12px;color:var(--t3);margin-left:auto">${v.date}</span>
+          style="display:block;padding:12px 14px;background:var(--sf-lowest);border:1px solid var(--bd);border-radius:10px;text-decoration:none;color:inherit;transition:all .15s;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title)}</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:var(--pr)">👁 ${esc(v.views)}</span>
+            ${eng!==null?`<span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${engC};background:rgba(255,255,255,.05);padding:1px 6px;border-radius:4px">${eng}% eng</span>`:''}
+            <span style="font-size:11px;color:var(--t3);margin-left:auto">${v.date}</span>
           </div>
         </a>`;
       }).join('');
-      el.innerHTML=`<div class="am-sect-lbl">Recent Uploads</div>
-        <div style="padding:0 2px">${vidCards}</div>
-        ${buildViewsTrend(vids)}
-        ${buildCalendar(vids)}
-        ${buildEngTrend(vids)}
-        ${buildWordCloud(vids)}
-        ${buildDuration(vids)}`;
+
+      el.innerHTML=`
+        <div class="am-sect-lbl">Channel Insights <em>— Performance Mix ${shortsCount > 0 ? `(${shortsCount} Shorts hidden)` : ''}</em></div>
+        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:20px">
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Latest Videos</div>
+            ${vidCards}
+            ${shortsCount > 0 ? `<div style="font-size:11px;color:var(--t4);margin-top:8px;text-align:center">Filtered ${shortsCount} Shorts from this view</div>` : ''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div>
+              <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Views Trend</div>
+              ${buildViewsTrend(longFormVids)}
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Upload Consistency</div>
+              ${buildCalendar(longFormVids)}
+            </div>
+          </div>
+        </div>`;
     })
-    .catch(()=>{
-      const el=document.getElementById('amOvRecent');
-      if(el)el.innerHTML='<div class="am-sect-lbl">Recent Uploads</div><p style="color:var(--t3)">Could not load.</p>';
-    });
 }
 
 /* ── Tab 2: Monthly Performance ─────────────────────── */
@@ -875,9 +924,17 @@ async function renderAmMonthly(){
       const r=await fetch(`/api/channels/${_amChannelId}/videos/full`);
       _amFullVideos=await r.json();
     }
-    const vids=_amFullVideos;
-    if(!vids||!vids.length){
+    const allVids=_amFullVideos;
+    if(!allVids||!allVids.length){
       contEl.innerHTML='<p style="color:var(--t3);padding:24px">No video data available.</p>';
+      loadEl.style.display='none';contEl.style.display='block';return;
+    }
+
+    const vids = allVids.filter(v => !isYouTubeShort(v));
+    const shortsCount = allVids.length - vids.length;
+
+    if(!vids.length){
+      contEl.innerHTML='<p style="color:var(--t3);padding:24px">No long-form video data available.</p>';
       loadEl.style.display='none';contEl.style.display='block';return;
     }
 
@@ -952,6 +1009,11 @@ async function renderAmMonthly(){
       ?Math.round(((thisMonthData.views-lastMonthData.views)/lastMonthData.views)*100):null;
 
     contEl.innerHTML=`
+      ${shortsCount > 0 ? `<div style="margin: 0 0 16px 0; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--bd); border-radius: 6px; font-size: 11.5px; color: var(--t3); display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 14px">ℹ️</span>
+        <span><b>${shortsCount} Shorts</b> are excluded from these analytics to ensure performance data reflects long-form content.</span>
+      </div>` : ''}
+
       <!-- This Month Card -->
       <div class="am-month-summary">
         <div class="am-ms-item">
@@ -1034,7 +1096,7 @@ async function renderAmMonthly(){
         try{
           const d=JSON.parse(g.dataset.tip);
           tip.innerHTML=`
-            <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--t1)">${d.month}</span>
+            <span style="font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;color:var(--t1)">${d.month}</span>
             <span style="display:flex;flex-direction:column;align-items:center">
               <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--pr)">${d.views}</span>
               <span style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-top:1px">Views</span>
@@ -1074,9 +1136,17 @@ async function renderAmGrowth(){
       const r=await fetch(`/api/channels/${_amChannelId}/videos/full`);
       _amFullVideos=await r.json();
     }
-    const vids=_amFullVideos;
-    if(!vids||!vids.length){
+    const allVids=_amFullVideos;
+    if(!allVids||!allVids.length){
       contEl.innerHTML='<p style="color:var(--t3);padding:24px">No video data available.</p>';
+      loadEl.style.display='none';contEl.style.display='block';return;
+    }
+
+    const vids = allVids.filter(v => !isYouTubeShort(v));
+    const shortsCount = allVids.length - vids.length;
+
+    if(!vids.length){
+      contEl.innerHTML='<p style="color:var(--t3);padding:24px">No long-form video data available.</p>';
       loadEl.style.display='none';contEl.style.display='block';return;
     }
 
@@ -1130,6 +1200,10 @@ async function renderAmGrowth(){
     const goodCount=withVpd.filter(v=>(v.vpd||0)>=200&&(v.vpd||0)<1000).length;
 
     contEl.innerHTML=`
+      ${shortsCount > 0 ? `<div style="margin: 0 0 16px 0; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--bd); border-radius: 6px; font-size: 11.5px; color: var(--t3); display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 14px">ℹ️</span>
+        <span><b>${shortsCount} Shorts</b> are excluded from these analytics to ensure performance data reflects long-form content.</span>
+      </div>` : ''}
       <div class="am-month-summary">
         <div class="am-ms-item"><div class="am-ms-val" style="color:var(--gr)">${hotCount}</div><div class="am-ms-lbl">🔥 Hot (&gt;1K/day)</div></div>
         <div class="am-ms-item"><div class="am-ms-val" style="color:var(--gold)">${goodCount}</div><div class="am-ms-lbl">✅ Good (&gt;200/day)</div></div>
@@ -1236,7 +1310,7 @@ async function renderAmTimeline(){
       contEl.innerHTML=`
         <div style="text-align:center;padding:48px 24px">
           <div style="font-size:32px;margin-bottom:12px">📈</div>
-          <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:8px">Building your timeline…</div>
+          <div style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;margin-bottom:8px">Building your timeline…</div>
           <div style="font-size:13px;color:var(--t3);line-height:1.6;max-width:320px;margin:0 auto">
             The growth timeline needs at least 2 data points.<br>
             Hit <strong>Refresh</strong> on your channel today, then again tomorrow — your trajectory will appear here.
