@@ -26,6 +26,15 @@ app = Flask(__name__, static_folder="static")
 # Restrict CORS to localhost only in dev; tighten for production
 CORS(app, origins=["http://localhost:5000", "http://127.0.0.1:5000"])
 
+@app.after_request
+def fix_charset(response):
+    """Ensure JS and CSS files are served with UTF-8 charset so emoji/unicode renders correctly."""
+    ct = response.content_type or ''
+    if ('javascript' in ct or 'css' in ct) and 'charset' not in ct:
+        base = ct.split(';')[0].strip()
+        response.content_type = f'{base}; charset=utf-8'
+    return response
+
 DATA_FILE      = Path(__file__).parent / "channels.json"
 SNAPSHOTS_FILE = Path(__file__).parent / "snapshots.json"
 

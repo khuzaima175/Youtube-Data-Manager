@@ -18,11 +18,38 @@
 <div class="ovrl" id="ovrl" onclick="closeDrawer()"></div>
 <!-- Drawer -->
 <div class="drw" id="drw">
-  <div class="drw-bar">
-    <span class="drw-bar-t">Channel Details</span>
-    <button class="drw-x" onclick="closeDrawer()">close</button>
+  <!-- Fixed Header: banner + channel identity always visible -->
+  <div class="drw-fixed-hdr" id="drwFixedHdr">
+    <!-- Banner image or placeholder fills this -->
+    <div class="drw-banner-wrap" id="drwBannerWrap"></div>
+    <!-- Channel identity row -->
+    <div class="drw-identity" id="drwIdentity"></div>
+    <!-- Stats strip (4 key numbers) -->
+    <div class="drw-stats-strip" id="drwStatsStrip"></div>
+    <!-- Tab bar -->
+    <div class="drw-tab-bar">
+      <button class="drw-tab on" id="drwTab-videos" onclick="switchDrwTab('videos')">
+        <span class="drw-tab-icon" style="font-family:'Material Symbols Outlined'">play_circle</span>
+        Videos
+      </button>
+      <button class="drw-tab" id="drwTab-analytics" onclick="switchDrwTab('analytics')">
+        <span class="drw-tab-icon" style="font-family:'Material Symbols Outlined'">bar_chart</span>
+        Analytics
+      </button>
+      <button class="drw-tab" id="drwTab-about" onclick="switchDrwTab('about')">
+        <span class="drw-tab-icon" style="font-family:'Material Symbols Outlined'">info</span>
+        About
+      </button>
+    </div>
   </div>
-  <div class="drw-body" id="drwBody"></div>
+  <!-- Scrollable body panels, one per tab -->
+  <div class="drw-panels" id="drwPanels">
+    <div class="drw-panel on" id="drwPanel-videos"></div>
+    <div class="drw-panel" id="drwPanel-analytics"></div>
+    <div class="drw-panel" id="drwPanel-about"></div>
+  </div>
+  <!-- Close button always visible in top-right corner -->
+  <button class="drw-close-btn" onclick="closeDrawer()">close</button>
 </div>
 
 <!-- ═══════════════════════════════════════
@@ -39,6 +66,7 @@
         <div class="am-hdr-sub" id="amSub"></div>
       </div>
     </div>
+    <div id="amActions" style="display:flex;gap:6px;align-items:center;margin-left:auto;margin-right:12px"></div>
     <button class="am-close" onclick="closeAnalyticsModal()">close</button>
   </div>
 
@@ -161,7 +189,7 @@
         <button class="btn btn-gh" onclick="exportCSV()">
           <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">download</span> Export CSV
         </button>
-        <button class="btn btn-gh" onclick="refreshAll2()">
+        <button class="btn btn-gh" onclick="refreshAll()">
           <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">refresh</span> Refresh All
         </button>
         <button class="btn btn-pr" id="addTgl" onclick="toggleAdd()">

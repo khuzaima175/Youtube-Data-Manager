@@ -88,6 +88,11 @@ let _amChannelId=null;        // Currently open analytics modal channel id
 let _amFullVideos=null;       // Cached full video list for modal
 let _amSnapshots=null;        // Cached snapshots for modal
 
+/* Drawer State */
+let _drwLatestMode = 'latest';
+let _drwOpenId = null;
+let _drwVideosCache = null;
+
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 // Route YouTube CDN images through our proxy to avoid hotlink-block
@@ -107,8 +112,21 @@ function isYouTubeShort(v) {
   // Check URL
   if (v.url && v.url.includes('/shorts/')) return true;
   // Check duration (in seconds)
-  const dur = parseInt(v.duration ?? v.duration_seconds ?? 0);
-  if (dur > 0 && dur <= 62) return true;
+  // Backend returns duration_secs. Fallback to parsing if needed.
+  let dur = 0;
+  if (typeof v.duration_secs === 'number') {
+    dur = v.duration_secs;
+  } else if (v.duration_seconds) {
+    dur = parseInt(v.duration_seconds, 10);
+  } else if (v.duration && typeof v.duration === 'string') {
+    // If it's MM:SS or H:MM:SS format
+    const parts = v.duration.split(':').map(n => parseInt(n, 10));
+    if (parts.length === 3) dur = parts[0]*3600 + parts[1]*60 + parts[2];
+    else if (parts.length === 2) dur = parts[0]*60 + parts[1];
+    else dur = parseInt(v.duration, 10) || 0;
+  }
+
+  if (dur > 0 && dur <= 180) return true;
   // Check title for #shorts tag
   const title = (v.title || '').toLowerCase();
   if (title.includes('#shorts') || title.includes('#short')) return true;
@@ -154,6 +172,40 @@ async function fetchAll(){
   if(b)b.textContent=all.length||'';
 }
 
+/* ── Refresh All Channels ──────────────────────────────────────── */
+async function refreshAll(){
+  const btn=document.getElementById('refAllBtn');
+  if(btn){
+    btn.style.animation='rot 0.5s linear infinite';
+    btn.disabled=true;
+    btn.title='Refreshing…';
+  }
+  try{
+    await fetchAll();
+    if(!all.length){toast('No channels to refresh','e');return;}
+    toast(`Refreshing ${all.length} channel${all.length>1?'s':''}…`);
+    let done=0;
+    for(const ch of all){
+      try{
+        await fetch(`/api/channels/${ch.id}/refresh`,{method:'POST'});
+      }catch{/* individual channel failure is non-fatal */}
+      done++;
+      if(done<all.length)toast(`Refreshing… ${done}/${all.length}`);
+    }
+    await fetchAll();
+    // Re-render whichever page is visible
+    const dashActive=document.getElementById('page-dash')?.classList.contains('on');
+    const chActive=document.getElementById('page-channels')?.classList.contains('on');
+    if(dashActive)renderDash();
+    if(chActive)renderChannels();
+    toast(`All ${all.length} channels refreshed!`,'s');
+  }catch(ex){
+    toast('Refresh failed — check console','e');
+  }finally{
+    if(btn){btn.style.animation='';btn.disabled=false;btn.title='Refresh all channels';}
+  }
+}
+
 /* ════════════════════════════════════════════════════════
    DASHBOARD
 ════════════════════════════════════════════════════════ */
@@ -166,15 +218,15 @@ async function renderDash(){
     const comps=all.filter(c=>!c.is_primary);
     let html='';
 
-    html+=`<div class="dash-greet">${greet()} 👋</div>
+    html+=`<div class="dash-greet">${greet()}</div>
     <div class="dash-title">${primary?esc(primary.name)+' Analytics':'YT Tracker Dashboard'}</div>`;
 
     if(!primary){
       html+=`<div class="no-pr au">
-        <div class="no-pr-ico">📺</div>
+        <div class="no-pr-ico"><span style="font-family:'Material Symbols Outlined';font-size:48px;color:var(--t4)">subscriptions</span></div>
         <h3>Set your primary channel</h3>
-        <p>Go to <strong>My Channels</strong>, add your channel, then click ⭐ Set Mine to see your analytics here.</p>
-        <button class="btn btn-pr" onclick="sp('channels')">Open My Channels →</button>
+        <p>Go to <strong>My Channels</strong>, add your channel, then click <strong>Set Mine</strong> to see your analytics here.</p>
+        <button class="btn btn-pr" onclick="sp('channels')">Open My Channels</button>
       </div>`;
     } else {
       const v=primary.video||{};
@@ -183,16 +235,16 @@ async function renderDash(){
         <div class="my-hero-top">
           <div class="my-hero-l">
             ${primary.logo_url
-              ?`<img class="my-hero-logo" src="${esc(primary.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+              ?`<img class="my-hero-logo" src="${esc(proxyImg(primary.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
               :`<div class="my-hero-logo" style="display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;color:var(--t3)">${(primary.name||'?')[0].toUpperCase()}</div>`}
             <div class="my-hero-text">
               <div class="my-hero-name">${esc(primary.name)}</div>
               <div class="my-hero-meta">
                 ${primary.handle?`<span>${esc(primary.handle)}</span>`:''}
-                ${primary.country?`<span>·</span><span>${esc(primary.country)}</span>`:''}
-                ${primary.created?`<span>·</span><span>Since ${primary.created}</span>`:''}
+                ${primary.country?`<span class="meta-sep">•</span><span>${esc(primary.country)}</span>`:''}
+                ${primary.created?`<span class="meta-sep">•</span><span>Since ${primary.created}</span>`:''}
               </div>
-              <div class="my-hero-hint">Click to view full analytics →</div>
+              <div class="my-hero-hint">Click to view full analytics ›</div>
             </div>
           </div>
           ${v.title?`
@@ -201,8 +253,8 @@ async function renderDash(){
             <div class="my-vid-mini">
               <img class="my-vid-thumb" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
               <div class="my-vid-body">
-                <div class="my-vid-title">${esc(v.title)}</div>
-                <div class="my-vid-meta">👁 ${esc(v.views)} · ${v.date||''}</div>
+                <div class="my-vid-title" title="${esc(v.title)}">${esc(v.title)}</div>
+                <div class="my-vid-meta"><span class="ms-icon">visibility</span> ${esc(v.views)} <span class="meta-sep">•</span> ${v.date||''}</div>
               </div>
             </div>
           </div>`:''}
@@ -213,7 +265,7 @@ async function renderDash(){
           <div class="my-stat"><div class="my-stat-lbl">Videos</div><div class="my-stat-val">${esc(primary.total_videos)}</div></div>
           <div class="my-stat"><div class="my-stat-lbl">Avg Views</div><div class="my-stat-val green">${esc(primary.avg_views)}</div></div>
         </div>
-      </div>`;
+      </div>`
 
       /* 4A placeholder */
       html+=`<div id="dashMonthGlance" class="dash-mg-wrap au"><div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px"><div class="spin"></div>Loading this month…</div></div>`;
@@ -226,23 +278,23 @@ async function renderDash(){
       const forRace=[primary,...comps].filter(c=>c.video&&c.video.title);
       if(forRace.length){
         const ranked=[...forRace].sort((a,b)=>(b.video.views_raw||0)-(a.video.views_raw||0));
-        const rankIco=i=>['🥇','🥈','🥉'][i]||(i+1);
+        const rankIco = i => ['1','2','3'][i] || String(i+1);
         html+=`<div class="sl d1">Latest Video Face-off <em>${forRace.length} channels compared</em></div>
         <div class="vr-grid d2">`;
         forRace.forEach(ch=>{
           const vv=ch.video,ri=ranked.findIndex(x=>x.id===ch.id),isMine=ch.id===primary.id;
-          html+=`<div class="vr-card ${isMine?'mc':''}" onclick="openDrawer('${esc(ch.id)}')">
+          html+=`<div class="vr-card ${isMine?'mc':''}" onclick="openAnalyticsModal('${esc(ch.id)}')">
             <img class="vr-thumb" src="${esc(vv.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
             <div class="vr-body">
               <div class="vr-ch-row">
-                ${ch.logo_url?`<img class="vr-ch-logo" src="${esc(ch.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`:
+                ${ch.logo_url?`<img class="vr-ch-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`:
                   `<div class="vr-ch-logo" style="display:flex;align-items:center;justify-content:center;font-weight:700;font-size:8px;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
                 <span class="vr-ch-name" style="${isMine?'color:var(--gold)':''}">${esc(ch.name)}</span>
-                <span class="vr-rank">${rankIco(ri)}</span>
+                <span class="rank-badge rank-${ri+1}">${rankIco(ri)}</span>
               </div>
-              <div class="vr-title">${esc(vv.title)}</div>
+              <div class="vr-title" title="${esc(vv.title)}">${esc(vv.title)}</div>
               <div class="vr-views">${esc(vv.views)} <span style="font-size:11px;font-weight:400;color:var(--t3)">views</span></div>
-              <div class="vr-date">📅 ${vv.date} · 👍 ${esc(vv.likes)}</div>
+              <div class="vr-date"><span class="ms-icon">calendar_today</span> ${vv.date} <span class="meta-sep">•</span> <span class="ms-icon">thumb_up</span> ${esc(vv.likes)}</div>
             </div>
           </div>`;
         });
@@ -293,8 +345,8 @@ async function renderDash(){
             <div class="ru-body">
               <div class="ru-title">${esc(v.title)}</div>
               <div class="ru-meta">
-                <span class="ru-stat" style="color:var(--pr)">👁 ${esc(v.views)}</span>
-                <span class="ru-stat" style="color:var(--gr)">👍 ${esc(v.likes)}</span>
+                <span class="ru-stat" style="color:var(--pr)"><span class="ms-icon">visibility</span> ${esc(v.views)}</span>
+                <span class="ru-stat" style="color:var(--gr)"><span class="ms-icon">thumb_up</span> ${esc(v.likes)}</span>
                 <span style="font-size:11px;color:var(--t3);margin-left:auto">${v.date}</span>
               </div>
             </div>
@@ -316,7 +368,7 @@ function buildLB(primary,comps){
   const lbl=sort==='subscribers_raw'?'Subscribers':sort==='avg_views_raw'?'Avg Views':'Total Views';
   const lbl2=sort==='subscribers_raw'?'Avg Views':'Subscribers';
   const fld2=sort==='subscribers_raw'?'avg_views':'subscribers';
-  const rk=['🥇','🥈','🥉'];
+  const rk = ['1st', '2nd', '3rd'];
   let rows='';
   sorted.forEach((ch,i)=>{
     const pct=Math.round(((ch[sort]||0)/maxVal)*100);
@@ -324,11 +376,11 @@ function buildLB(primary,comps){
     const rkCls=i===0?'rk1':i===1?'rk2':i===2?'rk3':'';
     const dispV=sort==='subscribers_raw'?ch.subscribers:sort==='avg_views_raw'?ch.avg_views:ch.total_views;
     rows+=`
-    <div class="lb-row ${mine?'mine':''}" onclick="openDrawer('${esc(ch.id)}')">
-      <div class="lb-rk ${rkCls}">${rk[i]||i+1}</div>
+    <div class="lb-row ${mine?'mine':''}" onclick="openAnalyticsModal('${esc(ch.id)}')">
+      <div class="lb-rk ${rkCls}"><span class="rank-badge rank-${i+1}">${rk[i]||i+1}</span></div>
       <div class="lb-ch">
         ${ch.logo_url
-          ?`<img class="lb-logo" src="${esc(ch.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+          ?`<img class="lb-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
           :`<div class="lb-logo-fb">${(ch.name||'?')[0].toUpperCase()}</div>`}
         <div>
           <div class="lb-ch-name">${esc(ch.name)}${mine?'<span class="lb-you">⭐ You</span>':''}</div>
@@ -345,7 +397,10 @@ function buildLB(primary,comps){
     </div>`;
   });
   return `
-  <div class="sl d1">Competitor Leaderboard <em>Click any row for full details</em></div>
+  <div class="section-hdr">
+    <span style="font-family:'Material Symbols Outlined';font-size:16px;vertical-align:middle">leaderboard</span>
+    Competitor Leaderboard
+  </div>
   <div class="lb d2">
     <div class="lb-top">
       <span class="lb-top-t">Ranked by ${lbl}</span>
@@ -368,87 +423,13 @@ function setSort(f){sort=f;renderDash();}
 function animateBars(){document.querySelectorAll('.lb-bar').forEach(b=>b.style.width=(b.dataset.pct||0)+'%');}
 
 /* ════════════════════════════════════════════════════════
-   DRAWER ANALYTICS HELPERS
+   DRAWER LOGIC (Terminal Luxe)
 ════════════════════════════════════════════════════════ */
 
-function buildViewsTrend(vids){
-  if(!vids||vids.length<3)return '';
-  const sorted=[...vids].sort((a,b)=>new Date(a.published_at||a.date)-new Date(b.published_at||b.date));
-  const views=sorted.map(v=>v.view_count??v.views_raw??0);
-  const maxV=Math.max(...views,1);
-  const half=Math.floor(sorted.length/2);
-  const recentAvg=views.slice(half).reduce((a,b)=>a+b,0)/Math.max(views.length-half,1);
-  const olderAvg=views.slice(0,half).reduce((a,b)=>a+b,0)/Math.max(half,1);
-  const trendPct=olderAvg>0?Math.round(((recentAvg-olderAvg)/olderAvg)*100):0;
-  const tc=trendPct>10?'var(--gr)':trendPct<-10?'var(--rd)':'var(--t3)';
-  const tl=trendPct>10?`↑ ${trendPct}% trending up`:trendPct<-10?`↓ ${Math.abs(trendPct)}% declining`:'→ stable';
-  const bars=sorted.map(v=>{
-    const vc=v.view_count??v.views_raw??0;
-    const pct=Math.max(4,Math.round((vc/maxV)*100));
-    const c=vc>=recentAvg?'var(--pr)':'var(--t3)';
-    return `<div style="flex:1;display:flex;align-items:flex-end" title="${esc(v.title||'')}\n${v.views||''} views"><div style="width:100%;background:${c};border-radius:2px 2px 0 0;height:${pct}%;min-height:3px;opacity:.85;transition:height .6s var(--e)"></div></div>`;
-  }).join('');
-  return `<div class="drw-sect">
-    <div class="drw-sh">Views Trend <span style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:none;letter-spacing:0;color:${tc};font-weight:700">${tl}</span></div>
-    <div style="height:60px;display:flex;align-items:flex-end;gap:3px;background:var(--sf-lowest);border-radius:8px;padding:8px 10px 0;border:1px solid rgba(255,255,255,.04)">${bars}</div>
-    <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--t3)"><span>${sorted[0]?.date||''}</span><span>${sorted[sorted.length-1]?.date||''}</span></div>
-  </div>`;
-}
 
-function buildCalendar(vids){
-  if(!vids||!vids.length)return '';
-  const cells=[];
-  for(let w=11;w>=0;w--){
-    const ws=Date.now()-(w+1)*7*864e5,we=Date.now()-w*7*864e5;
-    const wv=vids.filter(v=>{const t=new Date(v.published_at||v.date).getTime();return !isNaN(t)&&t>=ws&&t<we;});
-    const lbl=w===0?'This week':w===1?'Last week':`${w}w ago`;
-    cells.push(`<div title="${lbl}: ${wv.length?wv.length+' video(s)':'No upload'}" style="width:20px;height:20px;border-radius:4px;background:${wv.length?'var(--gr)':'var(--sf-highest)'};border:1px solid rgba(255,255,255,.05);opacity:${wv.length?1:.45};cursor:default"></div>`);
-  }
-  const sorted=[...vids].sort((a,b)=>new Date(b.published_at||b.date)-new Date(a.published_at||a.date));
-  let streak=0,lastW=-1;
-  for(const v of sorted){
-    const wa=Math.floor((Date.now()-new Date(v.published_at||v.date).getTime())/(7*864e5));
-    if(streak===0&&wa<=1){streak=1;lastW=wa;}
-    else if(streak>0&&wa===lastW+1){streak++;lastW=wa;}
-    else if(streak>0)break;
-  }
-  const sc=streak>=4?'var(--gr)':streak>=2?'var(--pr)':'var(--t3)';
-  const sl=streak>=4?`🔥 ${streak}-week streak!`:streak>=2?`✓ ${streak} weeks in a row`:streak===1?'Posted this week':'Irregular posting';
-  return `<div class="drw-sect">
-    <div class="drw-sh">Upload Calendar <span style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:none;letter-spacing:0;color:${sc};font-weight:700">${sl}</span></div>
-    <div style="display:flex;gap:5px;flex-wrap:wrap;background:var(--sf-lowest);border-radius:8px;padding:10px 12px;border:1px solid rgba(255,255,255,.04)">${cells.join('')}</div>
-    <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--t3)"><span>12 weeks ago</span><span>This week</span></div>
-  </div>`;
-}
 
-function buildEngTrend(vids){
-  if(!vids||vids.length<4)return '';
-  const rates=vids.slice(0,10).map(v=>calcEngagementRate(v.like_count??0,v.comment_count??0,v.view_count??v.views_raw??0)??0).filter(r=>r>0);
-  if(rates.length<4)return '';
-  const sorted_for_eng=[...vids].sort((a,b)=>new Date(a.published_at||a.date)-new Date(b.published_at||b.date));
-  const engBars=sorted_for_eng.slice(-10).map(v=>{
-    const r=calcEngagementRate(v.like_count??0,v.comment_count??0,v.view_count??v.views_raw??0)??0;
-    const maxR=Math.max(...rates,0.1);
-    const h=Math.max(4,Math.round((r/maxR)*100));
-    const c=r>=4?'var(--gr)':r>=2?'var(--gold)':'var(--rd)';
-    return `<div style="flex:1;display:flex;align-items:flex-end" title="${r.toFixed(1)}% eng"><div style="width:100%;background:${c};border-radius:2px 2px 0 0;height:${h}%;min-height:3px;opacity:.8"></div></div>`;
-  }).join('');
-  const half=Math.floor(rates.length/2);
-  const recentEng=rates.slice(0,Math.ceil(rates.length/2)).reduce((a,b)=>a+b,0)/Math.ceil(rates.length/2);
-  const olderEng=rates.slice(half).reduce((a,b)=>a+b,0)/Math.max(rates.length-half,1);
-  const chg=olderEng>0?((recentEng-olderEng)/olderEng)*100:0;
-  const tc=chg>5?'var(--gr)':chg<-5?'var(--rd)':'var(--t3)';
-  const tl=chg>5?`↑ Growing`:chg<-5?`↓ Declining`:'→ Stable';
-  const avg=(rates.reduce((a,b)=>a+b,0)/rates.length).toFixed(1);
-  return `<div class="drw-sect">
-    <div class="drw-sh">Engagement Trend <span style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:none;letter-spacing:0;color:${tc};font-weight:700">${tl} · avg ${avg}%</span></div>
-    <div style="height:44px;display:flex;align-items:flex-end;gap:3px;background:var(--sf-lowest);border-radius:8px;padding:8px 10px 0;border:1px solid rgba(255,255,255,.04)">${engBars}</div>
-    <div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:var(--t3)">
-      <span>Older <span style="font-family:'JetBrains Mono',monospace;color:var(--t2)">${olderEng.toFixed(1)}%</span></span>
-      <span>Recent <span style="font-family:'JetBrains Mono',monospace;color:${tc}">${recentEng.toFixed(1)}%</span></span>
-    </div>
-  </div>`;
-}
+
+
 
 function buildWordCloud(vids){
   if(!vids||vids.length<2)return '';
@@ -460,33 +441,280 @@ function buildWordCloud(vids){
   const maxC=top[0][1];
   const tags=top.map(([w,c])=>{
     const op=0.45+(c/maxC)*0.55;
-    const fs=11+Math.round((c/maxC)*3);
-    return `<span style="background:rgba(0,229,255,${(op*0.13).toFixed(2)});color:rgba(0,229,255,${op.toFixed(2)});border:1px solid rgba(0,229,255,${(op*0.25).toFixed(2)});padding:3px 9px;border-radius:20px;font-size:${fs}px;font-weight:600;white-space:nowrap;cursor:default" title="${c} occurrences">${esc(w)} <span style="font-family:'JetBrains Mono',monospace;font-size:9px;opacity:.65">×${c}</span></span>`;
+    return `<span class="drw-topic-tag">${esc(w)} <em>×${c}</em></span>`;
   }).join('');
-  return `<div class="drw-sect">
-    <div class="drw-sh">Topic Patterns <span style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:none;letter-spacing:0;color:var(--t3);font-weight:400">last ${vids.length} videos</span></div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;background:var(--sf-lowest);border-radius:8px;padding:10px 12px;border:1px solid rgba(255,255,255,.04)">${tags}</div>
+  return `<div>
+    <div class="drw-analytics-sect-hdr" style="margin-top:24px">Topic Patterns <em>last ${vids.length} videos</em></div>
+    <div class="drw-topic-wrap">${tags}</div>
   </div>`;
 }
 
-function buildDuration(vids){
-  const wd=vids.filter(v=>v.duration_secs>0);
-  if(!wd.length)return '';
-  const fmtS=s=>{const m=Math.floor(s/60),sec=s%60;return `${m}:${String(sec).padStart(2,'0')}`;};
-  const avg=Math.round(wd.reduce((s,v)=>s+v.duration_secs,0)/wd.length);
-  const mn=Math.min(...wd.map(v=>v.duration_secs));
-  const mx=Math.max(...wd.map(v=>v.duration_secs));
-  const cat=avg<300?'Short-form':avg<900?'Mid-length':avg<1800?'Long-form':'Deep Dive';
-  const cc=avg<300?'var(--rd)':avg<900?'var(--pr)':avg<1800?'var(--gr)':'var(--gold)';
-  return `<div class="drw-sect">
-    <div class="drw-sh">Video Length <span style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:none;letter-spacing:0;color:${cc};font-weight:700">${cat}</span></div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-      <div style="background:var(--sf-lowest);border-radius:8px;padding:10px;border:1px solid rgba(255,255,255,.04);text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">${fmtS(avg)}</div><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-top:3px">Avg</div></div>
-      <div style="background:var(--sf-lowest);border-radius:8px;padding:10px;border:1px solid rgba(255,255,255,.04);text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">${fmtS(mn)}</div><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-top:3px">Shortest</div></div>
-      <div style="background:var(--sf-lowest);border-radius:8px;padding:10px;border:1px solid rgba(255,255,255,.04);text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">${fmtS(mx)}</div><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-top:3px">Longest</div></div>
+
+/* ════════════════════════════════════════════════════════
+   IMPROVED ANALYTICS BUILDERS
+════════════════════════════════════════════════════════ */
+
+function buildViewsTrendImproved(longFormVids) {
+  const sorted = [...longFormVids]
+    .filter(v => v.published_at || v.date)
+    .sort((a,b) => new Date(a.published_at||a.date) - new Date(b.published_at||b.date))
+    .slice(-20);
+
+  if (sorted.length < 2) {
+    return `<div class="am-trend-empty">Not enough data — need at least 2 videos to show a trend.</div>`;
+  }
+
+  const values = sorted.map(v => v.view_count ?? v.views_raw ?? 0);
+  const maxV   = Math.max(...values, 1);
+  const minV   = Math.min(...values);
+  const rangeV = maxV - minV || 1;
+
+  const half = Math.floor(sorted.length / 2);
+  const recentAvg = values.slice(half).reduce((a,b)=>a+b,0) / Math.max(values.length-half,1);
+  const olderAvg  = values.slice(0,half).reduce((a,b)=>a+b,0) / Math.max(half,1);
+  const trendPct  = olderAvg > 0 ? Math.round(((recentAvg-olderAvg)/olderAvg)*100) : 0;
+  const trendLbl = trendPct > 10
+    ? `▲ ${trendPct}% trending up`
+    : trendPct < -10
+    ? `▼ ${Math.abs(trendPct)}% declining`
+    : `● ${Math.abs(trendPct)}% stable`;
+  const trendC    = trendPct > 10 ? 'var(--gr)' : trendPct < -10 ? 'var(--rd)' : 'var(--t3)';
+
+  const W = 820, H = 120, padL = 60, padR = 16, padT = 14, padB = 30;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const pts = sorted.map((v, i) => {
+    const x = padL + (i / (sorted.length - 1)) * plotW;
+    const y = padT + plotH - ((values[i] - minV) / rangeV) * plotH;
+    return [x, y];
+  });
+
+  const polyline = pts.map(([x,y]) => `${x},${y}`).join(' ');
+  const areaPath = `M${pts[0][0]},${H-padB} ` +
+    pts.map(([x,y]) => `L${x},${y}`).join(' ') +
+    ` L${pts[pts.length-1][0]},${H-padB} Z`;
+
+  const yLabels = [
+    { val: maxV, y: padT },
+    { val: Math.round((maxV+minV)/2), y: padT + plotH/2 },
+    { val: minV, y: padT + plotH },
+  ];
+  const yTickLines = yLabels.map(t =>
+    `<line x1="${padL}" y1="${t.y}" x2="${W-padR}" y2="${t.y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+     <text x="${padL-6}" y="${t.y+4}" text-anchor="end" fill="rgba(255,255,255,0.3)" font-size="9" font-family="JetBrains Mono,monospace">${fmtN(t.val)}</text>`
+  ).join('');
+
+  const dots = pts.map(([x,y], i) => {
+    const v = sorted[i];
+    const dateStr = (v.published_at||v.date||'').slice(0,10);
+    return `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--pr)" stroke="var(--sf-low)" stroke-width="2" style="cursor:pointer">
+      <title>${esc(v.title||'')} — ${fmtN(values[i])} views • ${dateStr}</title>
+    </circle>`;
+  }).join('');
+
+  const xDateLabels = [
+    { idx:0, anchor:'start' },
+    { idx: Math.floor((sorted.length-1)/2), anchor:'middle' },
+    { idx: sorted.length-1, anchor:'end' },
+  ].map(({ idx, anchor }) => {
+    const [x] = pts[idx];
+    const d = (sorted[idx].published_at||sorted[idx].date||'').slice(0,10);
+    return `<text x="${x}" y="${H-4}" text-anchor="${anchor}" fill="rgba(255,255,255,0.25)" font-size="9" font-family="JetBrains Mono,monospace">${d}</text>`;
+  }).join('');
+
+  return `
+    <div class="am-trend-wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:700;color:var(--t2)">Per-video views (up to 20 recent)</span>
+        <span style="font-size:11px;color:${trendC};font-weight:700">${trendLbl}</span>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}" class="am-trend-svg">
+        <defs>
+          <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--pr)" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="var(--pr)" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        ${yTickLines}
+        <path d="${areaPath}" fill="url(#trendGrad)"/>
+        <polyline points="${polyline}" fill="none" stroke="var(--pr)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        ${dots}
+        ${xDateLabels}
+      </svg>
+      <div class="am-trend-footer">
+        <span style="color:var(--t4);font-size:10px">${sorted.length} videos · hover dots for details</span>
+        <span style="color:var(--t4);font-size:10px">peak: <span style="color:var(--pr);font-weight:700">${fmtN(maxV)}</span></span>
+      </div>
+    </div>`;
+}
+
+function buildCalendarImproved(longFormVids) {
+  if (!longFormVids.length) return `<div class="am-trend-empty">No video data available.</div>`;
+
+  const dateMap = {};
+  longFormVids.forEach(v => {
+    const d = (v.published_at||v.date||'').slice(0,10);
+    if (d) dateMap[d] = (dateMap[d]||0) + 1;
+  });
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const totalDays = 52 * 7;
+  const startDate = new Date(today); startDate.setDate(today.getDate() - totalDays + 1);
+
+  const cellSize = 11, gap = 2, cols = 52, rows = 7;
+  const W = cols * (cellSize + gap) + 36, H = rows * (cellSize + gap) + 24;
+
+  const dayLabels = ['S','M','T','W','T','F','S'];
+  const dayLabelSvg = dayLabels.map((d,i) =>
+    i % 2 === 1 ? `<text x="0" y="${i*(cellSize+gap)+cellSize}" fill="rgba(255,255,255,0.2)" font-size="8" font-family="JetBrains Mono,monospace">${d}</text>` : ''
+  ).join('');
+
+  let cells = '', monthLabels = '', prevMonth = -1;
+
+  for (let col = 0; col < cols; col++) {
+    for (let row = 0; row < rows; row++) {
+      const dayOffset = col * 7 + row;
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + dayOffset);
+      if (d > today) continue;
+
+      const iso = d.toISOString().slice(0,10);
+      const count = dateMap[iso] || 0;
+      const x = 28 + col * (cellSize + gap);
+      const y = row * (cellSize + gap);
+
+      const fill = count === 0 ? 'rgba(255,255,255,0.04)'
+        : count === 1 ? 'rgba(0,229,255,0.28)'
+        : count === 2 ? 'rgba(0,229,255,0.58)'
+        : 'rgba(0,229,255,0.88)';
+      const stroke = count > 0 ? 'rgba(0,229,255,0.15)' : 'rgba(255,255,255,0.03)';
+      const tooltip = count > 0 ? `${count} upload${count>1?'s':''} on ${iso}` : `No uploads on ${iso}`;
+
+      cells += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" ry="2" fill="${fill}" stroke="${stroke}" stroke-width="0.5"><title>${tooltip}</title></rect>`;
+
+      const m = d.getMonth();
+      if (row === 0 && m !== prevMonth) {
+        const mNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        monthLabels += `<text x="${x}" y="${H-4}" fill="rgba(255,255,255,0.22)" font-size="8" font-family="JetBrains Mono,monospace">${mNames[m]}</text>`;
+        prevMonth = m;
+      }
+    }
+  }
+
+  // Streak calculation
+  const sortedDates = Object.keys(dateMap).sort().reverse();
+  let streak = 0, lastW = -1;
+  for (const iso of sortedDates) {
+    const wa = Math.floor((Date.now() - new Date(iso).getTime()) / (7 * 864e5));
+    if (streak === 0 && wa <= 1) { streak = 1; lastW = wa; }
+    else if (streak > 0 && wa === lastW + 1) { streak++; lastW = wa; }
+    else if (streak > 0) break;
+  }
+  const sc = streak >= 4 ? 'var(--gr)' : streak >= 2 ? 'var(--pr)' : 'var(--t3)';
+  const sl = streak >= 4
+    ? `${streak}-week streak`
+    : streak >= 2
+    ? `${streak} weeks in a row`
+    : streak === 1
+    ? `1 upload this week`
+    : `No uploads this week`;
+
+  const totalUploads = Object.values(dateMap).reduce((s,n)=>s+n,0);
+  const activeDays = Object.keys(dateMap).length;
+
+  return `
+    <div class="am-cal-wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:700;color:var(--t2)">${totalUploads} uploads · ${activeDays} active days</span>
+        <span style="font-size:11px;color:${sc};font-weight:700">${sl}</span>
+      </div>
+      <svg viewBox="0 0 ${W} ${H+20}" width="100%" class="am-cal-svg">
+        ${dayLabelSvg}
+        ${cells}
+        ${monthLabels}
+      </svg>
+      <div class="am-trend-footer">
+        <span style="color:var(--t4);font-size:10px">Past 52 weeks · hover cells for dates</span>
+        <div style="display:flex;align-items:center;gap:5px">
+          <span style="font-size:9px;color:var(--t4)">Less</span>
+          ${['rgba(255,255,255,0.04)','rgba(0,229,255,0.28)','rgba(0,229,255,0.58)','rgba(0,229,255,0.88)'].map(c=>`<span style="width:10px;height:10px;border-radius:2px;background:${c};display:inline-block"></span>`).join('')}
+          <span style="font-size:9px;color:var(--t4)">More</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function buildEngTrendImproved(vids) {
+  if (!vids || vids.length < 4) return '';
+  const sorted = [...vids].sort((a, b) => new Date(a.published_at || a.date) - new Date(b.published_at || b.date));
+  const last12 = sorted.slice(-12);
+  const rates = last12.map(v => calcEngagementRate(v.like_count ?? 0, v.comment_count ?? 0, v.view_count ?? v.views_raw ?? 0) ?? 0);
+  const validRates = rates.filter(r => r > 0);
+  if (validRates.length < 3) return '';
+
+  const maxR = Math.max(...rates, 0.1);
+  const avgRate = (validRates.reduce((a, b) => a + b, 0) / validRates.length).toFixed(1);
+
+  const halfIdx = Math.floor(rates.length / 2);
+  const recentSlice = validRates.slice(Math.ceil(validRates.length / 2));
+  const olderSlice = validRates.slice(0, halfIdx);
+  const recentEng = recentSlice.length ? recentSlice.reduce((a, b) => a + b, 0) / recentSlice.length : 0;
+  const olderEng = olderSlice.length ? olderSlice.reduce((a, b) => a + b, 0) / olderSlice.length : 0;
+  const chg = olderEng > 0 ? ((recentEng - olderEng) / olderEng) * 100 : 0;
+  const tc = chg > 5 ? 'var(--gr)' : chg < -5 ? 'var(--rd)' : 'var(--t3)';
+  const tl = chg > 5 ? '▲ Growing' : chg < -5 ? '▼ Declining' : '● Stable';
+
+  const bars = last12.map((v, i) => {
+    const r = rates[i];
+    const pct = Math.max(4, Math.round((r / maxR) * 100));
+    const c = r >= 4 ? 'var(--gr)' : r >= 2 ? 'var(--gold)' : 'var(--rd)';
+    const titleShort = esc(v.title || '');
+    return `<div class="drw-trend-bar-wrap">
+      <div class="drw-trend-bar" style="height:${pct}%;background:${c}"></div>
+      <div class="drw-trend-tooltip">${esc(titleShort)}<br><strong>${r.toFixed(1)}% engagement</strong></div>
+    </div>`;
+  }).join('');
+
+  return `<div class="drw-analytics-sect-hdr" style="margin-top:24px">Engagement Trend <em style="color:${tc}">${tl} · avg ${avgRate}%</em></div>
+  <div class="drw-trend-chart">
+    <div class="drw-trend-bars">${bars}</div>
+    <div class="drw-trend-footer">
+      <span>Older <strong style="font-family:'JetBrains Mono',monospace;color:var(--t2)">${olderEng.toFixed(1)}%</strong></span>
+      <span style="font-size:9px;color:var(--t4)">Hover bars for details</span>
+      <span>Recent <strong style="font-family:'JetBrains Mono',monospace;color:${tc}">${recentEng.toFixed(1)}%</strong></span>
     </div>
   </div>`;
 }
+
+function buildDurationImproved(vids) {
+  const wd = vids.filter(v => v.duration_secs > 0);
+  if (!wd.length) return '';
+  const fmtS = s => { const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}`; };
+  const avg = Math.round(wd.reduce((s, v) => s + v.duration_secs, 0) / wd.length);
+  const mn = Math.min(...wd.map(v => v.duration_secs));
+  const mx = Math.max(...wd.map(v => v.duration_secs));
+  const cat = avg < 300 ? 'Short-form' : avg < 900 ? 'Mid-length' : avg < 1800 ? 'Long-form' : 'Deep Dive';
+  const cc = avg < 300 ? 'var(--rd)' : avg < 900 ? 'var(--pr)' : avg < 1800 ? 'var(--gr)' : 'var(--gold)';
+  return `<div class="drw-analytics-sect-hdr" style="margin-top:24px">Video Length <em style="color:${cc}">${cat}</em></div>
+  <div class="drw-dur-grid">
+    <div class="drw-dur-cell">
+      <div class="drw-dur-val">${fmtS(avg)}</div>
+      <div class="drw-dur-lbl">Average</div>
+    </div>
+    <div class="drw-dur-cell">
+      <div class="drw-dur-val" style="color:var(--pr)">${fmtS(mn)}</div>
+      <div class="drw-dur-lbl">Shortest</div>
+    </div>
+    <div class="drw-dur-cell">
+      <div class="drw-dur-val" style="color:var(--gold)">${fmtS(mx)}</div>
+      <div class="drw-dur-lbl">Longest</div>
+    </div>
+  </div>`;
+}
+
+const buildViewsTrend = buildViewsTrendImproved;
+const buildCalendar = buildCalendarImproved;
 
 /* ════════════════════════════════════════════════════════
    CARD ASYNC ENRICHMENT (cached)
@@ -522,12 +750,12 @@ async function enrichCards(){
           const pct = Math.max(8, Math.round((vc/maxV)*100));
           const c = vc >= (maxV*0.8) ? 'var(--pr)' : 'var(--t4)';
           const isShort = isYouTubeShort(v);
-          const shortMark = isShort ? ' · Short' : '';
-          // Truncate title to 40 chars
-          const titleStr = v.title ? v.title.substring(0, 40) + (v.title.length > 40 ? '…' : '') : '';
+          const shortMark = isShort ? ' • Short' : '';
+          // Truncate title via CSS
+          const titleStr = esc(v.title || '');
           const dateStr = v.published_at ? new Date(v.published_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : (v.date||'');
           return `<div class="cc-spark-bar cc-spark-tip-wrap" style="height:${pct}%;background:${c}${isShort?';opacity:0.45':''}">
-            <div class="cc-spark-tooltip">
+            <div class="cc-spark-tooltip" title="${esc(v.title || '')}">
               <div class="cc-spark-tip-title">${esc(titleStr)}${shortMark}</div>
               <div class="cc-spark-tip-views">${fmtN(vc)} views</div>
               <div class="cc-spark-tip-date">${dateStr}</div>
@@ -559,24 +787,11 @@ async function enrichCards(){
       const streakEl=document.getElementById('cc-streak-'+ch.id);
       if(streakEl){
         const daysSince=sorted.length?Math.floor((now-new Date(sorted[0].published_at||sorted[0].date).getTime())/864e5):999;
-        if(streak>=4){streakEl.textContent=`🔥 ${streak}wk streak`;streakEl.className='badge bdg-gr';streakEl.style.display='';}
-        else if(streak>=2){streakEl.textContent=`✓ ${streak}wks`;streakEl.className='badge bdg-pr';streakEl.style.display='';}
-        else if(daysSince>28){streakEl.textContent=`⚠ ${daysSince}d gap`;streakEl.className='badge bdg-rd';streakEl.style.display='';}
+        if(streak>=4){streakEl.textContent=`${streak}-wk streak`;streakEl.className='badge bdg-gr';streakEl.style.display='';}
+        else if(streak>=2){streakEl.textContent=`${streak}wks`;streakEl.className='badge bdg-pr';streakEl.style.display='';}
+        else if(daysSince>28){streakEl.textContent=`${daysSince}d gap`;streakEl.className='badge bdg-rd';streakEl.style.display='';}
       }
 
-      const mVids=vids.filter(v=>{const t=new Date(v.published_at||v.date).getTime();return !isNaN(t)&&(now-t)<30*864e5 && !isYouTubeShort(v);});
-      if(mVids.length>1){
-        const best=mVids.reduce((a,b)=>(b.view_count??b.views_raw??0)>(a.view_count??a.views_raw??0)?b:a);
-        const bestEl=document.getElementById('cc-best-'+ch.id);
-        if(bestEl&&best.title){
-          bestEl.innerHTML=`<div style="background:var(--gr-glow); border-radius:8px; padding:10px 12px; margin-top:12px; border:1px solid rgba(61,220,132,0.15)">
-            <div style="font-family:'Outfit',sans-serif; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--gr); margin-bottom:4px">🏆 Peak Performance</div>
-            <div style="font-family:'Outfit',sans-serif; font-size:12px; font-weight:500; line-height:1.4; color:var(--t1); display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden">${esc(best.title)}</div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gr); margin-top:3px">${best.views||''} views</div>
-          </div>`;
-
-        }
-      }
     }catch{}
   });
   await Promise.all(promises);
@@ -594,186 +809,226 @@ function toggleAcc(id) {
 /* ════════════════════════════════════════════════════════
    OPEN CHANNEL DETAILS (Modal)
 ════════════════════════════════════════════════════════ */
-function openDrawer(id){
-  // Close analytics modal first if it's showing — avoids z-index conflicts
-  const modal=document.getElementById('analyticsModal');
-  if(modal&&modal.classList.contains('open')){
-    modal.classList.remove('open');
-    document.getElementById('amOvrl').classList.remove('open');
+/* ════════════════════════════════════════════════════════
+   DRAWER (REFACTORED)
+════════════════════════════════════════════════════════ */
+
+function switchDrwTab(tab) {
+  document.querySelectorAll('.drw-tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.drw-panel').forEach(p => p.classList.remove('on'));
+  const tabEl = document.getElementById('drwTab-' + tab);
+  const panelEl = document.getElementById('drwPanel-' + tab);
+  if (tabEl) tabEl.classList.add('on');
+  if (panelEl) panelEl.classList.add('on');
+}
+
+function toggleDrwBest(channelId) {
+  const container = document.getElementById('drwBestContainer-' + channelId);
+  const arrow = document.getElementById('drwBestArrow-' + channelId);
+  if (!container) return;
+  const isOpen = container.classList.toggle('open');
+  if (arrow) arrow.style.transform = isOpen ? 'rotate(180deg)' : '';
+  if (isOpen && container.dataset.loaded !== '1') {
+    container.dataset.loaded = '1';
+    loadDrwBestEver(channelId, container);
   }
-  const ch=all.find(c=>c.id===id);
-  if(!ch)return;
-  const v=ch.video||{};
+}
 
-  document.getElementById('drwBody').innerHTML=`
-    ${ch.banner_url
-      ?`<img class="drw-banner" src="${esc(ch.banner_url)}" onerror="this.outerHTML='<div class=drw-banner-ph></div>'" alt="">`
-      :'<div class="drw-banner-ph"></div>'}
-    
-    <div class="drw-head">
-      ${ch.logo_url
-        ?`<img class="drw-logo" src="${esc(ch.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`
-        :`<div class="drw-logo-fb">${(ch.name||'?')[0].toUpperCase()}</div>`}
-      <div class="drw-info">
-        <div class="drw-name">${esc(ch.name)}</div>
-        <div class="drw-hdl">${esc(ch.handle||'')}</div>
-      </div>
-      <a class="btn btn-gh drw-save" href="https://www.youtube.com/${esc(ch.handle||'channel/'+ch.id)}" target="_blank" rel="noopener" style="margin-top:32px">
-        <svg viewBox="0 0 24 24" style="width:14px;fill:currentColor;margin-right:6px"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
-        YouTube
-      </a>
-    </div>
-
-    <!-- Stats Grid -->
-    <div class="drw-stats-grid">
-      <div class="drw-stat-hero">
-        <div class="drw-stat-lbl">Subscribers</div>
-        <div class="drw-stat-val gold">${esc(ch.subscribers)}</div>
-      </div>
-      <div class="drw-stat-cell">
-        <div class="drw-stat-lbl">Total Views</div>
-        <div class="drw-stat-val">${esc(ch.total_views)}</div>
-      </div>
-      <div class="drw-stat-cell">
-        <div class="drw-stat-lbl">Avg Views</div>
-        <div class="drw-stat-val cyan">${esc(ch.avg_views)}</div>
-      </div>
-      <div class="drw-stat-cell">
-        <div class="drw-stat-lbl">Engagement</div>
-        <div class="drw-stat-val green" id="drwSubRatio">—</div>
-      </div>
-    </div>
-
-    <div class="drw-two-col">
-      <div class="drw-bento-cell">
-        <div class="drw-bento-lbl">Videos</div>
-        <div class="drw-bento-val">${esc(ch.total_videos)}</div>
-      </div>
-      <div class="drw-bento-cell">
-        <div class="drw-bento-lbl">Performance vs Avg</div>
-        <div class="drw-bento-val" id="drwRecentVsAvg">—</div>
-      </div>
-    </div>
-
-    <!-- Accordion: About -->
-    ${ch.description?`
-    <div class="drw-accordion">
-      <button class="drw-acc-hdr" onclick="toggleAcc('about')">
-        <span>About <em>— Channel Description</em></span>
-        <span class="drw-acc-arrow" id="drw-acc-arrow-about">expand_more</span>
-      </button>
-      <div class="drw-acc-body" id="drw-acc-body-about">
-        <div class="drw-desc">${esc(ch.description)}</div>
-      </div>
-    </div>`:''}
-
-    <!-- Accordion: Latest Upload -->
-    ${v.title?`
-    <div class="drw-accordion">
-      <button class="drw-acc-hdr" onclick="toggleAcc('latest')">
-        <span>Latest Upload <em>— ${v.date}</em></span>
-        <span class="drw-acc-arrow" id="drw-acc-arrow-latest">expand_more</span>
-      </button>
-      <div class="drw-acc-body open" id="drw-acc-body-latest">
-        <a class="drw-lv" href="${esc(v.url)}" target="_blank" rel="noopener">
-          <img class="drw-lv-img" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
-          <div class="drw-lv-body">
-            <div class="drw-lv-title">${esc(v.title)}</div>
-            <div class="drw-lv-stats"><span>👁 ${esc(v.views)}</span><span>👍 ${esc(v.likes)}</span><span>💬 ${esc(v.comments||'—')}</span></div>
-          </div>
-        </a>
-      </div>
-    </div>`:''}
-
-    <!-- Accordion: Recent Performance -->
-    <div class="drw-accordion" id="drwRecent">
-      <button class="drw-acc-hdr" onclick="toggleAcc('recent')">
-        <span>Recent Performance <em>— Last 10 Videos</em></span>
-        <span class="drw-acc-arrow" id="drw-acc-arrow-recent">expand_more</span>
-      </button>
-      <div class="drw-acc-body open" id="drw-acc-body-recent">
-        <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px;padding:20px 0"><div class="spin"></div>Loading insights…</div>
-      </div>
-    </div>`;
-
-  document.getElementById('drw').classList.add('open');
-  document.getElementById('ovrl').classList.add('open');
-  document.body.style.overflow='hidden';
-
-  fetch(`/api/channels/${id}/videos?max=20`)
-    .then(r=>r.json())
-    .then(vids=>{
-      const s=document.getElementById('drw-acc-body-recent');
-      const ch2=all.find(c=>c.id===id);
-      if(!s)return;
-      if(!vids.length){s.innerHTML='<p style="color:var(--t3);font-size:12.5px">No uploads found.</p>';return;}
-
-      const latestNonShort = vids.find(v => !isYouTubeShort(v));
-      const longFormVids = vids.filter(v => !isYouTubeShort(v));
-      const shortsCount = vids.length - longFormVids.length;
-
-      const chSub=ch2?(ch2.subscriber_count??ch2.subscribers_raw??0):0;
-      const chViews=ch2?(ch2.total_views_raw??0):0;
-      const chVids=ch2?(ch2.video_count??ch2.total_videos_raw??0):0;
-      const drwRva=calcRecentVsAvg(longFormVids,chViews,chVids);
-      const drwSub=calcSubViewRatio(chSub,chViews);
-      const rvaEl=document.getElementById('drwRecentVsAvg');
-      if(rvaEl){rvaEl.textContent=formatRecentVsAvg(drwRva);rvaEl.style.cssText=rvaEl.style.cssText.replace(/color:[^;]+/,recentVsAvgColor(drwRva));}
-      const subEl=document.getElementById('drwSubRatio');
-      if(subEl){subEl.textContent=drwSub!==null?drwSub+'%':'—';subEl.style.cssText=subEl.style.cssText.replace(/color:[^;]+/,subViewRatioColor(drwSub));}
-
-      if (shortsCount > 0) {
-        const hdr = document.querySelector('#drwRecent .drw-acc-hdr span');
-        if (hdr) hdr.innerHTML += ` <span class="badge bdg-dim" style="font-size:8px;padding:0 4px;margin-left:4px;opacity:0.7">${shortsCount} Shorts hidden</span>`;
-      }
-
-      const tbl10=longFormVids.slice(0,10);
-      const vcs=tbl10.map(v=>v.view_count??v.views_raw??0);
-      const maxVc=Math.max(...vcs),minVc=Math.min(...vcs);
-      const hasDiff=maxVc!==minVc;
-      const bestIdx=hasDiff?vcs.indexOf(maxVc):-1;
-      const worstIdx=hasDiff?vcs.lastIndexOf(minVc):-1;
-
-      const vidCards=tbl10.map((v,ri)=>{
-        const vVc=v.view_count??v.views_raw??0;
-        const vLc=v.like_count??0;
-        const vCc=v.comment_count??0;
-        const eng=calcEngagementRate(vLc,vCc,vVc);
-        const isBest=ri===bestIdx,isWorst=ri===worstIdx&&worstIdx!==bestIdx;
-        const engC=eng===null?'var(--t3)':eng>=4?'var(--gr)':eng>=2?'var(--gold)':'var(--rd)';
-        return `<a href="${esc(v.url)}" target="_blank" rel="noopener" class="drw-vid-row">
-          ${isBest?'<span class="drw-vid-badge best">🏆 BEST</span>':''}
-          <div class="drw-vid-title">${esc(v.title)}</div>
-          <div class="drw-vid-meta">
-            <span style="font-family:'JetBrains Mono',monospace;color:var(--pr);font-size:12px;font-weight:700">👁 ${esc(v.views)}</span>
-            <span style="font-family:'JetBrains Mono',monospace;color:var(--t2);font-size:12px">👍 ${esc(v.likes)}</span>
-            ${eng!==null?`<span class="drw-vid-eng" style="color:${engC}">${eng}%</span>`:''}
-            <span style="font-size:11px;color:var(--t3);margin-left:auto">${v.date}</span>
+function loadDrwBestEver(channelId, container) {
+  container.innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12px;padding:16px 0"><div class="spin"></div>Loading all-time best…</div>';
+  fetch(`/api/channels/${channelId}/videos?max=50`)
+    .then(r => r.json())
+    .then(vids => {
+      const longForm = vids.filter(v => !isYouTubeShort(v));
+      if (!longForm.length) { container.innerHTML = '<p style="color:var(--t3);font-size:12px;padding:12px 0">No long-form videos found.</p>'; return; }
+      const sorted = [...longForm].sort((a, b) => (b.view_count ?? b.views_raw ?? 0) - (a.view_count ?? a.views_raw ?? 0));
+      const top10 = sorted.slice(0, 10);
+      const rankSymbols = ['🥇','🥈','🥉'];
+      container.innerHTML = top10.map((v, i) => {
+        const vc = v.view_count ?? v.views_raw ?? 0;
+        const eng = calcEngagementRate(v.like_count ?? 0, v.comment_count ?? 0, vc);
+        const engC = eng === null ? 'var(--t3)' : eng >= 4 ? 'var(--gr)' : eng >= 2 ? 'var(--gold)' : 'var(--rd)';
+        const rankClass = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
+        const rankDisp = i < 3 ? rankSymbols[i] : (i + 1);
+        return `<a class="drw-hot-card" href="${esc(v.url)}" target="_blank" rel="noopener">
+          <div class="drw-hot-rank ${rankClass}">${rankDisp}</div>
+          <img class="drw-hot-thumb" src="${esc(v.thumb || '')}" onerror="this.style.background='var(--sf-highest)';this.removeAttribute('src')" alt="">
+          <div class="drw-hot-info">
+            <div class="drw-hot-title">${esc(v.title)}</div>
+            <div class="drw-hot-stats">
+              <span style="font-family:'JetBrains Mono',monospace;color:var(--pr);font-weight:700">👁 ${esc(v.views)}</span>
+              <span style="font-family:'JetBrains Mono',monospace;color:var(--t2)"><span class="ms-icon">thumb_up</span> ${esc(v.likes)}</span>
+              ${eng !== null ? `<span style="font-family:'JetBrains Mono',monospace;color:${engC};font-size:10px">${eng}%</span>` : ''}
+              <span style="font-size:10px;color:var(--t3);margin-left:auto">${v.date}</span>
+            </div>
           </div>
         </a>`;
       }).join('');
-
-      s.innerHTML=`
-        <div style="padding:0 2px">${vidCards}</div>
-        <div style="margin-top:20px">
-          ${buildViewsTrend(longFormVids)}
-          ${buildCalendar(longFormVids)}
-          ${buildEngTrend(longFormVids)}
-          ${buildWordCloud(longFormVids)}
-          ${buildDuration(longFormVids)}
-        </div>`;
     })
-    .catch(()=>{
-      const s=document.getElementById('drw-acc-body-recent');
-      if(s)s.innerHTML='<p style="color:var(--t3);font-size:12.5px">Could not load recent uploads.</p>';
-    });
+    .catch(() => { container.innerHTML = '<p style="color:var(--t3);font-size:12px;padding:12px 0">Could not load.</p>'; });
 }
 
-function closeDrawer(){
-  document.getElementById('drw').classList.remove('open');
-  document.getElementById('ovrl').classList.remove('open');
-  document.body.style.overflow='';
+function renderDrwLatestUpload(v, allVids, latestNonShort) {
+  const showingNonShort = _drwLatestMode === 'nonshort' && latestNonShort;
+  const displayV = showingNonShort ? latestNonShort : v;
+  if (!displayV || !displayV.title) return '';
+
+  const hasShort = v && isYouTubeShort(v) && latestNonShort && latestNonShort.id !== v.id;
+  const hasDifference = latestNonShort && v && latestNonShort.id !== v.id;
+
+  const switcherHtml = hasDifference ? `
+    <div class="drw-latest-switcher">
+      <button class="drw-latest-switch-btn ${_drwLatestMode === 'latest' ? 'on' : ''}" onclick="_drwLatestMode='latest';renderDrwVideosTab()">Latest</button>
+      <button class="drw-latest-switch-btn ${_drwLatestMode === 'nonshort' ? 'on' : ''}" onclick="_drwLatestMode='nonshort';renderDrwVideosTab()">Last Long-form</button>
+      ${hasShort ? '<span style="font-size:10px;color:var(--t3);margin-left:4px">Latest is a Short</span>' : ''}
+    </div>` : '';
+
+  const labelText = showingNonShort ? 'Last Long-form Upload' : (isYouTubeShort(displayV) ? '⚡ Latest Upload (Short)' : '▶ Latest Upload');
+  const labelClass = showingNonShort ? 'drw-latest-label non-short' : 'drw-latest-label';
+
+  return `<div style="margin-bottom:20px">
+    ${switcherHtml}
+    <a class="drw-latest-card" href="${esc(displayV.url)}" target="_blank" rel="noopener">
+      <img class="drw-latest-thumb" src="${esc(displayV.thumb || '')}" onerror="this.style.background='var(--sf-highest)';this.removeAttribute('src')" alt="">
+      <div class="drw-latest-body">
+        <div class="${labelClass}">${labelText} <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3)">${displayV.date || ''}</span></div>
+        <div class="drw-latest-title">${esc(displayV.title)}</div>
+        <div class="drw-latest-meta">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:var(--pr)">👁 ${esc(displayV.views)}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2)"><span class="ms-icon">thumb_up</span> ${esc(displayV.likes)}</span>
+          ${displayV.comments ? `<span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t3)"><span class="ms-icon">comment</span> ${esc(displayV.comments)}</span>` : ''}
+        </div>
+      </div>
+    </a>
+  </div>`;
 }
+
+function renderDrwVideosTab() {
+  const panel = document.getElementById('drwPanel-videos');
+  if (!panel || !_drwVideosCache) return;
+  const vids = _drwVideosCache;
+  const ch = all.find(c => c.id === _drwOpenId);
+  if (!ch) return;
+
+  const allSorted = [...vids].sort((a, b) => new Date(b.published_at || b.date) - new Date(a.published_at || a.date));
+  const latestAny = allSorted[0];
+  const latestNonShort = allSorted.find(v => !isYouTubeShort(v));
+  const longFormVids = vids.filter(v => !isYouTubeShort(v));
+  const shortsCount = vids.length - longFormVids.length;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const thisMonthVids = longFormVids.filter(v => {
+    const t = new Date(v.published_at || v.date).getTime();
+    return !isNaN(t) && t >= monthStart;
+  });
+  const hot5 = [...thisMonthVids].sort((a, b) => (b.view_count ?? b.views_raw ?? 0) - (a.view_count ?? a.views_raw ?? 0)).slice(0, 5);
+
+  const recent10 = longFormVids.slice(0, 10);
+  const vcs = recent10.map(v => v.view_count ?? v.views_raw ?? 0);
+  const maxVc = Math.max(...vcs, 1);
+  const bestIdx = vcs.indexOf(Math.max(...vcs));
+
+  const hot5Html = hot5.length > 0 ? `
+    <div class="drw-vid-section-label">
+      Hot This Month <em style="font-style:normal;font-size:9px;color:var(--t4);margin-left:4px">${hot5.length} video${hot5.length > 1 ? 's' : ''}</em>
+    </div>
+    ${hot5.map((v, i) => {
+      const vc = v.view_count ?? v.views_raw ?? 0;
+      const eng = calcEngagementRate(v.like_count ?? 0, v.comment_count ?? 0, vc);
+      const engC = eng === null ? 'var(--t3)' : eng >= 4 ? 'var(--gr)' : eng >= 2 ? 'var(--gold)' : 'var(--rd)';
+      const rankClass = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
+      const rankSymbols = ['🥇','🥈','🥉','4','5'];
+      return `<a class="drw-hot-card" href="${esc(v.url)}" target="_blank" rel="noopener">
+        <div class="drw-hot-rank ${rankClass}">${rankSymbols[i]}</div>
+        <img class="drw-hot-thumb" src="${esc(v.thumb || '')}" onerror="this.style.background='var(--sf-highest)';this.removeAttribute('src')" alt="">
+        <div class="drw-hot-info">
+          <div class="drw-hot-title">${esc(v.title)}</div>
+          <div class="drw-hot-stats">
+            <span style="font-family:'JetBrains Mono',monospace;color:var(--pr);font-weight:700">👁 ${esc(v.views)}</span>
+            ${eng !== null ? `<span style="font-family:'JetBrains Mono',monospace;color:${engC};font-size:10px">${eng}%</span>` : ''}
+            <span style="font-size:10px;color:var(--t3);margin-left:auto">${v.date}</span>
+          </div>
+        </div>
+      </a>`;
+    }).join('')}` : '';
+
+  const recent10Html = recent10.length > 0 ? `
+    <div class="drw-vid-section-label" style="margin-top:${hot5.length > 0 ? '24px' : '0'}">
+      Recent Uploads ${shortsCount > 0 ? `<span style="font-size:9px;color:var(--t4);font-weight:400;margin-left:4px">${shortsCount} Shorts hidden</span>` : ''}
+    </div>
+    ${recent10.map((v, ri) => {
+      const vc = v.view_count ?? v.views_raw ?? 0;
+      const lc = v.like_count ?? 0;
+      const cc = v.comment_count ?? 0;
+      const eng = calcEngagementRate(lc, cc, vc);
+      const isBest = ri === bestIdx;
+      const engC = eng === null ? 'var(--t3)' : eng >= 4 ? 'var(--gr)' : eng >= 2 ? 'var(--gold)' : 'var(--rd)';
+      return `<a href="${esc(v.url)}" target="_blank" rel="noopener" class="drw-vid-row">
+        ${isBest ? '<span class="drw-vid-badge best">🏆 BEST</span>' : ''}
+        <div class="drw-vid-title">${esc(v.title)}</div>
+        <div class="drw-vid-meta">
+          <span style="font-family:'JetBrains Mono',monospace;color:var(--pr);font-size:12px;font-weight:700"><span class="ms-icon">visibility</span> ${esc(v.views)}</span>
+          <span style="font-family:'JetBrains Mono',monospace;color:var(--t2);font-size:12px"><span class="ms-icon">thumb_up</span> ${esc(v.likes)}</span>
+          ${eng !== null ? `<span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${engC};background:rgba(255,255,255,.05);padding:1px 6px;border-radius:4px">${eng}%</span>` : ''}
+          <span style="font-size:11px;color:var(--t3);margin-left:auto">${v.date}</span>
+        </div>
+      </a>`;
+    }).join('')}` : '';
+
+  const bestToggleHtml = longFormVids.length >= 5 ? `
+    <button class="drw-best-toggle" id="drwBestToggle-${_drwOpenId}" onclick="toggleDrwBest('${_drwOpenId}')">
+      <span class="drw-best-toggle-label">
+        <span style="font-family:'Material Symbols Outlined';font-size:16px;vertical-align:middle">emoji_events</span>
+        All-Time Best 10 Videos
+      </span>
+      <span class="drw-best-toggle-arrow" id="drwBestArrow-${_drwOpenId}">expand_more</span>
+    </button>
+    <div class="drw-best-container" id="drwBestContainer-${_drwOpenId}" style="margin-top:8px"></div>` : '';
+
+  panel.innerHTML = renderDrwLatestUpload(latestAny, vids, latestNonShort) + hot5Html + recent10Html + bestToggleHtml;
+}
+
+function renderDrwAnalyticsTab(vids) {
+  const panel = document.getElementById('drwPanel-analytics');
+  if (!panel || !vids.length) return;
+  const longFormVids = vids.filter(v => !isYouTubeShort(v));
+  panel.innerHTML = buildViewsTrendImproved(longFormVids)
+    + buildCalendarImproved(longFormVids)
+    + buildEngTrendImproved(longFormVids)
+    + buildWordCloud(longFormVids)
+    + buildDurationImproved(longFormVids);
+}
+
+function renderDrwAboutTab(ch) {
+  const panel = document.getElementById('drwPanel-about');
+  if (!panel) return;
+  const country = ch.country || '';
+  const joined = ch.joined_date || ch.published_at || '';
+  const tags = ch.keywords || ch.tags || '';
+  panel.innerHTML = `
+    ${ch.description ? `
+      <div class="drw-analytics-sect-hdr">About</div>
+      <div class="drw-about-desc">${esc(ch.description)}</div>` : '<p style="color:var(--t3);font-size:13px">No description available.</p>'}
+    <div class="drw-about-meta-row" style="margin-top:${ch.description ? '20px' : '0'}">
+      ${country ? `<div class="drw-about-meta-item"><span class="drw-about-meta-icon">public</span><span class="drw-about-meta-label">Country</span><span class="drw-about-meta-val">${esc(country)}</span></div>` : ''}
+      ${joined ? `<div class="drw-about-meta-item"><span class="drw-about-meta-icon">calendar_today</span><span class="drw-about-meta-label">Joined</span><span class="drw-about-meta-val">${esc(joined)}</span></div>` : ''}
+      <div class="drw-about-meta-item">
+        <span class="drw-about-meta-icon">tag</span>
+        <span class="drw-about-meta-label">Channel ID</span>
+        <span class="drw-about-meta-val" style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(ch.id)}</span>
+      </div>
+      ${tags ? `<div class="drw-about-meta-item"><span class="drw-about-meta-icon">sell</span><span class="drw-about-meta-label">Tags</span><span class="drw-about-meta-val" style="font-size:12px">${esc(tags)}</span></div>` : ''}
+    </div>
+    <div style="margin-top:20px">
+      <a class="btn btn-gh" href="https://www.youtube.com/${esc(ch.handle || 'channel/' + ch.id)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;width:100%;justify-content:center;padding:12px">
+        <svg viewBox="0 0 24 24" style="width:14px;fill:currentColor"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
+        Open on YouTube
+      </a>
+    </div>`;
+}
+
+
 
 /* ════════════════════════════════════════════════════════
    MY CHANNEL ANALYTICS MODAL — 5 Tabs
@@ -785,14 +1040,33 @@ async function openAnalyticsModal(channelId){
   _amChannelId=channelId;
   _amFullVideos=null;
   _amSnapshots=null;
+  _amVidPreset='recent';
+  _amVidFilter='longform';
+  _amOvVids=null; // clear cache when switching channels
 
   // Populate header
   const logoEl=document.getElementById('amLogo');
   logoEl.innerHTML=ch.logo_url
-    ?`<img src="${esc(ch.logo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
+    ?`<img src="${esc(proxyImg(ch.logo_url))}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
     :`<div style="display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;color:var(--t3)">${(ch.name||'?')[0].toUpperCase()}</div>`;
   document.getElementById('amName').textContent=ch.name||'';
   document.getElementById('amSub').textContent=`${ch.handle||''} · ${ch.subscribers} subscribers · ${ch.total_videos} videos`;
+
+  // Add action buttons to header for competitor channels
+  const actionsEl = document.getElementById('amActions');
+  if (actionsEl) {
+    if (!ch.is_primary) {
+      actionsEl.innerHTML = `
+        <button class="btn btn-gh" onclick="closeAnalyticsModal();setPrimary('${esc(ch.id)}')" title="Set as My Channel">
+          <span style="font-family:'Material Symbols Outlined';font-size:15px;vertical-align:middle">star</span> Set Mine
+        </button>
+        <button class="btn btn-gh" style="color:var(--rd)" onclick="closeAnalyticsModal();rmCh('${esc(ch.id)}')" title="Remove">
+          <span style="font-family:'Material Symbols Outlined';font-size:15px;vertical-align:middle">delete</span>
+        </button>`;
+    } else {
+      actionsEl.innerHTML = '';
+    }
+  }
 
   // Reset to overview tab
   switchAnalyticsTab('overview', true);
@@ -826,12 +1100,18 @@ function switchAnalyticsTab(tab, skipLoad){
   else if(tab==='timeline')renderAmTimeline();
 }
 
-function renderAmOverview(ch){
-  const subRatio=calcSubViewRatio(ch.subscriber_count??ch.subscribers_raw??0, ch.total_views_raw??0);
-  const panel=document.getElementById('amPanel-overview');
-  panel.innerHTML=`
+/* ── Overview: per-modal state ── */
+let _amVidPreset   = 'recent';   // 'recent' | 'hotWeek' | 'hotMonth' | 'alltime'
+let _amVidFilter   = 'longform'; // 'longform' | 'all'
+let _amOvVids      = null;  // cached video list for overview tab (fetched once per channel)
+
+function renderAmOverview(ch) {
+  const thisChannelId = ch.id; // snapshot which channel we're loading for
+  const subRatio = calcSubViewRatio(ch.subscriber_count ?? ch.subscribers_raw ?? 0, ch.total_views_raw ?? 0);
+  const panel = document.getElementById('amPanel-overview');
+  
+  panel.innerHTML = `
     <div class="am-overview-grid">
-      <!-- Stats row -->
       <div class="am-bento-grid">
         <div class="am-bento-hero">
           <div class="am-bento-lbl">Subscribers</div>
@@ -855,60 +1135,244 @@ function renderAmOverview(ch){
           <div class="am-bento-val" style="color:${subViewRatioColor(subRatio)}">${subRatio!==null?subRatio+'%':'—'}</div>
         </div>
       </div>
-
-      <div class="am-sep-sect" id="amOvRecent">
-        <div class="am-sect-lbl">Channel Insights <em>— Loading...</em></div>
-        <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px;padding:32px 0"><div class="spin"></div>Analyzing recent content…</div>
+      <div class="am-sep-sect" id="amOvRecent-${thisChannelId}">
+        <div class="am-sect-lbl">Channel Insights — <em style="color:var(--t3)">Loading...</em></div>
+        <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px;padding:32px 0">
+          <div class="spin"></div> Analyzing recent content…
+        </div>
       </div>
     </div>`;
 
-  // Load recent videos async
-  fetch(`/api/channels/${ch.id}/videos?max=20`)
-    .then(r=>r.json())
-    .then(vids=>{
-      const el=document.getElementById('amOvRecent');
-      if(!el)return;
-      if(!vids.length){el.innerHTML='<div class="am-sect-lbl">Recent Uploads</div><p style="color:var(--t3)">No uploads found.</p>';return;}
+  // Use channel-specific ID so stale fetches don't overwrite new channel data
+  const _fetchOvVids = _amOvVids
+    ? Promise.resolve(_amOvVids)
+    : fetch(`/api/channels/${ch.id}/videos/full`).then(r => r.json());
+
+  _fetchOvVids
+    .then(vids => {
+      // Guard: only update if this channel is still open
+      if (_amChannelId !== thisChannelId) return;
+      _amOvVids = vids; // cache for this channel session
+      const el = document.getElementById(`amOvRecent-${thisChannelId}`);
+      if (!el) return;
+      
+      if (!vids.length) {
+        el.innerHTML = '<div class="am-sect-lbl">Recent Uploads</div><p style="color:var(--t3)">No uploads found.</p>';
+        return;
+      }
 
       const longFormVids = vids.filter(v => !isYouTubeShort(v));
-      const shortsCount = vids.length - longFormVids.length;
+      const shortsCount  = vids.length - longFormVids.length;
 
-      const tbl5=longFormVids.slice(0,5);
-      const vidCards=tbl5.map((v,ri)=>{
-        const vc=v.view_count??v.views_raw??0;
-        const eng=calcEngagementRate(v.like_count??0,v.comment_count??0,vc);
-        const engC=eng===null?'var(--t3)':eng>=4?'var(--gr)':eng>=2?'var(--gold)':'var(--rd)';
-        return `<a href="${esc(v.url)}" target="_blank" rel="noopener"
-          style="display:block;padding:12px 14px;background:var(--sf-lowest);border:1px solid var(--bd);border-radius:10px;text-decoration:none;color:inherit;transition:all .15s;margin-bottom:8px">
-          <div style="font-size:13px;font-weight:600;color:var(--t1);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title)}</div>
-          <div style="display:flex;align-items:center;gap:12px">
-            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:800;color:var(--pr)">👁 ${esc(v.views)}</span>
-            ${eng!==null?`<span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${engC};background:rgba(255,255,255,.05);padding:1px 6px;border-radius:4px">${eng}% eng</span>`:''}
-            <span style="font-size:11px;color:var(--t3);margin-left:auto">${v.date}</span>
+      const filterBarHtml = `
+        <div class="am-vid-filter-bar">
+          <div class="am-sect-lbl" style="margin:0">
+            Recent Videos
+            <span id="amVidCount-${thisChannelId}">
+              <em style="font-weight:400;color:var(--t3);font-style:normal">
+                — showing ${getFilteredVideos(vids, _amVidFilter, _amVidPreset).length} of ${
+                  _amVidFilter === 'longform'
+                    ? longFormVids.length + ' long-form'
+                    : vids.length + ' total'
+                }
+              </em>
+            </span>
           </div>
-        </a>`;
-      }).join('');
-
-      el.innerHTML=`
-        <div class="am-sect-lbl">Channel Insights <em>— Performance Mix ${shortsCount > 0 ? `(${shortsCount} Shorts hidden)` : ''}</em></div>
-        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:20px">
-          <div>
-            <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Latest Videos</div>
-            ${vidCards}
-            ${shortsCount > 0 ? `<div style="font-size:11px;color:var(--t4);margin-top:8px;text-align:center">Filtered ${shortsCount} Shorts from this view</div>` : ''}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:16px">
-            <div>
-              <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Views Trend</div>
-              ${buildViewsTrend(longFormVids)}
+          <div class="am-vid-filter-controls">
+            <div class="am-vid-dropdown-wrap">
+              <select class="am-vid-select" onchange="setAmVidFilter(this.value)">
+                <option value="longform" ${_amVidFilter==='longform'?'selected':''}>Long-form</option>
+                <option value="all"      ${_amVidFilter==='all'?'selected':''}>
+                  All Videos${shortsCount > 0 ? ` · ${shortsCount} Shorts` : ''}
+                </option>
+              </select>
             </div>
-            <div>
-              <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Upload Consistency</div>
-              ${buildCalendar(longFormVids)}
+            <div class="am-vid-dropdown-wrap">
+              <select class="am-vid-select" onchange="setAmVidPreset(this.value)">
+                <option value="recent"   ${_amVidPreset==='recent'?'selected':''}>5 Most Recent</option>
+                <option value="hotWeek"  ${_amVidPreset==='hotWeek'?'selected':''}>🔥 Trending (Views/Day)</option>
+                <option value="hotMonth" ${_amVidPreset==='hotMonth'?'selected':''}>📅 Best This Month</option>
+                <option value="alltime"  ${_amVidPreset==='alltime'?'selected':''}>🏆 All-Time Top 5</option>
+              </select>
             </div>
           </div>
         </div>`;
+
+      const displayVids = getFilteredVideos(vids, _amVidFilter, _amVidPreset);
+
+      const channelAvgViews = longFormVids.length
+        ? longFormVids.reduce((s, v) => s + (v.view_count ?? v.views_raw ?? 0), 0) / longFormVids.length
+        : 0;
+
+      const showRank = _amVidPreset !== 'recent';
+      const emptyMsg = _amVidPreset === 'hotWeek'
+        ? 'No recent videos found to calculate trend.'
+        : _amVidPreset === 'hotMonth'
+          ? 'No videos uploaded this month.'
+          : 'No videos found.';
+
+      const vidListHtml = displayVids.length === 0
+        ? `<div class="am-vid-empty">${emptyMsg}</div>`
+        : displayVids.map((v, i) => buildAmVidRowRich(v, showRank ? i : null, channelAvgViews)).join('');
+
+      el.innerHTML = `
+        ${filterBarHtml}
+        <div class="am-vid-list am-vid-list-rich" id="amVidListRich-${thisChannelId}">
+          ${vidListHtml}
+        </div>
+
+        <div class="am-sect-lbl" style="margin-top:28px;margin-bottom:14px">📈 Recent Views Trend</div>
+        ${buildViewsTrend(longFormVids)}
+
+        <div class="am-sect-lbl" style="margin-top:28px;margin-bottom:14px">Upload Calendar</div>
+        ${buildCalendar(longFormVids)}
+      `;
     })
+    .catch(err => {
+      if (_amChannelId !== thisChannelId) return;
+      const el = document.getElementById(`amOvRecent-${thisChannelId}`);
+      if (el) el.innerHTML = '<p style="color:var(--t3);font-size:13px;padding:16px 0">Could not load channel insights.</p>';
+    });
+}
+
+function getFilteredVideos(vids, filter, preset) {
+  const base = filter === 'all' ? vids : vids.filter(v => !isYouTubeShort(v));
+  const now = Date.now();
+  const weekMs  = 7  * 24 * 60 * 60 * 1000;
+  const monthMs = 30 * 24 * 60 * 60 * 1000;
+
+  if (preset === 'recent') {
+    return [...base]
+      .sort((a, b) => new Date(b.published_at || b.date) - new Date(a.published_at || a.date))
+      .slice(0, 5);
+  }
+  if (preset === 'hotWeek') {
+    // "Trending" = highest views-per-day among videos from the past 90 days
+    return [...base]
+      .filter(v => (now - new Date(v.published_at || v.date).getTime()) <= 90 * 24 * 60 * 60 * 1000)
+      .map(v => {
+        const daysOld = Math.max(1, (now - new Date(v.published_at || v.date).getTime()) / 86400000);
+        return { ...v, _vpd: (v.view_count ?? v.views_raw ?? 0) / daysOld };
+      })
+      .sort((a, b) => b._vpd - a._vpd)
+      .slice(0, 5);
+  }
+  if (preset === 'hotMonth') {
+    // "Best this month" = published in last 30 days, most total views
+    return [...base]
+      .filter(v => (now - new Date(v.published_at || v.date).getTime()) <= monthMs)
+      .sort((a, b) => (b.view_count ?? b.views_raw ?? 0) - (a.view_count ?? a.views_raw ?? 0))
+      .slice(0, 5);
+  }
+  if (preset === 'alltime') {
+    return [...base]
+      .sort((a, b) => (b.view_count ?? b.views_raw ?? 0) - (a.view_count ?? a.views_raw ?? 0))
+      .slice(0, 5);
+  }
+  return base.slice(0, 5);
+}
+
+function setAmVidFilter(filter) {
+  _amVidFilter = filter;
+  _reRenderAmVidList();
+}
+
+function setAmVidPreset(preset) {
+  _amVidPreset = preset;
+  _reRenderAmVidList();
+}
+
+function _reRenderAmVidList() {
+  if (!_amOvVids || !_amChannelId) return;
+  const vids = _amOvVids;
+  const longFormVids = vids.filter(v => !isYouTubeShort(v));
+  const channelAvgViews = longFormVids.length
+    ? longFormVids.reduce((s, v) => s + (v.view_count ?? v.views_raw ?? 0), 0) / longFormVids.length
+    : 0;
+  const displayVids = getFilteredVideos(vids, _amVidFilter, _amVidPreset);
+  const showRank = _amVidPreset !== 'recent';
+  const ch = all.find(c => c.id === _amChannelId);
+  if (!ch) return;
+  const listEl = document.getElementById(`amVidListRich-${_amChannelId}`);
+  if (!listEl) return;
+  const emptyMsg = _amVidPreset === 'hotWeek'
+    ? 'No recent videos found to calculate trend.'
+    : _amVidPreset === 'hotMonth'
+    ? 'No videos uploaded this month.'
+    : 'No videos found.';
+  listEl.innerHTML = displayVids.length === 0
+    ? `<div class="am-vid-empty">${emptyMsg}</div>`
+    : displayVids.map((v, i) => buildAmVidRowRich(v, showRank ? i : null, channelAvgViews)).join('');
+
+  // Update count in header
+  const countEl = document.getElementById(`amVidCount-${_amChannelId}`);
+  if (countEl) {
+    countEl.innerHTML = `
+      <em style="font-weight:400;color:var(--t3);font-style:normal">
+        — showing ${displayVids.length} of ${
+          _amVidFilter === 'longform'
+            ? longFormVids.length + ' long-form'
+            : vids.length + ' total'
+        }
+      </em>`;
+  }
+}
+
+function buildAmVidRowRich(v, rankIdx, channelAvg) {
+  const vc  = v.view_count ?? v.views_raw ?? 0;
+  const eng = calcEngagementRate(v.like_count ?? 0, v.comment_count ?? 0, vc);
+
+  const engC = eng === null ? 'var(--t3)'
+    : eng >= 4 ? 'var(--gr)'
+    : eng >= 2 ? 'var(--gold)'
+    : 'var(--rd)';
+
+  const viewsVsAvg = channelAvg > 0
+    ? ((vc - channelAvg) / channelAvg) * 100
+    : 0;
+  const viewsColor = viewsVsAvg > 20 ? 'var(--gr)'
+    : viewsVsAvg < -30 ? 'var(--rd)'
+    : 'var(--pr)';
+
+  const pubDate = new Date(v.published_at || v.date);
+  const daysAgo = Math.floor((Date.now() - pubDate.getTime()) / 86400000);
+  const relDate = daysAgo === 0 ? 'Today'
+    : daysAgo === 1 ? 'Yesterday'
+    : daysAgo < 7  ? `${daysAgo}d ago`
+    : daysAgo < 30 ? `${Math.floor(daysAgo/7)}w ago`
+    : daysAgo < 365? `${Math.floor(daysAgo/30)}mo ago`
+    : `${Math.floor(daysAgo/365)}y ago`;
+  const absDate = pubDate.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+
+  const isShort = isYouTubeShort(v);
+
+  return `
+    <a href="${esc(v.url)}" target="_blank" rel="noopener" class="am-vid-row-rich">
+      <div class="am-vid-rich-thumb-wrap">
+        <img class="am-vid-rich-thumb"
+          src="${esc(v.thumb || '')}"
+          onerror="this.style.background='var(--sf-highest)';this.removeAttribute('src')"
+          alt="">
+        ${isShort ? '<span class="am-vid-short-pill">Short</span>' : ''}
+        ${rankIdx === 0 ? '<span class="am-vid-rank-pill rank-gold">🥇</span>' : ''}
+        ${rankIdx === 1 ? '<span class="am-vid-rank-pill rank-silver">🥈</span>' : ''}
+        ${rankIdx === 2 ? '<span class="am-vid-rank-pill rank-bronze">🥉</span>' : ''}
+        ${rankIdx > 2 ? `<span class="am-vid-rank-pill" style="font-size:10px;top:6px;left:6px;font-weight:700;color:var(--t1)">#${rankIdx+1}</span>` : ''}
+      </div>
+      <div class="am-vid-rich-body">
+        <div class="am-vid-rich-title">${esc(v.title)}</div>
+        <div class="am-vid-rich-meta">
+          <span class="am-vid-rich-views" style="color:${viewsColor}">
+            <span class="ms-icon">visibility</span> ${esc(fmtN(vc))}
+          </span>
+          ${eng !== null ? `
+            <span class="am-vid-rich-eng" style="color:${engC}">
+              ${eng}% eng
+            </span>` : ''}
+          <span class="am-vid-rich-date" title="${absDate}">${relDate}</span>
+        </div>
+      </div>
+    </a>`;
 }
 
 /* ── Tab 2: Monthly Performance ─────────────────────── */
@@ -1238,7 +1702,8 @@ function renderAmCompare(){
   const contEl=document.getElementById('amCompareContent');
   if(!all.length){contEl.innerHTML='<p style="color:var(--t3);padding:24px">No channels to compare.</p>';return;}
 
-  const primary=all.find(c=>c.is_primary)||all[0];
+  const focalId = _amChannelId;
+  const me = all.find(c => c.id === focalId) || all.find(c => c.is_primary) || all[0];
   const sorted=[...all].sort((a,b)=>(b.subscribers_raw||0)-(a.subscribers_raw||0));
 
   const metrics=[
@@ -1252,10 +1717,10 @@ function renderAmCompare(){
   const headCells=sorted.map(ch=>`
     <th style="padding:10px 12px;text-align:center;min-width:100px">
       <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
-        ${ch.logo_url?`<img src="${esc(ch.logo_url)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid ${ch.id===primary.id?'var(--gold)':'var(--bd2)'}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+        ${ch.logo_url?`<img src="${esc(proxyImg(ch.logo_url))}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid ${ch.id===me.id?'var(--gold)':'var(--bd2)'}" onerror="this.style.background='var(--sf-highest)'" alt="">`
           :`<div style="width:32px;height:32px;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">${(ch.name||'?')[0]}</div>`}
-        <div style="font-size:11px;font-weight:600;color:${ch.id===primary.id?'var(--gold)':'var(--t2)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px" title="${esc(ch.name)}">${esc(ch.name.length>12?ch.name.slice(0,12)+'…':ch.name)}</div>
-        ${ch.id===primary.id?'<span class="badge bdg-gd" style="font-size:9px">⭐ You</span>':''}
+        <div style="font-size:11px;font-weight:600;color:${ch.id===me.id?'var(--gold)':'var(--t2)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px" title="${esc(ch.name)}">${esc(ch.name.length>12?ch.name.slice(0,12)+'…':ch.name)}</div>
+        ${ch.id===me.id?'<span class="badge bdg-gd" style="font-size:9px">⭐ Focused</span>':''}
       </div>
     </th>`).join('');
 
@@ -1265,10 +1730,10 @@ function renderAmCompare(){
     const cells=sorted.map((ch,i)=>{
       const v=ch[m.raw]||0;
       const isBest=v===best&&best>0;
-      const isMine=ch.id===primary.id;
+      const isMe=ch.id===me.id;
       const rank=vals.filter(x=>x>v).length+1;
-      return `<td style="padding:10px 12px;text-align:center;background:${isMine?'rgba(255,213,79,.03)':'transparent'}">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${isBest?'var(--gr)':isMine?'var(--gold)':'var(--t1)'}">${m.fmt(v)}</div>
+      return `<td style="padding:10px 12px;text-align:center;background:${isMe?'rgba(255,213,79,.03)':'transparent'}">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${isBest?'var(--gr)':isMe?'var(--gold)':'var(--t1)'}">${m.fmt(v)}</div>
         <div style="font-size:9px;color:var(--t3);margin-top:2px">#${rank}</div>
         ${isBest?'<span style="font-size:9px;color:var(--gr)">▲ Best</span>':''}
       </td>`;
@@ -1424,7 +1889,7 @@ function handleCardClick(event, channelId){
   const ch = all.find(c => c.id === channelId);
   if(!ch) return;
   if(ch.is_primary) openAnalyticsModal(channelId);
-  else openDrawer(channelId);
+  else openAnalyticsModal(channelId);
 }
 
 async function renderChannels(){
@@ -1435,7 +1900,7 @@ async function renderChannels(){
   if(cnt)cnt.textContent=all.length?all.length:'';
   if(!all.length){
     el.innerHTML=`<div class="no-pr" style="margin-top:24px">
-      <div class="no-pr-ico">📺</div>
+      <div class="no-pr-ico"><span style="font-family:'Material Symbols Outlined';font-size:48px;color:var(--t4)">subscriptions</span></div>
       <h3>No channels yet</h3>
       <p>Add channels to start tracking competitor analytics and performance metrics.</p>
       <button class="btn btn-pr" onclick="toggleAdd()">+ Add Your First Channel</button>
@@ -1445,122 +1910,121 @@ async function renderChannels(){
   const primary=all.find(c=>c.is_primary);
   const competitors=all.filter(c=>!c.is_primary).sort((a,b)=>(b[chSort]||0)-(a[chSort]||0));
   const sortedAll=primary?[primary,...competitors]:competitors;
-  el.innerHTML=`<div class="ch-grid">${sortedAll.map((ch,index)=>{
+
+  const renderCard = (ch, index) => {
     const isMine=ch.is_primary;
-    
-    // Determine status indicator color
-    const daysSinceUpload = ch.video?.date 
-      ? Math.floor((Date.now() - new Date(ch.video.date).getTime()) / 864e5)
-      : 999;
-
-    const isStale = daysSinceUpload > 30;
-    
-    const recentVideos = typeof _enrichCache !== 'undefined' ? _enrichCache[ch.id]?.vids || [] : [];
-    const vsAvgDiff = calcRecentVsAvg(recentVideos, ch.total_views_raw, ch.total_videos_raw);
-
-    let statusClass = 'status-neutral';
-    if (isStale) statusClass = 'status-stale';
-    else if (vsAvgDiff !== null && vsAvgDiff > 10) statusClass = 'status-growing';
-    else if (vsAvgDiff !== null && vsAvgDiff < -10) statusClass = 'status-declining';
-
-    const cardVcount=ch.video?.view_count??ch.video?.views_raw??0;
-    const vidDateStr=ch.video?.published_at||ch.video?.date;
+    const v=ch.video||{};
+    const chSub=ch.subscriber_count??ch.subscribers_raw??0;
+    const chVidCnt=ch.video_count??ch.total_videos_raw??0;
+    const chTotViews=ch.total_views_raw??0;
+    const cardVcount=v.view_count??v.views_raw??0;
+    const cardLcount=v.like_count??0;
+    const cardCcount=v.comment_count??0;
+    const vidDateStr=v.published_at||v.date;
     const cardVpd=vidDateStr?viewsPerDay(cardVcount,vidDateStr):null;
-    const vpdDisplay = cardVpd ? fmtN(cardVpd) : '—';
+    const cardHot=isHotVideo(cardVpd,chTotViews,chVidCnt);
+    const cardEngRate=calcEngagementRate(cardLcount,cardCcount,cardVcount);
+    const cardSubRatio=calcSubViewRatio(chSub,chTotViews);
+    const chAvgRaw=ch.avg_views_raw??0;
+    const cardVsAvg=(chAvgRaw>0&&cardVcount>0)?Math.round(((cardVcount-chAvgRaw)/chAvgRaw)*100):null;
+    const relDays=vidDateStr?Math.floor((Date.now()-new Date(vidDateStr).getTime())/(864e5)):null;
+    const relDate=relDays===null?'—':relDays===0?'Today':relDays===1?'1d ago':relDays<30?`${relDays}d ago`:relDays<365?`${Math.floor(relDays/30)}mo ago`:`${Math.floor(relDays/365)}y ago`;
 
     return `
-<div class="ch-card au ${isMine?'mine':''} ${isStale?'stale':''}"
-     id="ctr-${esc(ch.id)}"
-     onclick="handleCardClick(event,'${esc(ch.id)}')"
-     style="animation-delay:${index * 0.05}s">
+<div class="ch-card au ${isMine?'mine':''}" id="ctr-${esc(ch.id)}"
+  onclick="openAnalyticsModal('${esc(ch.id)}')"
+  style="animation-delay:${index * 0.04}s">
 
-  <!-- STATUS INDICATOR BAR -->
-  <div class="cc-status-bar ${statusClass}"></div>
+  <!-- Actions overlay — unchanged -->
+  <div class="cc-acts" onclick="event.stopPropagation()">
+    ${!isMine?`<button class="cc-act gold" title="Set as My Channel" onclick="setPrimary('${esc(ch.id)}')"><span class="msi" style="font-size:16px">star</span></button>`:''}
+    <button class="cc-act" title="Refresh" onclick="ref1('${esc(ch.id)}')"><span class="msi" style="font-size:16px">refresh</span></button>
+    <button class="cc-act danger" title="Remove" onclick="rmCh('${esc(ch.id)}')"><span class="msi" style="font-size:16px">delete</span></button>
+  </div>
 
-  <!-- MAIN ROW -->
-  <div class="cc-row">
+  <!-- Compact always-visible header -->
+  <div class="cc-top">
     <div class="cc-av">
-      <div class="cc-logo-wrap">
-        ${ch.logo_url
-          ?`<img class="cc-logo" src="${esc(ch.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`
-          :`<div class="cc-logo-fb">${(ch.name||'?')[0].toUpperCase()}</div>`}
-        ${isMine ? '<div class="cc-crown">⭐</div>' : ''}
-      </div>
+      ${ch.logo_url
+        ?`<img class="cc-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+        :`<div class="cc-logo-fb">${(ch.name||'?')[0].toUpperCase()}</div>`}
+      ${isMine?'<div class="cc-crown"><span style="font-family:\'Material Symbols Outlined\'">star</span></div>':''}
     </div>
-
     <div class="cc-ident">
       <div class="cc-name">${esc(ch.name)}</div>
-      <div class="cc-handle">${esc(ch.handle||'')}</div>
+      ${ch.handle?`<div class="cc-handle">${esc(ch.handle)}</div>`:''}
       <div class="cc-tags">
-        ${isMine ? '<span class="badge bdg-gd">My Channel</span>' : '<span class="badge bdg-dim">Competitor</span>'}
-        ${ch.country ? `<span class="badge bdg-dim">${esc(ch.country)}</span>` : ''}
-        <span id="cc-streak-${esc(ch.id)}" class="badge" style="display:none"></span>
+        ${isMine?'<span class="badge bdg-gd">⭐ My Channel</span>':'<span class="badge bdg-dim">Competitor</span>'}
+        ${ch.country?`<span class="badge bdg-dim">${esc(ch.country)}</span>`:''}
+        ${cardHot?'<span class="badge bdg-rd">🔥 Hot</span>':''}
+        <span class="badge" id="cc-streak-${esc(ch.id)}" style="display:none"></span>
       </div>
     </div>
-
-    <div class="cc-primary-metric">
-      <div class="cc-pm-val gold">${esc(ch.subscribers)}</div>
-      <div class="cc-pm-lbl">subscribers</div>
-    </div>
-
-    <div class="cc-secondary-metrics">
-      <div class="cc-sm-item">
-        <span class="cc-sm-val">${esc(ch.avg_views)}</span>
-        <span class="cc-sm-lbl">avg views</span>
-      </div>
-      <div class="cc-sm-item">
-        <span class="cc-sm-val">${esc(ch.total_videos)}</span>
-        <span class="cc-sm-lbl">videos</span>
-      </div>
-    </div>
-
-    <div class="cc-acts" onclick="event.stopPropagation()">
-      ${!isMine?`<button class="cc-act gold" title="Set as mine" onclick="setPrimary('${esc(ch.id)}')">star</button>`:''}
-      <button class="cc-act" title="Refresh" onclick="ref1('${esc(ch.id)}')">refresh</button>
-      <button class="cc-act danger" title="Remove" onclick="rmCh('${esc(ch.id)}')">delete</button>
+    <!-- Always-visible right summary -->
+    <div class="cc-summary">
+      <div class="cc-summary-subs">${esc(ch.subscribers)}</div>
+      <div class="cc-summary-lbl">Subscribers</div>
+      <div class="cc-summary-sub2">${esc(ch.total_videos)} videos</div>
     </div>
   </div>
 
-  <!-- HOVER EXPANSION -->
+  <!-- Expandable body — shown on hover -->
   <div class="cc-expand">
     <div class="cc-expand-inner">
-      <div class="cc-sparkline" id="cc-spark-${esc(ch.id)}"></div>
 
-      <div class="cc-expand-metrics">
-        <div class="cc-em-item">
-          <span class="cc-em-val">${vpdDisplay}</span>
-          <span class="cc-em-lbl">views/day</span>
+      <!-- 4-cell stats strip -->
+      <div class="cc-stats-row">
+        <div class="cc-sb">
+          <div class="cc-sb-val" style="${subViewRatioColor(cardSubRatio)}">${cardSubRatio!==null?cardSubRatio+'%':'—'}</div>
+          <div class="cc-sb-lbl">Audience %</div>
         </div>
-        <div class="cc-em-item">
-          <span class="cc-em-val" id="cc-eng-${esc(ch.id)}" style="color:var(--t3)">—</span>
-          <span class="cc-em-lbl">engagement</span>
+        <div class="cc-sb">
+          <div class="cc-sb-val green">${esc(ch.avg_views)}</div>
+          <div class="cc-sb-lbl">Avg Views</div>
         </div>
-        <div class="cc-em-item">
-          <span class="cc-em-val" id="cc-lastup-${esc(ch.id)}">${daysSinceUpload === 999 ? '—' : daysSinceUpload === 0 ? 'Today' : daysSinceUpload + 'd ago'}</span>
-          <span class="cc-em-lbl">last upload</span>
+        <div class="cc-sb">
+          <div class="cc-sb-val" style="${cardVpd&&cardVpd>1000?'color:var(--pr)':''}">${cardVpd?fmtN(cardVpd):'—'}</div>
+          <div class="cc-sb-lbl">Views/Day</div>
+        </div>
+        <div class="cc-sb">
+          <div class="cc-sb-val" id="cc-eng-${esc(ch.id)}" style="color:var(--t3)">—</div>
+          <div class="cc-sb-lbl">Engagement</div>
         </div>
       </div>
 
-      ${ch.video && ch.video.title ? `
-      <div class="cc-expand-vid" onclick="event.stopPropagation();window.open('${esc(ch.video.url)}','_blank')">
-        <img class="cc-expand-thumb" src="${esc(ch.video.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
-        <div class="cc-expand-vid-info">
-          <div class="cc-expand-vid-title">${esc(ch.video.title)}</div>
-          <div class="cc-expand-vid-meta">👁 ${esc(ch.video.views)} · ${ch.video.date||''}</div>
+      <!-- Sparkline (enriched async) -->
+      <div class="cc-spark-wrap">
+        <div class="cc-spark" id="cc-spark-${esc(ch.id)}"></div>
+      </div>
+
+      <!-- Latest upload footer -->
+      ${v.title?`
+      <div class="cc-footer">
+        <div class="cc-vid">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div class="cc-vlbl">Latest Upload</div>
+            <div style="font-size:10px;color:var(--t3)">${relDate}</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <img class="cc-vthumb" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
+            <div class="cc-vinfo">
+              <div class="cc-vtitle">${esc(v.title)}</div>
+              <div class="cc-vstats">
+                <span style="color:var(--pr)"><span class="ms-icon">visibility</span> ${esc(v.views)}</span>
+                <span style="color:var(--t2)"><span class="ms-icon">thumb_up</span> ${esc(v.likes)}</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>` : ''}
-
-      <div id="cc-best-${esc(ch.id)}"></div>
-
-      <button class="cc-view-link" onclick="event.stopPropagation();${isMine?`openAnalyticsModal('${esc(ch.id)}')`:`openDrawer('${esc(ch.id)}')`}">
-        ${isMine ? 'Full Terminal' : 'Analysis'} <span class="arrow">→</span>
-      </button>
+      </div>`:''}
 
     </div>
   </div>
 
 </div>`;
-  }).join('')}</div>`;
+  };
+
+  el.innerHTML=`<div class="ch-grid">${sortedAll.map((ch, i) => renderCard(ch, i)).join('')}</div>`;
   enrichCards();
 }
 
@@ -1636,16 +2100,7 @@ async function refreshAll(){
   toast('All channels refreshed!','s');
 }
 
-async function refreshAll2(){
-  if(!all.length)return;
-  const btn=document.querySelector('[onclick="refreshAll2()"]');
-  const orig=btn?btn.innerHTML:'';
-  if(btn){btn.disabled=true;btn.innerHTML='<div class="spin" style="width:12px;height:12px;border-width:2px"></div><span>Refreshing…</span>';}
-  for(const ch of all){try{await fetch(`/api/channels/${ch.id}/refresh`,{method:'POST'});}catch{}}
-  await renderChannels();
-  if(btn){btn.disabled=false;btn.innerHTML=orig;}
-  toast('All channels refreshed!','s');
-}
+
 
 /* ════════════════════════════════════════════════════════
    FEATURE 4 — DASHBOARD ASYNC PANELS
@@ -1681,7 +2136,7 @@ async function loadThisMonthPanel(primaryId){
     }
     const momC=mom>=0?'var(--gr)':'var(--rd)';
     el.innerHTML=`
-      <div class="sl d-mg">✨ This Month at a Glance</div>
+      <div class="sl d-mg">âœ¨ This Month at a Glance</div>
       <div class="mg-grid d-mg2">
         <div class="mg-item">
           <div class="mg-ico">👁</div>
@@ -1702,7 +2157,7 @@ async function loadThisMonthPanel(primaryId){
         </div>
         ${subsDelta!==null?`
         <div class="mg-item">
-          <div class="mg-ico">👥</div>
+          <div class="mg-ico">ðŸ‘¥</div>
           <div class="mg-val" style="color:${subsDelta>=0?'var(--gr)':'var(--rd)'}">${subsDelta>=0?'+':''}${fmtN(subsDelta)}</div>
           <div class="mg-lbl">Subscriber Change</div>
         </div>`:''}
@@ -1729,10 +2184,10 @@ async function loadFastestGrowing(channels){
       const mine=primary&&ch.id===primary.id;
       const barPct=Math.max(2,Math.round((ch.pct/maxPct)*100));
       const bc=mine?'var(--gold)':i===0?'var(--gr)':'var(--pr)';
-      return `<div class="fg-row${mine?' fg-mine':''}" onclick="openDrawer('${esc(ch.id)}')">
+      return `<div class="fg-row${mine?' fg-mine':''}" onclick="openAnalyticsModal('${esc(ch.id)}')">
         <div class="fg-rk">${['🥇','🥈','🥉'][i]||i+1}</div>
         <div class="fg-ch">
-          ${ch.logo_url?`<img class="fg-logo" src="${esc(ch.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">`:``+`<div class="fg-logo" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
+          ${ch.logo_url?`<img class="fg-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`:``+`<div class="fg-logo" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
           <div style="flex:1;min-width:0">
             <div class="fg-name">${esc(ch.name)}${mine?'<span class="lb-you">⭐ You</span>':''}</div>
             <div class="fg-bar-wrap"><div class="fg-bar" style="width:${barPct}%;background:${bc}"></div></div>
@@ -1793,7 +2248,7 @@ let _srQuotaReset=Date.now();
 const SR_QUOTA_MAX=10;     // max autocomplete calls per minute
 const SR_QUOTA_WINDOW=60000; // 60 seconds
 
-// Replace the existing keydown‐only listener with full keyup debounce
+// Replace the existing keydownâ€only listener with full keyup debounce
 document.getElementById('srInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){closeSuggestions();doSearch();}
   if(e.key==='Escape')closeSuggestions();
@@ -1843,7 +2298,7 @@ function showSuggestions(items, rateLimited){
     <div class="sug-row" onclick="selectSuggestion('${esc(ch.id)}')">
       <div class="sug-avatar">
         ${ch.logo_url
-          ?`<img src="${esc(ch.logo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
+          ?`<img src="${esc(proxyImg(ch.logo_url))}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
           :`<div style="width:100%;height:100%;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
       </div>
       <div class="sug-info">
@@ -1920,7 +2375,7 @@ function showAddSuggestions(items,rateLimited){
     <div class="sug-row" onclick="selectAddSuggestion('${esc(ch.id)}','${esc(ch.name)}')">
       <div class="sug-avatar">
         ${ch.logo_url
-          ?`<img src="${esc(ch.logo_url)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
+          ?`<img src="${esc(proxyImg(ch.logo_url))}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
           :`<div style="width:100%;height:100%;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
       </div>
       <div class="sug-info">
@@ -1985,10 +2440,10 @@ function renderSearch(d){
   document.getElementById('srRes').innerHTML=`
     <div class="sr-card au">
       ${d.banner_url
-        ?`<img class="sr-banner" src="${esc(d.banner_url)}" onerror="this.outerHTML='<div class=sr-banner-ph></div>'" alt="">`
+        ?`<img class="sr-banner" src="${esc(proxyImg(d.banner_url))}" onerror="this.outerHTML='<div class=sr-banner-ph></div>'" alt="">`
         :'<div class="sr-banner-ph"></div>'}
       <div class="sr-head">
-        <img class="sr-logo" src="${esc(d.logo_url)}" onerror="this.style.background='var(--sf-highest)'" alt="">
+        <img class="sr-logo" src="${esc(proxyImg(d.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">
         <div class="sr-meta">
           <div class="sr-name">${esc(d.name)}</div>
           <div class="sr-sub">
@@ -2003,17 +2458,17 @@ function renderSearch(d){
         </button>
       </div>
       <div class="sr-stats">
-        <div class="sr-st"><div class="sr-st-ico">👥</div><div class="sr-st-val" style="color:var(--gold)">${esc(d.subscribers)}</div><div class="sr-st-lbl">Subscribers</div></div>
+        <div class="sr-st"><div class="sr-st-ico">ðŸ‘¥</div><div class="sr-st-val" style="color:var(--gold)">${esc(d.subscribers)}</div><div class="sr-st-lbl">Subscribers</div></div>
         <div class="sr-st"><div class="sr-st-ico">👁</div><div class="sr-st-val">${esc(d.total_views)}</div><div class="sr-st-lbl">Total Views</div></div>
         <div class="sr-st"><div class="sr-st-ico">🎬</div><div class="sr-st-val" style="color:var(--pr)">${esc(d.total_videos)}</div><div class="sr-st-lbl">Videos</div></div>
-        <div class="sr-st"><div class="sr-st-ico">📊</div><div class="sr-st-val" style="color:var(--gr)">${esc(d.avg_views)}</div><div class="sr-st-lbl">Avg Views</div></div>
+        <div class="sr-st"><div class="sr-st-ico">ðŸ“Š</div><div class="sr-st-val" style="color:var(--gr)">${esc(d.avg_views)}</div><div class="sr-st-lbl">Avg Views</div></div>
       </div>
       ${d.description?`<div class="sr-desc"><div class="sr-desc-l">About</div><div class="sr-desc-t">${esc(d.description)}${d.description.length>=300?'…':''}</div></div>`:''}
       ${vid.title?`
       <a class="sr-vid" href="${esc(vid.url)}" target="_blank" rel="noopener">
         <img class="sr-vthumb" src="${esc(vid.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
         <div class="sr-vbody">
-          <div class="sr-vbadge">✦ Latest Upload</div>
+          <div class="sr-vbadge">âœ¦ Latest Upload</div>
           <div class="sr-vtitle">${esc(vid.title)}</div>
           <div class="sr-vdate">Published ${vid.date}</div>
           <div class="sr-vstats">
