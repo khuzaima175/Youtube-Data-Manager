@@ -267,19 +267,19 @@ async function renderDash(){
         </div>
       </div>`
 
-      /* 4A placeholder */
+      html+=`<div class="dash-section-hdr">📊 Performance</div>`;
       html+=`<div id="dashMonthGlance" class="dash-mg-wrap au"><div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px"><div class="spin"></div>Loading this month…</div></div>`;
 
       if(all.length>1)html+=buildLB(primary,comps);
 
-      /* 4B placeholder */
-      html+=`<div id="dashFastGrow"></div>`;
+      html+=`<div class="dash-section-hdr">🎬 Content</div>`;
+      html+=`<div id="dashVelocity"></div>`;
 
       const forRace=[primary,...comps].filter(c=>c.video&&c.video.title);
       if(forRace.length){
         const ranked=[...forRace].sort((a,b)=>(b.video.views_raw||0)-(a.video.views_raw||0));
         const rankIco = i => ['1','2','3'][i] || String(i+1);
-        html+=`<div class="sl d1">Latest Video Face-off <em>${forRace.length} channels compared</em></div>
+        html+=`<div class="dash-section-hdr" style="border:none;margin-bottom:0">Latest Video Face-off <em style="color:var(--t4);font-style:normal;font-weight:400;font-size:11px;margin-left:8px">${forRace.length} channels compared</em></div>
         <div class="vr-grid d2">`;
         forRace.forEach(ch=>{
           const vv=ch.video,ri=ranked.findIndex(x=>x.id===ch.id),isMine=ch.id===primary.id;
@@ -301,13 +301,12 @@ async function renderDash(){
         html+=`</div>`;
       }
 
-      /* 4C placeholder */
-      html+=`<div id="dashVelocity"></div>`;
-
-      html+=`<div class="sl d3">My Recent Uploads</div>
-        <div class="ru-grid d4" id="ruGrid">
+      html+=`<div class="dash-section-hdr">📁 Your Uploads</div>`;
+      html+=`<div class="ru-grid d4" id="ruGrid">
           <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px"><div class="spin"></div>Loading…</div>
         </div>`;
+      
+      html+=`<div id="dashFastGrow"></div>`;
     }
 
     el.innerHTML=html;
@@ -361,41 +360,61 @@ async function renderDash(){
   }
 }
 
-function buildLB(primary,comps){
-  const rows_all=[primary,...comps];
-  const sorted=[...rows_all].sort((a,b)=>(b[sort]||0)-(a[sort]||0));
-  const maxVal=Math.max(...rows_all.map(c=>c[sort]||0),1);
-  const lbl=sort==='subscribers_raw'?'Subscribers':sort==='avg_views_raw'?'Avg Views':'Total Views';
-  const lbl2=sort==='subscribers_raw'?'Avg Views':'Subscribers';
-  const fld2=sort==='subscribers_raw'?'avg_views':'subscribers';
+function buildLB(primary, comps) {
+  const rows_all = [primary, ...comps];
+  const sorted = [...rows_all].sort((a, b) => (b[sort] || 0) - (a[sort] || 0));
+
+  const lbl  = sort === 'subscribers_raw' ? 'Subscribers'
+             : sort === 'avg_views_raw'   ? 'Avg Views'
+             : 'Total Views';
+  const lbl2 = sort === 'subscribers_raw' ? 'Avg Views' : 'Subscribers';
+  const fld2 = sort === 'subscribers_raw' ? 'avg_views' : 'subscribers';
+
+  // Logarithmic scale so MrBeast vs small channels both show a meaningful bar
+  const maxVal = Math.max(...rows_all.map(c => c[sort] || 0), 1);
+  function logPct(val) {
+    if (!val || val <= 0) return 0;
+    return Math.round((Math.log10(val + 1) / Math.log10(maxVal + 1)) * 100);
+  }
+
   const rk = ['1st', '2nd', '3rd'];
-  let rows='';
-  sorted.forEach((ch,i)=>{
-    const pct=Math.round(((ch[sort]||0)/maxVal)*100);
-    const mine=ch.id===primary.id;
-    const rkCls=i===0?'rk1':i===1?'rk2':i===2?'rk3':'';
-    const dispV=sort==='subscribers_raw'?ch.subscribers:sort==='avg_views_raw'?ch.avg_views:ch.total_views;
-    rows+=`
-    <div class="lb-row ${mine?'mine':''}" onclick="openAnalyticsModal('${esc(ch.id)}')">
-      <div class="lb-rk ${rkCls}"><span class="rank-badge rank-${i+1}">${rk[i]||i+1}</span></div>
+  let rows = '';
+  sorted.forEach((ch, i) => {
+    const mine  = ch.id === primary.id;
+    const pct   = logPct(ch[sort] || 0);
+    const dispV = sort === 'subscribers_raw' ? ch.subscribers
+                : sort === 'avg_views_raw'   ? ch.avg_views
+                : ch.total_views;
+    const vsColor = i === 0 ? 'var(--gold)' : 'var(--t3)';
+    const vsText = i === 0 ? '👑 Leader' : '';
+
+    rows += `
+    <div class="lb-row ${mine ? 'mine' : ''}" onclick="openAnalyticsModal('${esc(ch.id)}')">
+      <div class="lb-rk">
+        <span class="rank-badge rank-${i + 1}">${rk[i] || i + 1}</span>
+      </div>
       <div class="lb-ch">
         ${ch.logo_url
-          ?`<img class="lb-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
-          :`<div class="lb-logo-fb">${(ch.name||'?')[0].toUpperCase()}</div>`}
+          ? `<img class="lb-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+          : `<div class="lb-logo-fb">${(ch.name || '?')[0].toUpperCase()}</div>`}
         <div>
-          <div class="lb-ch-name">${esc(ch.name)}${mine?'<span class="lb-you">⭐ You</span>':''}</div>
-          <div class="lb-ch-hdl">${esc(ch.handle||'')}</div>
+          <div class="lb-ch-name">${esc(ch.name)}${mine ? '<span class="lb-you">⭐ You</span>' : ''}</div>
+          <div class="lb-ch-hdl">${esc(ch.handle || '')}</div>
         </div>
       </div>
-      <div class="lb-bar-row">
-        <div class="lb-bar-bg"><div class="lb-bar ${mine?'mb':''}" data-pct="${pct}" style="width:0%"></div></div>
+      <div class="lb-bar-col">
+        <div class="lb-log-bar-bg">
+          <div class="lb-log-bar ${mine ? 'mb' : ''}" data-pct="${pct}" style="width:0%"></div>
+        </div>
+        <span class="lb-vs" style="color:${vsColor}">${vsText}</span>
       </div>
-      <div class="lb-num ${mine?'hi':''}">${esc(dispV)}</div>
+      <div class="lb-num ${mine ? 'hi' : ''}">${esc(dispV)}</div>
       <div class="lb-num lo">${esc(ch[fld2])}</div>
-      <div class="lb-upload" style="font-size:11px;color:var(--t3);text-align:right;white-space:nowrap">${ch.video?.date ? ch.video.date : '—'}</div>
+      <div class="lb-upload">${ch.video?.date ?? '—'}</div>
       <div class="lb-arr">›</div>
     </div>`;
   });
+
   return `
   <div class="section-hdr">
     <span style="font-family:'Material Symbols Outlined';font-size:16px;vertical-align:middle">leaderboard</span>
@@ -405,22 +424,26 @@ function buildLB(primary,comps){
     <div class="lb-top">
       <span class="lb-top-t">Ranked by ${lbl}</span>
       <div class="lb-sorts">
-        <button class="lsb ${sort==='subscribers_raw'?'on':''}" onclick="setSort('subscribers_raw')">Subscribers</button>
-        <button class="lsb ${sort==='avg_views_raw'?'on':''}" onclick="setSort('avg_views_raw')">Avg Views</button>
-        <button class="lsb ${sort==='total_views_raw'?'on':''}" onclick="setSort('total_views_raw')">Total Views</button>
+        <button class="lsb ${sort === 'subscribers_raw' ? 'on' : ''}" onclick="setSort('subscribers_raw')">Subscribers</button>
+        <button class="lsb ${sort === 'avg_views_raw'   ? 'on' : ''}" onclick="setSort('avg_views_raw')">Avg Views</button>
+        <button class="lsb ${sort === 'total_views_raw' ? 'on' : ''}" onclick="setSort('total_views_raw')">Total Views</button>
       </div>
     </div>
     <div class="lb-head">
-      <span class="lh">#</span><span class="lh" style="text-align:left">Channel</span>
-      <span class="lh">Bar</span><span class="lh">${lbl}</span>
-      <span class="lh">${lbl2}</span><span class="lh">Last Upload</span><span class="lh"></span>
+      <span class="lh">#</span>
+      <span class="lh" style="text-align:left">Channel</span>
+      <span class="lh">Scale</span>
+      <span class="lh">${lbl}</span>
+      <span class="lh">${lbl2}</span>
+      <span class="lh">Last Upload</span>
+      <span class="lh"></span>
     </div>
     ${rows}
   </div>`;
 }
 
 function setSort(f){sort=f;renderDash();}
-function animateBars(){document.querySelectorAll('.lb-bar').forEach(b=>b.style.width=(b.dataset.pct||0)+'%');}
+function animateBars(){document.querySelectorAll('.lb-log-bar').forEach(b=>b.style.width=(b.dataset.pct||0)+'%');}
 
 /* ════════════════════════════════════════════════════════
    DRAWER LOGIC (Terminal Luxe)
@@ -776,7 +799,7 @@ async function enrichCards(){
         engEl.textContent = avgEng.toFixed(1)+'%';
         engEl.style.color = avgEng >= 4 ? 'var(--gr)' : avgEng >= 2 ? 'var(--gold)' : 'var(--rd)';
       }
-
+      
       let streak=0,lastW=-1;
       for(const v of sorted){
         const wa=Math.floor((now-new Date(v.published_at||v.date).getTime())/(7*864e5));
@@ -784,12 +807,48 @@ async function enrichCards(){
         else if(streak>0&&wa===lastW+1){streak++;lastW=wa;}
         else if(streak>0)break;
       }
+      
       const streakEl=document.getElementById('cc-streak-'+ch.id);
       if(streakEl){
         const daysSince=sorted.length?Math.floor((now-new Date(sorted[0].published_at||sorted[0].date).getTime())/864e5):999;
         if(streak>=4){streakEl.textContent=`${streak}-wk streak`;streakEl.className='badge bdg-gr';streakEl.style.display='';}
         else if(streak>=2){streakEl.textContent=`${streak}wks`;streakEl.className='badge bdg-pr';streakEl.style.display='';}
         else if(daysSince>28){streakEl.textContent=`${daysSince}d gap`;streakEl.className='badge bdg-rd';streakEl.style.display='';}
+      }
+
+      const footerEl = document.getElementById('cc-footer-' + ch.id);
+      if(footerEl){
+        const longFormVids = sorted.filter(v => !isYouTubeShort(v));
+        if(longFormVids.length > 0){
+          const lv = longFormVids[0];
+          const pubDate = new Date(lv.published_at || lv.date);
+          const relDays = Math.max(1, Math.floor((now - pubDate.getTime()) / 864e5));
+          const relDateStr = pubDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' at ' + pubDate.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+          const vc = lv.view_count ?? lv.views_raw ?? 0;
+          const vpd = Math.round(vc / relDays);
+          const growthStr = vpd > 1000 ? `<span style="color:var(--gr)">🔥 ${fmtN(vpd)}/day</span>` : `<span style="color:var(--pr)">📈 ${fmtN(vpd)}/day</span>`;
+          
+          footerEl.innerHTML = `
+          <div class="cc-vid">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <div class="cc-vlbl">Latest Long-Form</div>
+              <div style="font-size:10px;color:var(--t3)">${relDateStr}</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <img class="cc-vthumb" src="${esc(lv.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
+              <div class="cc-vinfo">
+                <div class="cc-vtitle" title="${esc(lv.title)}">${esc(lv.title)}</div>
+                <div class="cc-vstats">
+                  <span style="color:var(--pr)"><span class="ms-icon">visibility</span> ${fmtN(vc)}</span>
+                  ${growthStr}
+                </div>
+              </div>
+            </div>
+          </div>`;
+          footerEl.style.display = '';
+        } else {
+          footerEl.style.display = 'none';
+        }
       }
 
     }catch{}
@@ -1413,7 +1472,7 @@ async function renderAmMonthly(){
       byMonth[m].likes+=(v.like_count||0);
       byMonth[m].comments+=(v.comment_count||0);
     });
-    const months=Object.values(byMonth).sort((a,b)=>a.month.localeCompare(b.month));
+    const months=Object.values(byMonth).sort((a,b)=>b.month.localeCompare(a.month));
     if(!months.length){
       contEl.innerHTML='<p style="color:var(--t3);padding:24px">No monthly data available.</p>';
       loadEl.style.display='none';contEl.style.display='block';return;
@@ -1455,7 +1514,7 @@ async function renderAmMonthly(){
       const shortM=m.month.slice(5)+"\u2019"+m.month.slice(2,4);
       const tipData=JSON.stringify({month:m.month,views:fmtN(m.views),count:m.count,likes:m.likes?fmtN(m.likes):'—'}).replace(/"/g,'&quot;');
       return `
-        <g class="am-bar-g" data-tip="${tipData}">
+        <g class="am-bar-g" data-tip="${tipData}" onclick="showMonthVideos('${m.month}')" style="cursor:pointer">
           <rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="5" fill="${fillId}"
             style="transition:opacity .15s,filter .15s"/>
           ${isBest?`<text x="${x+barW/2}" y="${y-8}" text-anchor="middle" font-size="10" fill="#FFD54F" font-weight="800" font-family="DM Sans">★</text>`:''}
@@ -1547,7 +1606,8 @@ async function renderAmMonthly(){
           <span><span style="display:inline-block;width:10px;height:10px;background:#ffb4ab;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Below avg</span>
           <span style="margin-left:auto;opacity:.6">${months.length} months tracked</span>
         </div>
-      </div>`;
+      </div>
+      <div id="amMonthVidsWrap" style="display:none; margin-top:24px;"></div>`;
 
     loadEl.style.display='none';
     contEl.style.display='block';
@@ -1585,6 +1645,40 @@ async function renderAmMonthly(){
     contEl.innerHTML=`<div class="am-err">Failed to load monthly data: ${esc(String(ex))}</div>`;
     loadEl.style.display='none';contEl.style.display='block';
   }
+}
+
+function showMonthVideos(month) {
+  const wrap = document.getElementById('amMonthVidsWrap');
+  if (!wrap) return;
+  if (!_amFullVideos) return;
+  const longFormVids = _amFullVideos.filter(v => !isYouTubeShort(v));
+  const monthVids = longFormVids.filter(v => (v.published_at || v.date || '').startsWith(month));
+  if (!monthVids.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+  
+  monthVids.sort((a,b) => (b.view_count || b.views_raw || 0) - (a.view_count || a.views_raw || 0));
+  const avgViews = longFormVids.length 
+    ? longFormVids.reduce((s, v) => s + (v.view_count ?? v.views_raw ?? 0), 0) / longFormVids.length 
+    : 0;
+
+  const mParts = month.split('-');
+  const monthLabel = new Date(mParts[0], parseInt(mParts[1])-1, 1).toLocaleDateString('en-US', {month: 'long', year: 'numeric'});
+
+  const vidsHtml = monthVids.map((v, i) => buildAmVidRowRich(v, i, avgViews)).join('');
+  
+  wrap.innerHTML = `
+    <div class="am-sect-lbl" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <span>Top Videos in ${monthLabel} <em style="font-style:normal;font-weight:400;color:var(--t3);margin-left:8px">${monthVids.length} videos</em></span>
+      <button class="btn btn-gh btn-sm" onclick="document.getElementById('amMonthVidsWrap').style.display='none'">Close</button>
+    </div>
+    <div class="am-vid-list am-vid-list-rich">
+      ${vidsHtml}
+    </div>
+  `;
+  wrap.style.display = 'block';
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 /* ── Tab 3: Growth Speed ────────────────────────────── */
@@ -1998,8 +2092,8 @@ async function renderChannels(){
       </div>
 
       <!-- Latest upload footer -->
-      ${v.title?`
-      <div class="cc-footer">
+      <div class="cc-footer" id="cc-footer-${esc(ch.id)}" style="${v.title ? '' : 'display:none'}">
+        ${v.title?`
         <div class="cc-vid">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <div class="cc-vlbl">Latest Upload</div>
@@ -2015,8 +2109,8 @@ async function renderChannels(){
               </div>
             </div>
           </div>
-        </div>
-      </div>`:''}
+        </div>`:''}
+      </div>
 
     </div>
   </div>
@@ -2100,11 +2194,6 @@ async function refreshAll(){
   toast('All channels refreshed!','s');
 }
 
-
-
-/* ════════════════════════════════════════════════════════
-   FEATURE 4 — DASHBOARD ASYNC PANELS
-════════════════════════════════════════════════════════ */
 const CH_COLORS=['#00E5FF','#FFD54F','#56FFA7','#FF7043','#BA68C8','#4FC3F7','#AED581','#F06292'];
 
 async function loadThisMonthPanel(primaryId){
@@ -2129,114 +2218,206 @@ async function loadThisMonthPanel(primaryId){
     const tmCmts=tmV.reduce((s,v)=>s+(v.comment_count||0),0);
     const eng=tmViews>0?((tmLikes+tmCmts)/tmViews*100).toFixed(1):null;
     const mom=lmViews>0?Math.round(((tmViews-lmViews)/lmViews)*100):null;
-    let subsDelta=null;
-    if(snaps&&snaps.length>=2){
-      const ss=[...snaps].sort((a,b)=>a.date.localeCompare(b.date));
-      subsDelta=(ss[ss.length-1].subscribers||0)-(ss[0].subscribers||0);
-    }
-    const momC=mom>=0?'var(--gr)':'var(--rd)';
+    
+    // Calculate values for rendering
+    const viewsThisMonth = tmViews;
+    const videosThisMonth = tmV.length;
+    const videosLastMonth = lmV.length;
+    const engRate = eng !== null ? parseFloat(eng) : 0;
+    
+    const deltaViews = mom !== null ? mom : 0;
+    const deltaClass = deltaViews > 0 ? 'up' : deltaViews < 0 ? 'down' : 'flat';
+    const deltaSign  = deltaViews > 0 ? '▲' : deltaViews < 0 ? '▼' : '●';
+
     el.innerHTML=`
-      <div class="sl d-mg">âœ¨ This Month at a Glance</div>
-      <div class="mg-grid d-mg2">
-        <div class="mg-item">
-          <div class="mg-ico">👁</div>
-          <div class="mg-val" style="color:var(--gold)">${fmtN(tmViews)}</div>
-          <div class="mg-lbl">Views This Month</div>
-          ${mom!==null?`<div class="mg-delta" style="color:${momC}">${mom>=0?'↑':'↓'} ${Math.abs(mom)}% vs last mo</div>`:''}
+      <div class="dash-mg-card">
+        <div class="dash-mg-icon" style="font-family: 'Segoe UI Emoji', sans-serif;">👁</div>
+        <div class="dash-mg-val">${fmtN(viewsThisMonth)}</div>
+        <div class="dash-mg-lbl">Views This Month</div>
+        <div class="dash-mg-delta ${deltaClass}">${deltaSign} ${Math.abs(deltaViews)}% vs last mo</div>
+      </div>
+      <div class="dash-mg-card">
+        <div class="dash-mg-icon" style="font-family: 'Segoe UI Emoji', sans-serif;">🎬</div>
+        <div class="dash-mg-val">${videosThisMonth}</div>
+        <div class="dash-mg-lbl">Videos Uploaded</div>
+        <div class="dash-mg-delta flat">${videosLastMonth} last month</div>
+      </div>
+      <div class="dash-mg-card">
+        <div class="dash-mg-icon" style="font-family: 'Segoe UI Emoji', sans-serif;">💬</div>
+        <div class="dash-mg-val">${engRate}%</div>
+        <div class="dash-mg-lbl">Engagement Rate</div>
+        <div class="dash-mg-delta ${engRate >= 4 ? 'up' : engRate >= 2 ? 'flat' : 'down'}">
+          ${engRate >= 4 ? 'Excellent' : engRate >= 2 ? 'Average' : 'Below avg'}
         </div>
-        <div class="mg-item">
-          <div class="mg-ico">🎬</div>
-          <div class="mg-val" style="color:var(--pr)">${tmV.length}</div>
-          <div class="mg-lbl">Videos Uploaded</div>
-          <div class="mg-delta" style="color:var(--t3)">${lmV.length} last month</div>
-        </div>
-        <div class="mg-item">
-          <div class="mg-ico">💬</div>
-          <div class="mg-val" style="color:${eng>=4?'var(--gr)':eng>=2?'var(--gold)':eng?'var(--rd)':'var(--t3)'}">${eng!==null?eng+'%':'—'}</div>
-          <div class="mg-lbl">Engagement Rate</div>
-        </div>
-        ${subsDelta!==null?`
-        <div class="mg-item">
-          <div class="mg-ico">ðŸ‘¥</div>
-          <div class="mg-val" style="color:${subsDelta>=0?'var(--gr)':'var(--rd)'}">${subsDelta>=0?'+':''}${fmtN(subsDelta)}</div>
-          <div class="mg-lbl">Subscriber Change</div>
-        </div>`:''}
-      </div>`;
+      </div>
+    `;
   }catch(e){el.style.display='none';}
 }
 
-async function loadFastestGrowing(channels){
-  const el=document.getElementById('dashFastGrow');
-  if(!el||channels.length<2){if(el)el.style.display='none';return;}
-  try{
-    const srs=await Promise.all(channels.map(ch=>fetch(`/api/snapshots/${ch.id}`).then(r=>r.json()).catch(()=>[])));
-    const withGain=channels.map((ch,i)=>{
-      const ss=(srs[i]||[]).sort((a,b)=>a.date.localeCompare(b.date));
-      if(ss.length<2)return{...ch,gain:0,pct:0};
-      const gain=(ss[ss.length-1].views||0)-(ss[ss.length-2].views||0);
-      const pct=ss[ss.length-2].views>0?parseFloat(((gain/ss[ss.length-2].views)*100).toFixed(2)):0;
-      return{...ch,gain,pct};
-    }).sort((a,b)=>b.pct-a.pct);
-    if(withGain.every(c=>c.gain===0)){el.style.display='none';return;}
-    const maxPct=Math.max(...withGain.map(c=>c.pct),0.001);
-    const primary=channels.find(c=>c.is_primary);
-    const rows=withGain.map((ch,i)=>{
-      const mine=primary&&ch.id===primary.id;
-      const barPct=Math.max(2,Math.round((ch.pct/maxPct)*100));
-      const bc=mine?'var(--gold)':i===0?'var(--gr)':'var(--pr)';
-      return `<div class="fg-row${mine?' fg-mine':''}" onclick="openAnalyticsModal('${esc(ch.id)}')">
-        <div class="fg-rk">${['🥇','🥈','🥉'][i]||i+1}</div>
-        <div class="fg-ch">
-          ${ch.logo_url?`<img class="fg-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`:``+`<div class="fg-logo" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
-          <div style="flex:1;min-width:0">
-            <div class="fg-name">${esc(ch.name)}${mine?'<span class="lb-you">⭐ You</span>':''}</div>
-            <div class="fg-bar-wrap"><div class="fg-bar" style="width:${barPct}%;background:${bc}"></div></div>
+async function loadFastestGrowing(channels) {
+  const el = document.getElementById('dashFastGrow');
+  if (!el || channels.length < 2) return;
+
+  // score = avg_views_raw / subscribers_raw (efficiency proxy)
+  const scored = channels.map(ch => ({
+    ch,
+    score: ch.avg_views_raw && ch.subscribers_raw
+      ? (ch.avg_views_raw / ch.subscribers_raw) * 100
+      : 0,
+  })).sort((a, b) => b.score - a.score);
+
+  const top = scored[0];
+  if (!top || top.score === 0) return;
+  const isPrimary = top.ch.id === channels.find(c => c.is_primary)?.id;
+
+  el.innerHTML = `
+    <div class="fg-card d2" onclick="openAnalyticsModal('${esc(top.ch.id)}')">
+      <div class="fg-badge">🚀 Highest View Efficiency</div>
+      <div class="fg-body">
+        ${top.ch.logo_url
+          ? `<img class="fg-logo" src="${esc(proxyImg(top.ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+          : `<div class="fg-logo-fb">${(top.ch.name || '?')[0]}</div>`}
+        <div class="fg-info">
+          <div class="fg-name">${esc(top.ch.name)}${isPrimary ? ' <span class="lb-you">⭐ You</span>' : ''}</div>
+          <div class="fg-stat">
+            Avg views per subscriber: <strong style="color:var(--gr);font-family:'JetBrains Mono',monospace">
+            ${top.score.toFixed(1)}%</strong>
+          </div>
+          <div class="fg-sub" style="color:var(--t3);font-size:11px">
+            ${fmtN(top.ch.avg_views_raw)} avg views · ${fmtN(top.ch.subscribers_raw)} subscribers
           </div>
         </div>
-        <div class="fg-val">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:${bc}">${ch.pct>=0?'+':''}${ch.pct}%</div>
-          <div style="font-size:10px;color:var(--t3)">${ch.gain>=0?'+':''}${fmtN(ch.gain)} views</div>
-        </div>
-      </div>`;
-    }).join('');
-    el.innerHTML=`<div class="sl d1">Fastest Growing <em>view gain since last snapshot</em></div><div class="fg-card d2">${rows}</div>`;
-  }catch(e){el.style.display='none';}
+        <div class="fg-arrow">›</div>
+      </div>
+    </div>`;
 }
 
-async function loadUploadVelocity(channels){
-  const el=document.getElementById('dashVelocity');
-  if(!el||channels.length<1){if(el)el.style.display='none';return;}
-  try{
-    const now=new Date();
-    const months=[];
-    for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);}
-    const vrs=await Promise.all(channels.map(ch=>fetch(`/api/channels/${ch.id}/videos?max=100`).then(r=>r.json()).catch(()=>[])));
-    const data=channels.map((ch,i)=>({ch,color:CH_COLORS[i%CH_COLORS.length],counts:months.map(m=>(vrs[i]||[]).filter(v=>(v.published_at||v.date||'').startsWith(m)).length)}));
-    const maxC=Math.max(...data.flatMap(d=>d.counts),1);
-    const bW=10,bGap=2,gGap=20;
-    const gW=channels.length*(bW+bGap)+gGap;
-    const cW=months.length*gW+60,cH=160,pH=cH-40;
-    let bars='';
-    months.forEach((m,mi)=>{
-      const gx=30+mi*gW;
-      data.forEach((d,ci)=>{
-        const c=d.counts[mi];
-        if(c===0)return;
-        const h=Math.max(8,Math.round((c/maxC)*pH));
-        const x=gx+ci*(bW+bGap),y=cH-30-h;
-        bars+=`<rect x="${x}" y="${y}" width="${bW}" height="${h}" rx="3" fill="${d.color}" opacity=".82"><title>${esc(d.ch.name)}: ${c} video${c!==1?'s':''}</title></rect>`;
-        bars+=`<text x="${x+bW/2}" y="${y-3}" text-anchor="middle" font-size="8" fill="${d.color}" font-family="DM Sans">${c}</text>`;
+async function loadUploadVelocity(channels) {
+  const el = document.getElementById('dashVelocity');
+  if (!el) return;
+
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px;padding:20px 0"><div class="spin"></div>Building upload chart…</div>`;
+
+  try {
+    // ── 1. Collect last 6 months of video data per channel ──────────────
+    const now    = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: d.toLocaleString('en-US', { month: 'short' }) + " '" + String(d.getFullYear()).slice(2),
+        year:  d.getFullYear(),
+        month: d.getMonth(),
       });
-      const shortM=m.slice(5)+"\u2019"+m.slice(2,4);
-      bars+=`<text x="${gx+data.length*(bW+bGap)/2}" y="${cH-8}" text-anchor="middle" font-size="9.5" fill="rgba(186,201,204,.7)" font-family="DM Sans">${shortM}</text>`;
+    }
+
+    const channelData = await Promise.all(
+      channels.map(async ch => {
+        try {
+          const r    = await fetch(`/api/channels/${ch.id}/videos?max=60`);
+          const vids = await r.json();
+          if (!Array.isArray(vids)) return { ch, counts: Array(6).fill(0) };
+          const counts = months.map(m =>
+            vids.filter(v => {
+              const d = new Date(v.published_at || v.date || 0);
+              return d.getFullYear() === m.year && d.getMonth() === m.month;
+            }).length
+          );
+          return { ch, counts };
+        } catch {
+          return { ch, counts: Array(6).fill(0) };
+        }
+      })
+    );
+
+    // ── 2. Build SVG grouped bar chart ───────────────────────────────────
+    // Chart dimensions
+    const W       = 900, H = 220;
+    const padL    = 32, padR = 12, padT = 20, padB = 40;
+    const plotW   = W - padL - padR;
+    const plotH   = H - padT - padB;
+    const nMonths = months.length;          // 6
+    const nCh     = channelData.length;
+
+    const allCounts = channelData.flatMap(d => d.counts);
+    const maxCount  = Math.max(...allCounts, 1);
+
+    // Assign colours from a fixed palette
+    const palette = [
+      '#00d4ff', '#f5c842', '#22c55e', '#f97316',
+      '#a855f7', '#ec4899', '#14b8a6', '#ef4444',
+    ];
+
+    const groupW  = plotW / nMonths;
+    const barW    = Math.min(18, Math.floor((groupW * 0.8) / nCh));
+    const barGap  = 3;
+    const groupPad = (groupW - nCh * barW - (nCh - 1) * barGap) / 2;
+
+    // Y axis grid lines
+    const yTicks = [0, Math.round(maxCount / 2), maxCount];
+    const gridLines = yTicks.map(t => {
+      const y = padT + plotH - (t / maxCount) * plotH;
+      return `
+        <line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}"
+              stroke="rgba(255,255,255,0.06)" stroke-width="1" stroke-dasharray="4 4"/>
+        <text x="${padL - 4}" y="${y + 4}" text-anchor="end"
+              fill="rgba(255,255,255,0.3)" font-size="9"
+              font-family="JetBrains Mono,monospace">${t}</text>`;
+    }).join('');
+
+    // Bars + tooltips
+    let bars = '';
+    channelData.forEach(({ ch, counts }, ci) => {
+      const colour = palette[ci % palette.length];
+      counts.forEach((count, mi) => {
+        if (count === 0) return;
+        const barH = Math.max(4, (count / maxCount) * plotH);
+        const x    = padL + mi * groupW + groupPad + ci * (barW + barGap);
+        const y    = padT + plotH - barH;
+        bars += `
+          <rect x="${x}" y="${y}" width="${barW}" height="${barH}"
+                rx="3" ry="3" fill="${colour}" opacity="0.85">
+            <title>${esc(ch.name)} — ${months[mi].label}: ${count} video${count !== 1 ? 's' : ''}</title>
+          </rect>
+          <text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle"
+                fill="${colour}" font-size="9"
+                font-family="JetBrains Mono,monospace"
+                opacity="${count > 0 ? '1' : '0'}">${count}</text>`;
+      });
     });
-    const legend=data.map(d=>`<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2)"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${d.color};flex-shrink:0"></span>${esc(d.ch.name)}</span>`).join('');
-    el.innerHTML=`<div class="sl d1">Monthly Upload Velocity <em>last 6 months</em></div>
-      <div class="fg-card d2" style="overflow-x:auto">
-        <svg width="${cW}" height="${cH}" style="display:block;min-width:${cW}px">${bars}</svg>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">${legend}</div>
+
+    // X axis month labels
+    const xLabels = months.map((m, mi) => {
+      const x = padL + mi * groupW + groupW / 2;
+      return `<text x="${x}" y="${H - 6}" text-anchor="middle"
+                    fill="rgba(255,255,255,0.45)" font-size="10"
+                    font-family="DM Sans,sans-serif">${m.label}</text>`;
+    }).join('');
+
+    // Legend
+    const legendItems = channelData.map(({ ch }, ci) =>
+      `<span class="vel-legend-dot" style="background:${palette[ci % palette.length]}"></span>
+       <span class="vel-legend-name">${esc(ch.name)}</span>`
+    ).join('');
+
+    el.innerHTML = `
+      <div class="dash-section-hdr">
+        <span style="font-family:'Material Symbols Outlined';font-size:16px;vertical-align:middle">bar_chart</span>
+        Monthly Upload Velocity <em style="color:var(--t4);font-style:normal;font-weight:400;font-size:11px;letter-spacing:0">last 6 months</em>
+      </div>
+      <div class="vel-wrap d2">
+        <svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet"
+             style="display:block;overflow:visible">
+          ${gridLines}
+          ${bars}
+          ${xLabels}
+        </svg>
+        <div class="vel-legend">${legendItems}</div>
       </div>`;
-  }catch(e){el.style.display='none';}
+  } catch (e) {
+    el.innerHTML = `<div class="err" style="display:block">Could not load velocity chart.</div>`;
+  }
 }
 
 /* ════════════════════════════════════════════════════════
