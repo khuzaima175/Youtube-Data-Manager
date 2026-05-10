@@ -18,6 +18,11 @@
       "date": "2026-05-08",
       "subscribers": 483000000,
       "views": 120763834893
+    },
+    {
+      "date": "2026-05-10",
+      "subscribers": 484000000,
+      "views": 121287568028
     }
   ],
   "UC7nBCgEhZRsf8HcFMdNi1lQ": [
@@ -32,6 +37,39 @@
       "date": "2026-05-08",
       "subscribers": 24200,
       "views": 3568736
+    },
+    {
+      "date": "2026-05-10",
+      "subscribers": 24200,
+      "views": 3582616
+    }
+  ],
+  "UCjd_zIvYtQymk0dPx3vTJcA": [
+    {
+      "date": "2026-05-10",
+      "subscribers": 681000,
+      "views": 112649056
+    }
+  ],
+  "UCqG32kBhpL8Vjb4WsCUc4dQ": [
+    {
+      "date": "2026-05-10",
+      "subscribers": 650000,
+      "views": 101458709
+    }
+  ],
+  "UCgRkORaUdfLghRQAgQqGKLg": [
+    {
+      "date": "2026-05-10",
+      "subscribers": 29200,
+      "views": 3592485
+    }
+  ],
+  "UCpTi5sLZXyYVnQEyqM-2Kig": [
+    {
+      "date": "2026-05-10",
+      "subscribers": 657000,
+      "views": 67873634
     }
   ]
 }

@@ -2184,15 +2184,7 @@ async function ref1(id){
   finally{if(btn){btn.style.opacity='';btn.disabled=false;}}
 }
 
-async function refreshAll(){
-  if(!all.length)return;
-  const btn=document.getElementById('refAllBtn');
-  if(btn){btn.style.opacity='.5';btn.disabled=true;}
-  for(const ch of all){try{await fetch(`/api/channels/${ch.id}/refresh`,{method:'POST'});}catch{}}
-  await renderChannels();
-  if(btn){btn.style.opacity='';btn.disabled=false;}
-  toast('All channels refreshed!','s');
-}
+
 
 const CH_COLORS=['#00E5FF','#FFD54F','#56FFA7','#FF7043','#BA68C8','#4FC3F7','#AED581','#F06292'];
 
@@ -2315,7 +2307,7 @@ async function loadUploadVelocity(channels) {
     const channelData = await Promise.all(
       channels.map(async ch => {
         try {
-          const r    = await fetch(`/api/channels/${ch.id}/videos?max=60`);
+          const r    = await fetch(`/api/channels/${ch.id}/videos/full`);
           const vids = await r.json();
           if (!Array.isArray(vids)) return { ch, counts: Array(6).fill(0) };
           const counts = months.map(m =>
@@ -2350,7 +2342,7 @@ async function loadUploadVelocity(channels) {
     ];
 
     const groupW  = plotW / nMonths;
-    const barW    = Math.min(18, Math.floor((groupW * 0.8) / nCh));
+    const barW    = Math.max(6, Math.min(18, Math.floor((groupW * 0.85) / nCh)));
     const barGap  = 3;
     const groupPad = (groupW - nCh * barW - (nCh - 1) * barGap) / 2;
 
