@@ -761,31 +761,32 @@ async function enrichCards(){
       if(!card)return;
       const sorted=[...vids].sort((a,b)=>new Date(b.published_at||b.date)-new Date(a.published_at||a.date));
 
-      // Add sparkline bars
-      const sparkEl = document.getElementById('cc-spark-'+ch.id);
-      if(sparkEl && vids.length >= 2){
-        const last8 = [...vids]
-          .sort((a,b) => new Date(a.published_at||a.date) - new Date(b.published_at||b.date))
-          .slice(-8);
-        const maxV = Math.max(...last8.map(v => v.view_count ?? v.views_raw ?? 0), 1);
-        sparkEl.innerHTML = last8.map(v => {
-          const vc = v.view_count ?? v.views_raw ?? 0;
-          const pct = Math.max(8, Math.round((vc/maxV)*100));
-          const c = vc >= (maxV*0.8) ? 'var(--pr)' : 'var(--t4)';
-          const isShort = isYouTubeShort(v);
-          const shortMark = isShort ? ' • Short' : '';
-          // Truncate title via CSS
-          const titleStr = esc(v.title || '');
-          const dateStr = v.published_at ? new Date(v.published_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : (v.date||'');
-          return `<div class="cc-spark-bar cc-spark-tip-wrap" style="height:${pct}%;background:${c}${isShort?';opacity:0.45':''}">
-            <div class="cc-spark-tooltip" title="${esc(v.title || '')}">
-              <div class="cc-spark-tip-title">${esc(titleStr)}${shortMark}</div>
-              <div class="cc-spark-tip-views">${fmtN(vc)} views</div>
-              <div class="cc-spark-tip-date">${dateStr}</div>
-            </div>
-          </div>`;
-        }).join('');
-
+      // Recent Videos — top 3 long-form, color-coded vs channel average
+      const rvEl = document.getElementById('cc-recentvids-'+ch.id);
+      if(rvEl){
+        const recent3 = sorted.filter(v => !isYouTubeShort(v)).slice(0, 3);
+        const chAvgViews = parseInt(ch.avg_views_raw || ch.avg_views || 0) || 0;
+        if(!recent3.length){ rvEl.innerHTML=''; } else {
+          rvEl.innerHTML = `<div class="cc-rv-hdr"><span style="font-family:'Material Symbols Outlined';font-size:12px;vertical-align:middle;margin-right:4px">play_circle</span>Recent Videos</div>` +
+          recent3.map(v => {
+            const vc = v.view_count ?? v.views_raw ?? 0;
+            const dateStr = v.published_at ? new Date(v.published_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : (v.date||'');
+            let vcColor = 'var(--t2)';
+            if(chAvgViews > 0){
+              if(vc >= chAvgViews*1.5) vcColor='var(--gr)';
+              else if(vc < chAvgViews*0.5) vcColor='var(--rd)';
+              else vcColor='var(--gold)';
+            }
+            return `<div class="cc-rv-row" onclick="event.stopPropagation();window.open('${esc(v.url||'')}','_blank')">
+              <div class="cc-rv-title" title="${esc(v.title||'')}">${esc(v.title||'Untitled')}</div>
+              <div class="cc-rv-meta">
+                <span class="cc-rv-views" style="color:${vcColor}">${fmtN(vc)}</span>
+                <span class="cc-rv-dot">·</span>
+                <span class="cc-rv-date">${dateStr}</span>
+              </div>
+            </div>`;
+          }).join('');
+        }
       }
 
       // Fill engagement rate
@@ -2086,9 +2087,9 @@ async function renderChannels(){
         </div>
       </div>
 
-      <!-- Sparkline (enriched async) -->
-      <div class="cc-spark-wrap">
-        <div class="cc-spark" id="cc-spark-${esc(ch.id)}"></div>
+      <!-- Recent Videos (enriched async) -->
+      <div class="cc-recentvids" id="cc-recentvids-${esc(ch.id)}">
+        <div class="cc-rv-loading"><div class="spin" style="width:10px;height:10px;border-width:1.5px"></div></div>
       </div>
 
       <!-- Latest upload footer -->
