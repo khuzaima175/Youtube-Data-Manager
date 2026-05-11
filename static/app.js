@@ -1682,7 +1682,7 @@ function showMonthVideos(month) {
   wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-/* ── Tab 3: Growth Speed ────────────────────────────── */
+/* ── Tab 3: Top Videos ──────────────────────────────── */
 async function renderAmGrowth(){
   if(!_amChannelId)return;
   const loadEl=document.getElementById('amGrowthLoading');
@@ -1701,90 +1701,219 @@ async function renderAmGrowth(){
       loadEl.style.display='none';contEl.style.display='block';return;
     }
 
-    const vids = allVids.filter(v => !isYouTubeShort(v));
-    const shortsCount = allVids.length - vids.length;
-
+    const vids=allVids.filter(v=>!isYouTubeShort(v));
     if(!vids.length){
       contEl.innerHTML='<p style="color:var(--t3);padding:24px">No long-form video data available.</p>';
       loadEl.style.display='none';contEl.style.display='block';return;
     }
 
-    // Calculate views/day for each video
-    const withVpd=vids
-      .filter(v=>(v.published_at||v.date)&&(v.view_count||v.views_raw||0)>0)
+    // ── Sort by total views descending ──────────────────
+    const byViews=[...vids]
+      .map(v=>({...v, vc: v.view_count||v.views_raw||0}))
+      .sort((a,b)=>b.vc-a.vc);
+
+    const channelTotalViews=byViews.reduce((s,v)=>s+v.vc,0);
+
+    // ── 80/20: walk down until 80% of total views hit ──
+    let cumViews=0, powerCount=0;
+    for(const v of byViews){
+      cumViews+=v.vc;
+      powerCount++;
+      if(cumViews>=channelTotalViews*0.8) break;
+    }
+    const powerVids=byViews.slice(0,powerCount);
+    const powerPct=Math.round((powerCount/byViews.length)*100);
+    const actualViewPct=Math.round((cumViews/channelTotalViews)*100);
+
+    // ── Topic extraction from power video titles ────────
+    const stopWords=new Set(['the','and','for','with','how','that','this','from','your','more',
+      'have','will','are','can','all','not','into','what','when','make','were','been','its',
+      'was','but','our','you','they','their','has','had','also','about','some','after','using',
+      'use','tutorial','video','part','best','full','guide','new','top','most','these','then',
+      'than','very','just','out','get','let','now','see','too','over','back','even','each',
+      'does','off','here','two','take','much','well','made','vs','with','without','my','a',
+      'an','in','on','to','of','is','it','by','at','be','do','so','we','he','she','they',
+      'ep','eps','episode','series','part','ft','feat','official']);
+    const freq={};
+    powerVids.forEach(v=>{
+      (v.title||'').toLowerCase()
+        .replace(/[^a-z0-9\s]/g,' ')
+        .split(/\s+/)
+        .filter(w=>w.length>2&&!stopWords.has(w)&&isNaN(w))
+        .forEach(w=>{freq[w]=(freq[w]||0)+1;});
+    });
+    const topTopics=Object.entries(freq)
+      .sort((a,b)=>b[1]-a[1])
+      .slice(0,10);
+
+    // ── Views/day for growth speed table ───────────────
+    const withVpd=byViews
+      .filter(v=>(v.published_at||v.date)&&v.vc>0)
       .map(v=>{
-        const vpd=viewsPerDay(v.view_count||v.views_raw||0, v.published_at||v.date);
+        const vpd=viewsPerDay(v.vc, v.published_at||v.date);
         const daysLive=Math.max(1,Math.floor((Date.now()-new Date(v.published_at||v.date).getTime())/864e5));
-        return {...v,vpd,daysLive};
+        const dateStr=(v.published_at||v.date||'').slice(0,10);
+        return {...v,vpd,daysLive,dateStr};
       })
       .sort((a,b)=>(b.vpd||0)-(a.vpd||0));
 
     const maxVpd=Math.max(...withVpd.map(v=>v.vpd||0),1);
-    const topRows=withVpd.slice(0,50).map((v,i)=>{
+    const avgVpd=withVpd.reduce((s,v)=>s+(v.vpd||0),0)/Math.max(withVpd.length,1);
+    const hotCount=withVpd.filter(v=>(v.vpd||0)>=1000).length;
+    const goodCount=withVpd.filter(v=>(v.vpd||0)>=200&&(v.vpd||0)<1000).length;
+
+    // ── Power videos rows (top 5 shown with thumbs) ────
+    const powerRows=powerVids.slice(0,8).map((v,i)=>{
+      const barPct=Math.round((v.vc/byViews[0].vc)*100);
+      const dateStr=(v.published_at||v.date||'').slice(0,10);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd1)">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t4);width:18px;text-align:right;flex-shrink:0">${i+1}</span>
+        ${v.thumb?`<img src="${esc(v.thumb)}" style="width:56px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0;background:var(--sf-highest)" onerror="this.style.background='var(--sf-highest)'" alt="">`:'<div style="width:56px;height:32px;border-radius:4px;background:var(--sf-highest);flex-shrink:0"></div>'}
+        <div style="flex:1;min-width:0">
+          <a href="${esc(v.url||'')}" target="_blank" rel="noopener"
+            style="font-size:12.5px;font-weight:600;color:var(--t1);text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35"
+            title="${esc(v.title||'')}">${esc(v.title||'Untitled')}</a>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+            <div style="flex:1;height:3px;background:var(--sf-highest);border-radius:2px;overflow:hidden">
+              <div style="height:100%;width:${barPct}%;background:var(--gr);border-radius:2px"></div>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:var(--gr)">${fmtN(v.vc)}</div>
+          <div style="font-size:10px;color:var(--t4);margin-top:1px">${dateStr}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    // ── Growth speed rows ───────────────────────────────
+    const speedRows=withVpd.slice(0,50).map((v,i)=>{
       const vpd=v.vpd||0;
-      const isHot=vpd>=1000;
-      const isGood=vpd>=200&&vpd<1000;
-      const isWeak=vpd<50;
+      const isHot=vpd>=1000, isGood=vpd>=200&&vpd<1000, isWeak=vpd<50;
       const color=isHot?'var(--gr)':isGood?'var(--gold)':isWeak?'var(--rd)':'var(--t3)';
       const badgeStyle=isHot
         ?'background:rgba(86,255,167,.1);color:var(--gr);border:1px solid rgba(86,255,167,.25)'
         :isGood
         ?'background:rgba(255,213,79,.1);color:var(--gold);border:1px solid rgba(255,213,79,.25)'
         :isWeak
-        ?'background:rgba(255,180,171,.08);color:var(--rd);border:1px solid rgba(255,180,171,.2)'
+        ?'background:rgba(255,100,100,.08);color:var(--rd);border:1px solid rgba(255,100,100,.2)'
         :'background:rgba(255,255,255,.05);color:var(--t3);border:1px solid var(--bd)';
       const badgeTxt=isHot?'HOT':isGood?'GOOD':isWeak?'SLOW':'AVG';
       const barPct=Math.round((vpd/maxVpd)*100);
-      return `<tr style="border-bottom:1px solid rgba(255,255,255,.03);transition:background .12s" onmouseover="this.style.background='rgba(255,255,255,.025)'" onmouseout="this.style.background=''">
-        <td style="padding:9px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3);width:28px;text-align:center">${i+1}</td>
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.03);transition:background .12s"
+        onmouseover="this.style.background='rgba(255,255,255,.025)'"
+        onmouseout="this.style.background=''">
+        <td style="padding:9px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t4);width:28px;text-align:center">${i+1}</td>
         <td style="padding:9px 10px;max-width:0;width:99%">
-          <a href="${esc(v.url)}" target="_blank" rel="noopener" style="font-size:12px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;color:var(--t1);text-decoration:none">${esc(v.title)}</a>
+          <a href="${esc(v.url||'')}" target="_blank" rel="noopener"
+            style="font-size:13.5px;font-weight:600;color:var(--t1);text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+            title="${esc(v.title||'')}">${esc(v.title||'Untitled')}</a>
           <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
-            <div style="flex:1;height:4px;background:var(--sf-highest);border-radius:2px;overflow:hidden">
-              <div style="height:100%;width:${barPct}%;background:${color};border-radius:2px;transition:width .6s"></div>
+            <div style="flex:1;height:3px;background:var(--sf-highest);border-radius:2px;overflow:hidden">
+              <div style="height:100%;width:${barPct}%;background:${color};border-radius:2px"></div>
             </div>
           </div>
         </td>
         <td style="padding:9px 8px;white-space:nowrap">
-          <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;letter-spacing:.4px;padding:3px 8px;border-radius:6px;${badgeStyle}">${badgeTxt}</span>
+          <span style="display:inline-flex;align-items:center;font-size:10px;font-weight:700;letter-spacing:.4px;padding:3px 8px;border-radius:6px;${badgeStyle}">${badgeTxt}</span>
         </td>
-        <td style="padding:9px 8px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:${color};white-space:nowrap">${fmtN(vpd)}<span style="font-size:9px;font-weight:400;color:var(--t3);margin-left:2px">/day</span></td>
-        <td style="padding:9px 8px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2);white-space:nowrap">${fmtN(v.view_count||v.views_raw||0)}</td>
-        <td style="padding:9px 8px;text-align:right;font-size:11px;color:var(--t3);white-space:nowrap">${v.daysLive}d old</td>
+        <td style="padding:9px 8px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:${color};white-space:nowrap">${fmtN(vpd)}<span style="font-size:9px;font-weight:400;color:var(--t4);margin-left:2px">/day</span></td>
+        <td style="padding:9px 8px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t2);white-space:nowrap">${fmtN(v.vc)}</td>
+        <td style="padding:9px 8px;text-align:right;font-size:11px;color:var(--t4);white-space:nowrap">${v.daysLive}d</td>
+        <td style="padding:9px 8px;text-align:right;font-size:11px;color:var(--t4);white-space:nowrap">${v.dateStr}</td>
       </tr>`;
     }).join('');
 
-    const avgVpd=withVpd.reduce((s,v)=>s+(v.vpd||0),0)/Math.max(withVpd.length,1);
-    const hotCount=withVpd.filter(v=>(v.vpd||0)>=1000).length;
-    const goodCount=withVpd.filter(v=>(v.vpd||0)>=200&&(v.vpd||0)<1000).length;
-
     contEl.innerHTML=`
-      ${shortsCount > 0 ? `<div style="margin: 0 0 16px 0; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--bd); border-radius: 6px; font-size: 11.5px; color: var(--t3); display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 14px">ℹ️</span>
-        <span><b>${shortsCount} Shorts</b> are excluded from these analytics to ensure performance data reflects long-form content.</span>
-      </div>` : ''}
-      <div class="am-month-summary">
-        <div class="am-ms-item"><div class="am-ms-val" style="color:var(--gr)">${hotCount}</div><div class="am-ms-lbl">🔥 Hot (&gt;1K/day)</div></div>
-        <div class="am-ms-item"><div class="am-ms-val" style="color:var(--gold)">${goodCount}</div><div class="am-ms-lbl">✅ Good (&gt;200/day)</div></div>
-        <div class="am-ms-item"><div class="am-ms-val">${fmtN(avgVpd)}</div><div class="am-ms-lbl">Avg Views/Day</div></div>
-        <div class="am-ms-item"><div class="am-ms-val">${fmtN(withVpd[0]?.vpd||0)}</div><div class="am-ms-lbl">Fastest Video</div></div>
+
+      <!-- ── SECTION 1: Power Videos 80/20 ── -->
+      <div class="am-sep-sect" style="margin-bottom:24px">
+        <div class="am-sect-lbl" style="display:flex;align-items:center;gap:7px">
+          <span style="font-family:'Material Symbols Outlined';font-size:15px;vertical-align:middle">military_tech</span>
+          Power Videos
+          <span style="font-size:10px;font-weight:400;color:var(--t4);margin-left:2px">videos driving 80% of all views</span>
+        </div>
+
+        <!-- stat strip -->
+        <div style="display:flex;align-items:stretch;gap:12px;margin:14px 0 18px">
+          <div style="flex:1;padding:14px 16px;background:rgba(86,255,167,.06);border:1px solid rgba(86,255,167,.2);border-radius:10px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:800;color:var(--gr);line-height:1">${powerCount}</div>
+            <div style="font-size:10px;color:var(--t3);margin-top:4px">power videos</div>
+          </div>
+          <div style="flex:1;padding:14px 16px;background:rgba(255,213,79,.06);border:1px solid rgba(255,213,79,.2);border-radius:10px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:800;color:var(--gold);line-height:1">${powerPct}%</div>
+            <div style="font-size:10px;color:var(--t3);margin-top:4px">of total videos</div>
+          </div>
+          <div style="flex:1;padding:14px 16px;background:rgba(255,255,255,.03);border:1px solid var(--bd2);border-radius:10px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:800;color:var(--t1);line-height:1">${actualViewPct}%</div>
+            <div style="font-size:10px;color:var(--t3);margin-top:4px">of total views</div>
+          </div>
+          <div style="flex:2;padding:14px 16px;background:rgba(255,255,255,.02);border:1px solid var(--bd1);border-radius:10px;display:flex;align-items:center">
+            <div style="font-size:12px;color:var(--t2);line-height:1.6">
+              <strong style="color:var(--gr)">${powerCount} videos</strong> out of <strong style="color:var(--t1)">${byViews.length}</strong> are carrying this channel.<br>
+              <span style="color:var(--t3);font-size:11px">Study their topics, titles and length — these are the proven winners.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- top 8 power videos with thumbnails -->
+        <div>${powerRows}</div>
+        ${powerCount>8?`<div style="font-size:11px;color:var(--t4);margin-top:10px;text-align:center">+ ${powerCount-8} more power videos — visible in the growth table below (marked in green)</div>`:''}
       </div>
+
+      <!-- ── SECTION 2: Topic Patterns ── -->
+      ${topTopics.length?`
+      <div class="am-sep-sect" style="margin-bottom:24px">
+        <div class="am-sect-lbl" style="display:flex;align-items:center;gap:7px">
+          <span style="font-family:'Material Symbols Outlined';font-size:15px;vertical-align:middle">tag</span>
+          Winning Topics
+          <span style="font-size:10px;font-weight:400;color:var(--t4);margin-left:2px">keywords from power videos</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+          ${topTopics.map(([word,count],i)=>{
+            const maxC=topTopics[0][1];
+            const op=0.5+((count/maxC)*0.5);
+            const size=i<3?'13px':'12px';
+            const bg=i<3?'rgba(86,255,167,.12)':'rgba(255,255,255,.05)';
+            const border=i<3?'1px solid rgba(86,255,167,.3)':'1px solid var(--bd1)';
+            const col=i<3?'var(--gr)':'var(--t2)';
+            return `<span style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;background:${bg};border:${border};font-size:${size};font-weight:600;color:${col};opacity:${op}">
+              ${esc(word)}
+              <em style="font-style:normal;font-size:10px;color:var(--t4);font-family:'JetBrains Mono',monospace">×${count}</em>
+            </span>`;
+          }).join('')}
+        </div>
+      </div>`:''}
+
+      <!-- ── SECTION 3: Growth Speed Table ── -->
       <div class="am-sep-sect">
-        <div class="am-sect-lbl">Top 50 Videos by Growth Speed</div>
+        <div class="am-sect-lbl" style="display:flex;align-items:center;gap:7px">
+          <span style="font-family:'Material Symbols Outlined';font-size:15px;vertical-align:middle">rocket_launch</span>
+          Growth Speed
+          <span style="font-size:10px;font-weight:400;color:var(--t4);margin-left:2px">top 50 by views/day</span>
+        </div>
+        <div class="am-month-summary" style="margin:12px 0 16px">
+          <div class="am-ms-item"><div class="am-ms-val" style="color:var(--gr)">${hotCount}</div><div class="am-ms-lbl">🔥 Hot (&gt;1K/day)</div></div>
+          <div class="am-ms-item"><div class="am-ms-val" style="color:var(--gold)">${goodCount}</div><div class="am-ms-lbl">✅ Good (&gt;200/day)</div></div>
+          <div class="am-ms-item"><div class="am-ms-val">${fmtN(avgVpd)}</div><div class="am-ms-lbl">Avg Views/Day</div></div>
+          <div class="am-ms-item"><div class="am-ms-val">${fmtN(withVpd[0]?.vpd||0)}</div><div class="am-ms-lbl">Fastest Video</div></div>
+        </div>
         <div style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse">
             <thead><tr style="border-bottom:1px solid var(--bd)">
               <th style="padding:6px 10px;text-align:left;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">#</th>
               <th style="padding:6px 10px;text-align:left;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Title</th>
-              <th style="padding:6px 6px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Views/Day</th>
-              <th style="padding:6px 6px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Total Views</th>
-              <th style="padding:6px 6px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Age</th>
-              <th style="padding:6px 6px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Date</th>
+              <th style="padding:6px 8px;text-align:center;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Speed</th>
+              <th style="padding:6px 8px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Views/Day</th>
+              <th style="padding:6px 8px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Total Views</th>
+              <th style="padding:6px 8px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Age</th>
+              <th style="padding:6px 8px;text-align:right;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Date</th>
             </tr></thead>
-            <tbody>${topRows}</tbody>
+            <tbody>${speedRows}</tbody>
           </table>
         </div>
       </div>`;
+
     loadEl.style.display='none';contEl.style.display='block';
   }catch(ex){
     contEl.innerHTML=`<div class="am-err">Failed: ${esc(String(ex))}</div>`;
