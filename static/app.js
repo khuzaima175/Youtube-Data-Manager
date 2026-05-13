@@ -2761,10 +2761,10 @@ function renderSearch(d){
         </button>
       </div>
       <div class="sr-stats">
-        <div class="sr-st"><div class="sr-st-ico">ðŸ‘¥</div><div class="sr-st-val" style="color:var(--gold)">${esc(d.subscribers)}</div><div class="sr-st-lbl">Subscribers</div></div>
+        <div class="sr-st"><div class="sr-st-ico">👥</div><div class="sr-st-val" style="color:var(--gold)">${esc(d.subscribers)}</div><div class="sr-st-lbl">Subscribers</div></div>
         <div class="sr-st"><div class="sr-st-ico">👁</div><div class="sr-st-val">${esc(d.total_views)}</div><div class="sr-st-lbl">Total Views</div></div>
         <div class="sr-st"><div class="sr-st-ico">🎬</div><div class="sr-st-val" style="color:var(--pr)">${esc(d.total_videos)}</div><div class="sr-st-lbl">Videos</div></div>
-        <div class="sr-st"><div class="sr-st-ico">ðŸ“Š</div><div class="sr-st-val" style="color:var(--gr)">${esc(d.avg_views)}</div><div class="sr-st-lbl">Avg Views</div></div>
+        <div class="sr-st"><div class="sr-st-ico">📊</div><div class="sr-st-val" style="color:var(--gr)">${esc(d.avg_views)}</div><div class="sr-st-lbl">Avg Views</div></div>
       </div>
       ${d.description?`<div class="sr-desc"><div class="sr-desc-l">About</div><div class="sr-desc-t">${esc(d.description)}${d.description.length>=300?'…':''}</div></div>`:''}
       ${vid.title?`
