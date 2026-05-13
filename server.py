@@ -1,30 +1,45 @@
 """
 YT Tracker — Flask backend
 Serves the dashboard and proxies YouTube Data API v3 requests.
+Data is persisted in Supabase (cloud Postgres).
 """
 
 import os
 import re
-import json
 import time
-import tempfile
 import urllib.request
-from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory, Response
 from flask_cors import CORS
 from googleapiclient.discovery import build
+from supabase import create_client, Client
 
 load_dotenv()
 
-API_KEY   = os.getenv("YOUTUBE_API_KEY", "")
-DEBUG     = os.getenv("FLASK_DEBUG", "0") == "1"
+API_KEY      = os.getenv("YOUTUBE_API_KEY", "")
+DEBUG        = os.getenv("FLASK_DEBUG", "0") == "1"
 MAX_CHANNELS = 20          # soft cap to protect API quota
+
+# ── Supabase client ───────────────────────────────────────────────────────────
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+
+_sb: Client | None = None
+
+def get_sb() -> Client:
+    """Return a cached Supabase client, raising clearly if credentials are missing."""
+    global _sb
+    if _sb is None:
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            raise ValueError("SUPABASE_URL / SUPABASE_SERVICE_KEY not set in .env")
+        _sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _sb
 
 app = Flask(__name__, static_folder="static")
 
-# Restrict CORS to localhost only in dev; tighten for production
-CORS(app, origins=["http://localhost:5000", "http://127.0.0.1:5000"])
+# ── CORS configuration ────────────────────────────────────────────────────────
+_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000").split(",")
+CORS(app, origins=[o.strip() for o in _origins if o.strip()])
 
 @app.after_request
 def fix_charset(response):
@@ -35,8 +50,6 @@ def fix_charset(response):
         response.content_type = f'{base}; charset=utf-8'
     return response
 
-DATA_FILE      = Path(__file__).parent / "channels.json"
-SNAPSHOTS_FILE = Path(__file__).parent / "snapshots.json"
 
 # Simple in-memory rate limiter: {ip: last_add_timestamp}
 _last_add: dict[str, float] = {}
@@ -104,62 +117,85 @@ def fmt_duration(secs: int) -> str:
     return f"{m}:{s:02d}"
 
 
+# ── Supabase persistence helpers ─────────────────────────────────────────────
+
 def load_channels() -> list:
-    """Load channels from JSON file. Returns empty list on error."""
+    """Load all tracked channels from Supabase, ordered by added_at."""
     try:
-        if DATA_FILE.exists():
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        pass
-    return []
+        sb = get_sb()
+        r = sb.table("channels").select("*").order("added_at").execute()
+        return r.data or []
+    except Exception as exc:
+        print(f"[Supabase] load_channels failed: {exc}")
+        return []
 
 
 def save_channels(channels: list) -> None:
-    """Atomically save channels to JSON (temp file + rename prevents corruption)."""
-    tmp = DATA_FILE.with_suffix(".tmp")
-    try:
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(channels, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, DATA_FILE)
-    except OSError:
-        if tmp.exists():
-            tmp.unlink(missing_ok=True)
-        raise
+    """
+    Persist the full channel list to Supabase.
+    Uses upsert so it is safe to call after add, delete, or set-primary.
+    NOTE: callers that delete a channel should call delete_channel_db() directly.
+    """
+    # This is only called for bulk updates (refresh-all, set-primary bulk toggle).
+    # Individual add/delete use targeted helpers below.
+    sb = get_sb()
+    if channels:
+        sb.table("channels").upsert(channels, on_conflict="id").execute()
+
+
+def add_channel_db(channel: dict) -> None:
+    """Insert a single channel row into Supabase."""
+    sb = get_sb()
+    sb.table("channels").insert(channel).execute()
+
+
+def update_channel_db(channel: dict) -> None:
+    """Update an existing channel row in Supabase."""
+    sb = get_sb()
+    sb.table("channels").update(channel).eq("id", channel["id"]).execute()
+
+
+def delete_channel_db(channel_id: str) -> None:
+    """Delete a channel row from Supabase."""
+    sb = get_sb()
+    sb.table("channels").delete().eq("id", channel_id).execute()
 
 
 def load_snapshots() -> dict:
-    """Load snapshots from JSON file. Returns empty dict on error."""
+    """
+    Load all snapshot rows from Supabase and reshape into
+    { channel_id: [ {date, subscribers, views}, ... ] }.
+    """
     try:
-        if SNAPSHOTS_FILE.exists():
-            with open(SNAPSHOTS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        pass
-    return {}
+        sb = get_sb()
+        r = sb.table("snapshots").select("*").order("date").execute()
+        result: dict = {}
+        for row in (r.data or []):
+            cid = row["channel_id"]
+            result.setdefault(cid, []).append({
+                "date":        row["date"],
+                "subscribers": row["subscribers"],
+                "views":       row["views"],
+            })
+        return result
+    except Exception as exc:
+        print(f"[Supabase] load_snapshots failed: {exc}")
+        return {}
 
 
 def save_snapshot(channel_id: str, subscribers: int, total_views: int) -> None:
-    """Append a daily snapshot entry for a channel (one per day, upsert)."""
-    snaps = load_snapshots()
+    """Upsert today's snapshot for a channel into Supabase."""
     today = time.strftime("%Y-%m-%d", time.gmtime())
-    entry = {"date": today, "subscribers": subscribers, "views": total_views}
-    if channel_id not in snaps:
-        snaps[channel_id] = []
-    # Upsert: replace existing entry for today if present
-    snaps[channel_id] = [s for s in snaps[channel_id] if s.get("date") != today]
-    snaps[channel_id].append(entry)
-    # Keep only last 365 entries per channel
-    snaps[channel_id] = sorted(snaps[channel_id], key=lambda s: s["date"])[-365:]
-
-    tmp = SNAPSHOTS_FILE.with_suffix(".tmp")
-    try:
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(snaps, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, SNAPSHOTS_FILE)
-    except OSError:
-        if tmp.exists():
-            tmp.unlink(missing_ok=True)
+    sb = get_sb()
+    sb.table("snapshots").upsert(
+        {
+            "channel_id":  channel_id,
+            "date":        today,
+            "subscribers": subscribers,
+            "views":       total_views,
+        },
+        on_conflict="channel_id,date",
+    ).execute()
 
 
 def build_yt():
@@ -532,8 +568,7 @@ def add_channel():
             d["is_primary"] = True   # first added → auto primary
 
         d["added_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        channels.append(d)
-        save_channels(channels)
+        add_channel_db(d)
         return jsonify({"success": True, "channel": d})
     except ValueError as ex:
         return api_error(str(ex), 503)
@@ -545,13 +580,18 @@ def add_channel():
 def delete_channel(channel_id):
     """Remove a channel from the tracking list."""
     channels = load_channels()
-    new_list = [c for c in channels if c["id"] != channel_id]
-    if len(new_list) == len(channels):
+    target = next((c for c in channels if c["id"] == channel_id), None)
+    if not target:
         return api_error("Channel not found", 404)
+
+    delete_channel_db(channel_id)
+
     # If deleted channel was primary, promote the first remaining
-    if new_list and not any(c.get("is_primary") for c in new_list):
-        new_list[0]["is_primary"] = True
-    save_channels(new_list)
+    remaining = [c for c in channels if c["id"] != channel_id]
+    if remaining and not any(c.get("is_primary") for c in remaining):
+        remaining[0]["is_primary"] = True
+        update_channel_db(remaining[0])
+
     return jsonify({"success": True})
 
 
@@ -564,15 +604,14 @@ def refresh_channel(channel_id):
         if e:
             return api_error(e, 404)
 
+        # Preserve metadata from the existing row
         channels = load_channels()
-        for i, c in enumerate(channels):
-            if c["id"] == channel_id:
-                d["is_primary"]    = c.get("is_primary", False)
-                d["added_at"]      = c.get("added_at", "")
-                d["last_refreshed"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                channels[i]        = d
-                break
-        save_channels(channels)
+        existing = next((c for c in channels if c["id"] == channel_id), {})
+        d["is_primary"]    = existing.get("is_primary", False)
+        d["added_at"]      = existing.get("added_at", "")
+        d["last_refreshed"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        update_channel_db(d)
 
         # Auto-save a daily snapshot for growth timeline
         try:
@@ -594,14 +633,14 @@ def refresh_channel(channel_id):
 def set_primary(channel_id):
     """Set a channel as the user's primary channel."""
     channels = load_channels()
-    found = False
-    for c in channels:
-        c["is_primary"] = (c["id"] == channel_id)
-        if c["id"] == channel_id:
-            found = True
+    found = any(c["id"] == channel_id for c in channels)
     if not found:
         return api_error("Channel not found", 404)
-    save_channels(channels)
+
+    sb = get_sb()
+    # Clear primary on all channels, then set on the target
+    sb.table("channels").update({"is_primary": False}).neq("id", "").execute()
+    sb.table("channels").update({"is_primary": True}).eq("id", channel_id).execute()
     return jsonify({"success": True})
 
 
@@ -705,7 +744,6 @@ def export_csv():
         ]
         lines.append(",".join(f'"{v}"' for v in row))
 
-    from flask import Response
     return Response(
         "\n".join(lines),
         mimetype="text/csv",
@@ -715,6 +753,15 @@ def export_csv():
 
 if __name__ == "__main__":
     if not API_KEY:
-        print("⚠  WARNING: YOUTUBE_API_KEY not set in .env — API calls will fail.")
-    print("YT Tracker running at http://localhost:5000")
-    app.run(debug=DEBUG, port=5000)
+        print("WARNING: YOUTUBE_API_KEY not set in .env -- API calls will fail.")
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        print("WARNING: SUPABASE_URL / SUPABASE_SERVICE_KEY not set in .env -- DB calls will fail.")
+    else:
+        try:
+            get_sb()  # eagerly validate credentials on startup
+            print("OK  Supabase connected.")
+        except Exception as e:
+            print(f"FAIL  Supabase connection failed: {e}")
+    port = int(os.getenv("PORT", 5000))
+    print(f"YT Tracker running at http://localhost:{port}")
+    app.run(debug=DEBUG, host="0.0.0.0", port=port)

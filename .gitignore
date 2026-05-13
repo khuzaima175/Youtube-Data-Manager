@@ -5,6 +5,7 @@
 
 # Data (contains your tracked channels — don't commit personal data)
 channels.json
+snapshots.json
 
 # Python
 __pycache__/
