@@ -35,6 +35,19 @@ def get_sb() -> Client:
         _sb = create_client(SUPABASE_URL, SUPABASE_KEY)
     return _sb
 
+# ── YouTube client singleton ──────────────────────────────────────────────────
+_yt: any = None
+
+def get_yt():
+    """Build or return the cached YouTube API client to avoid re-discovery lag."""
+    global _yt
+    if _yt is None:
+        if not API_KEY:
+            raise ValueError("YOUTUBE_API_KEY is not set in .env")
+        # static_discovery=False or reusing the client prevents the 1s 'cold start' lag
+        _yt = build("youtube", "v3", developerKey=API_KEY)
+    return _yt
+
 app = Flask(__name__, static_folder="static")
 
 # ── CORS configuration ────────────────────────────────────────────────────────
@@ -199,10 +212,8 @@ def save_snapshot(channel_id: str, subscribers: int, total_views: int) -> None:
 
 
 def build_yt():
-    """Build YouTube API client. Raises ValueError if API key is missing."""
-    if not API_KEY:
-        raise ValueError("YOUTUBE_API_KEY is not set in .env")
-    return build("youtube", "v3", developerKey=API_KEY)
+    """Wrapper to get the cached YouTube client."""
+    return get_yt()
 
 
 def api_error(message: str, code: int = 500):
@@ -749,6 +760,12 @@ def export_csv():
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=yt_tracker_channels.csv"}
     )
+
+
+@app.route("/ping")
+def ping():
+    """Low-overhead ping endpoint for UptimeRobot keep-alive."""
+    return "ok", 200
 
 
 if __name__ == "__main__":

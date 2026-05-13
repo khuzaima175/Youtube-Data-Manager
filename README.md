@@ -8,18 +8,20 @@ A professional, visually sophisticated web application for tracking YouTube chan
 - 📋 **Channel Tracking** — Track multiple channels with real-time stats and automated data enrichment.
 - 🔍 **Search & Add** — Find any YouTube channel and add it to your tracking list instantly.
 - 📈 **Deep Analytics**:
-  - Engagement trends and subscriber growth.
+  - Engagement trends and subscriber growth via Supabase snapshots.
   - Video performance analysis (views, likes, comments).
   - Average views and performance vs. channel average.
-- ⚡ **Performance Metrics**:
-  - Daily view counts and upload consistency tracking.
-  - Interactive "View Details" drawer for comprehensive channel deep-dives.
+- ⚡ **Performance & Stability**:
+  - **Cold Start Protection**: Includes a `/ping` route for UptimeRobot monitoring.
+  - **Optimized API Calls**: Reuses the YouTube API client to eliminate discovery doc lag.
+  - **Supabase Persistence**: Scalable cloud database for your channel list and snapshots.
 - 📥 **Data Export** — Export all your tracked channel data as a CSV for external analysis.
 - 📱 **Responsive Design** — Fully optimized for desktop, tablet, and mobile viewing.
 
 ## 🛠️ Technology Stack
 
 - **Backend**: Python 3.8+ / Flask
+- **Database**: Supabase (PostgreSQL)
 - **Frontend**: Vanilla HTML5, CSS3 (Custom Properties & Glassmorphism), and JavaScript
 - **API**: YouTube Data API v3
 - **Typography**: Syne, DM Sans, and JetBrains Mono
@@ -29,7 +31,8 @@ A professional, visually sophisticated web application for tracking YouTube chan
 ### Prerequisites
 
 - Python 3.8+
-- A YouTube Data API Key (obtainable from the [Google Cloud Console](https://console.cloud.google.com))
+- A YouTube Data API Key
+- A Supabase Project (URL and Service Key)
 
 ### Installation & Run
 
@@ -45,28 +48,19 @@ A professional, visually sophisticated web application for tracking YouTube chan
    ```
 
 3. **Configure Environment Variables**:
-   - Copy `.env.example` to `.env`:
-     ```bash
-     cp .env.example .env
-     ```
-   - Open `.env` and enter your `YOUTUBE_API_KEY`.
+   - Copy `.env.example` to `.env`.
+   - Add your `YOUTUBE_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_KEY`.
 
 4. **Run the application**:
    ```bash
    python server.py
    ```
-   The application will be available at `http://localhost:5000`.
 
-## 📁 Repository Structure
+## ☁️ Deployment (Railway)
 
-- `server.py`: Flask backend handling API requests and data persistence.
-- `static/`: Frontend assets (HTML, CSS, JS).
-  - `index.html`: Main application entry point.
-  - `app.js`: Application logic and API integration.
-  - `style.css`: Modern, responsive styling.
-- `channels.json`: (Local only) Stores your tracked channel data.
-- `.env.example`: Template for required environment variables.
-- `.gitignore`: Configured to protect sensitive keys and local data.
+1. Connect your GitHub repository to [Railway.app](https://railway.app).
+2. Add your environment variables in the Railway dashboard.
+3. **Fix Cold Starts**: Set up [UptimeRobot](https://uptimerobot.com) to ping `https://your-app-url.up.railway.app/ping` every 5 minutes.
 
 ## ⚖️ License
 
