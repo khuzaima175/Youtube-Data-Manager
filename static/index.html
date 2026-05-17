@@ -1,276 +1,301 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>YT Tracker — Channel Analytics</title>
-<meta name="description" content="Track and compare YouTube channels with in-depth analytics, engagement rates, and competitor insights."/>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,300;400;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,300,0,0" rel="stylesheet"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YT Tracker — Channel Analytics</title>
+  <meta name="description"
+    content="Track and compare YouTube channels with in-depth analytics, engagement rates, and competitor insights." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,300;400;600&family=DM+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,300,0,0"
+    rel="stylesheet" />
 
-<link rel="stylesheet" href="static/style.css"/>
+  <link rel="stylesheet" href="static/style.css" />
 </head>
+
 <body>
-<div id="toast"></div>
+  <div id="toast"></div>
 
-<!-- Drawer overlay -->
-<div class="ovrl" id="ovrl" onclick="closeDrawer()"></div>
-<!-- Drawer -->
-<div class="drw" id="drw">
-  <!-- Fixed Header: banner + channel identity always visible -->
-  <div class="drw-fixed-hdr" id="drwFixedHdr">
-    <!-- Banner image or placeholder fills this -->
-    <div class="drw-banner-wrap" id="drwBannerWrap"></div>
-    <!-- Channel identity row -->
-    <div class="drw-identity" id="drwIdentity"></div>
-    <!-- Stats strip (4 key numbers) -->
-    <div class="drw-stats-strip" id="drwStatsStrip"></div>
-    <!-- Tab bar -->
-    <div class="drw-tab-bar">
-      <button class="drw-tab on" id="drwTab-videos" onclick="switchDrwTab('videos')">
-        <span class="drw-tab-icon" style="font-family:'Material Symbols Outlined'">play_circle</span>
-        Videos
-      </button>
-      <button class="drw-tab" id="drwTab-analytics" onclick="switchDrwTab('analytics')">
-        <span class="drw-tab-icon" style="font-family:'Material Symbols Outlined'">bar_chart</span>
-        Analytics
-      </button>
-      <button class="drw-tab" id="drwTab-about" onclick="switchDrwTab('about')">
-        <span class="drw-tab-icon" style="font-family:'Material Symbols Outlined'">info</span>
-        About
-      </button>
+  <!-- Drawer overlay -->
+  <div class="ovrl" id="ovrl" onclick="closeDrawer()"></div>
+  <!-- Drawer -->
+  <div class="drw" id="drw">
+    <!-- Fixed Header: banner + channel identity always visible -->
+    <div class="drw-fixed-hdr" id="drwFixedHdr">
+      <!-- Banner image or placeholder fills this -->
+      <div class="drw-banner-wrap" id="drwBannerWrap"></div>
+      <!-- Channel identity row -->
+      <div class="drw-identity" id="drwIdentity"></div>
+      <!-- Stats strip (4 key numbers) -->
+      <div class="drw-stats-strip" id="drwStatsStrip"></div>
+      <!-- Tab bar -->
+      <div class="drw-tab-bar">
+        <button class="drw-tab on" id="drwTab-videos" onclick="switchDrwTab('videos')">
+          <span class="drw-tab-icon" style="font-family:'Material Symbols Outlined'">play_circle</span>
+          Videos
+        </button>
+        <button class="drw-tab" id="drwTab-analytics" onclick="switchDrwTab('analytics')">
+          <span class="drw-tab-icon" style="font-family:'Material Symbols Outlined'">bar_chart</span>
+          Analytics
+        </button>
+        <button class="drw-tab" id="drwTab-about" onclick="switchDrwTab('about')">
+          <span class="drw-tab-icon" style="font-family:'Material Symbols Outlined'">info</span>
+          About
+        </button>
+      </div>
     </div>
+    <!-- Scrollable body panels, one per tab -->
+    <div class="drw-panels" id="drwPanels">
+      <div class="drw-panel on" id="drwPanel-videos"></div>
+      <div class="drw-panel" id="drwPanel-analytics"></div>
+      <div class="drw-panel" id="drwPanel-about"></div>
+    </div>
+    <!-- Close button always visible in top-right corner -->
+    <button class="drw-close-btn" onclick="closeDrawer()">close</button>
   </div>
-  <!-- Scrollable body panels, one per tab -->
-  <div class="drw-panels" id="drwPanels">
-    <div class="drw-panel on" id="drwPanel-videos"></div>
-    <div class="drw-panel" id="drwPanel-analytics"></div>
-    <div class="drw-panel" id="drwPanel-about"></div>
-  </div>
-  <!-- Close button always visible in top-right corner -->
-  <button class="drw-close-btn" onclick="closeDrawer()">close</button>
-</div>
 
-<!-- ═══════════════════════════════════════
+  <!-- ═══════════════════════════════════════
      MY CHANNEL ANALYTICS MODAL
 ════════════════════════════════════════ -->
-<div class="am-ovrl" id="amOvrl" onclick="closeAnalyticsModal()"></div>
-<div class="am" id="analyticsModal">
-  <!-- Header -->
-  <div class="am-hdr">
-    <div class="am-hdr-l">
-      <div class="am-hdr-logo" id="amLogo"></div>
-      <div>
-        <div class="am-hdr-name" id="amName">Channel Analytics</div>
-        <div class="am-hdr-sub" id="amSub"></div>
-      </div>
-    </div>
-    <div id="amActions" style="display:flex;gap:6px;align-items:center;margin-left:auto;margin-right:12px"></div>
-    <button class="am-close" onclick="closeAnalyticsModal()">close</button>
-  </div>
-
-  <!-- Tab Bar -->
-  <div class="am-tabs">
-    <button class="am-tab on" id="amTab-overview"   onclick="switchAnalyticsTab('overview')">
-      <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">dashboard</span> Overview
-    </button>
-    <button class="am-tab" id="amTab-monthly"    onclick="switchAnalyticsTab('monthly')">
-      <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">bar_chart</span> Monthly
-    </button>
-    <button class="am-tab" id="amTab-growth"     onclick="switchAnalyticsTab('growth')">
-      <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">military_tech</span> Top Videos
-    </button>
-    <button class="am-tab" id="amTab-compare"    onclick="switchAnalyticsTab('compare')">
-      <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">compare_arrows</span> vs Competitors
-    </button>
-    <button class="am-tab" id="amTab-timeline"   onclick="switchAnalyticsTab('timeline')">
-      <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">show_chart</span> Timeline
-    </button>
-  </div>
-
-  <!-- Tab Panels -->
-  <div class="am-body">
-    <!-- Overview panel — populated by openAnalyticsModal() -->
-    <div class="am-panel on" id="amPanel-overview"></div>
-
-    <!-- Monthly Performance panel -->
-    <div class="am-panel" id="amPanel-monthly">
-      <div class="am-loading" id="amMonthlyLoading">
-        <div class="spin"></div><span>Loading all videos…</span>
-      </div>
-      <div id="amMonthlyContent" style="display:none"></div>
-    </div>
-
-    <!-- Growth Speed panel -->
-    <div class="am-panel" id="amPanel-growth">
-      <div class="am-loading" id="amGrowthLoading">
-        <div class="spin"></div><span>Calculating growth velocity…</span>
-      </div>
-      <div id="amGrowthContent" style="display:none"></div>
-    </div>
-
-    <!-- vs Competitors panel -->
-    <div class="am-panel" id="amPanel-compare">
-      <div id="amCompareContent"></div>
-    </div>
-
-    <!-- Growth Timeline panel -->
-    <div class="am-panel" id="amPanel-timeline">
-      <div class="am-loading" id="amTimelineLoading">
-        <div class="spin"></div><span>Loading snapshot history…</span>
-      </div>
-      <div id="amTimelineContent" style="display:none"></div>
-    </div>
-  </div>
-</div>
-
-<!-- Top Nav -->
-<nav class="topnav">
-  <div class="topnav-inner">
-    <div style="display:flex;align-items:center">
-      <div class="nav-brand" onclick="sp('dash')">YT<span>Tracker</span></div>
-      <div class="nav-links">
-        <button class="nav-link on" id="nav-dash" onclick="sp('dash')">Dashboard</button>
-        <button class="nav-link" id="nav-channels" onclick="sp('channels')">
-          My Channels <span class="nav-cnt" id="sbBadge"></span>
-        </button>
-        <button class="nav-link" id="nav-search" onclick="sp('search')">Search</button>
-      </div>
-    </div>
-    <div class="nav-right">
-      <span style="font-size:11px;color:var(--t3);margin-right:6px;opacity:.6">Press / to search</span>
-      <button class="nav-icon-btn" id="refAllBtn" onclick="refreshAll()" title="Refresh all channels">refresh</button>
-    </div>
-  </div>
-</nav>
-
-<!-- Mobile Nav -->
-<nav class="mob-nav">
-  <button class="mob-nav-btn on" id="mob-dash" onclick="sp('dash')">
-    <span class="msi" style="font-family:'Material Symbols Outlined'">grid_view</span>
-    <span>Dashboard</span>
-  </button>
-  <button class="mob-nav-btn" id="mob-channels" onclick="sp('channels')">
-    <span class="msi" style="font-family:'Material Symbols Outlined'">subscriptions</span>
-    <span>Channels</span>
-  </button>
-  <button class="mob-nav-btn" id="mob-search" onclick="sp('search')">
-    <span class="msi" style="font-family:'Material Symbols Outlined'">search</span>
-    <span>Search</span>
-  </button>
-</nav>
-
-<div class="main">
-
-  <!-- DASHBOARD -->
-  <div class="page on" id="page-dash">
-    <div id="dashMain">
-      <div style="display:flex;align-items:center;gap:12px;color:var(--t3);font-size:13px;padding:60px 0">
-        <div class="spin"></div>Loading…
-      </div>
-    </div>
-  </div>
-
-  <!-- MY CHANNELS -->
-  <div class="page" id="page-channels">
-    <div class="pg-head">
-      <div>
-        <div class="pg-title">My Channels</div>
-        <div class="pg-sub"><span class="mono" id="chCntLbl"></span> channels tracked</div>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <select id="chSortSel" onchange="setChSort(this.value)"
-          style="background:var(--sf-high);border:1px solid var(--bd2);color:var(--t2);padding:6px 10px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;outline:none">
-          <option value="subscribers_raw">Sort: Subscribers</option>
-          <option value="total_views_raw">Sort: Total Views</option>
-          <option value="avg_views_raw">Sort: Avg Views</option>
-        </select>
-        <button class="btn btn-gh" onclick="exportCSV()">
-          <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">download</span> Export CSV
-        </button>
-        <button class="btn btn-gh" onclick="refreshAll()">
-          <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">refresh</span> Refresh All
-        </button>
-        <button class="btn btn-pr" id="addTgl" onclick="toggleAdd()">
-          <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">add</span> Add Channel
-        </button>
-      </div>
-    </div>
-    <div class="add-panel" id="addPanel">
-      <div class="add-hd">Search and add a YouTube channel to track</div>
-      <div class="add-row">
-        <div class="add-inp-wrap">
-          <input class="add-inp" id="addInput" type="text" placeholder="Channel name or @handle…" autocomplete="off"
-            onkeydown="if(event.key==='Enter'){closeAddSuggestions();addCh();}"/>
-          <!-- Autocomplete dropdown for Add Channel -->
-          <div id="addDropdown" class="add-dropdown" style="display:none"></div>
+  <div class="am-ovrl" id="amOvrl" onclick="closeAnalyticsModal()"></div>
+  <div class="am" id="analyticsModal">
+    <!-- Header -->
+    <div class="am-hdr">
+      <div class="am-hdr-l">
+        <div class="am-hdr-logo" id="amLogo"></div>
+        <div>
+          <div class="am-hdr-name" id="amName">Channel Analytics</div>
+          <div class="am-hdr-sub" id="amSub"></div>
         </div>
-        <button class="btn btn-pr" id="addBtn" onclick="addCh()">Add</button>
-        <button class="btn btn-gh" onclick="toggleAdd()">Cancel</button>
       </div>
-      <div class="err" id="addErr"></div>
+      <div id="amActions" style="display:flex;gap:6px;align-items:center;margin-left:auto;margin-right:12px"></div>
+      <button class="am-close" onclick="closeAnalyticsModal()">close</button>
     </div>
-    <div id="chTbl"></div>
+
+    <!-- Tab Bar -->
+    <div class="am-tabs">
+      <button class="am-tab on" id="amTab-overview" onclick="switchAnalyticsTab('overview')">
+        <span
+          style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">dashboard</span>
+        Overview
+      </button>
+      <button class="am-tab" id="amTab-monthly" onclick="switchAnalyticsTab('monthly')">
+        <span
+          style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">bar_chart</span>
+        Monthly
+      </button>
+      <button class="am-tab" id="amTab-growth" onclick="switchAnalyticsTab('growth')">
+        <span
+          style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">military_tech</span>
+        Top Videos
+      </button>
+      <button class="am-tab" id="amTab-compare" onclick="switchAnalyticsTab('compare')">
+        <span
+          style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">compare_arrows</span>
+        vs Competitors
+      </button>
+      <button class="am-tab" id="amTab-timeline" onclick="switchAnalyticsTab('timeline')">
+        <span
+          style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">show_chart</span>
+        Timeline
+      </button>
+    </div>
+
+    <!-- Tab Panels -->
+    <div class="am-body">
+      <!-- Overview panel — populated by openAnalyticsModal() -->
+      <div class="am-panel on" id="amPanel-overview"></div>
+
+      <!-- Monthly Performance panel -->
+      <div class="am-panel" id="amPanel-monthly">
+        <div class="am-loading" id="amMonthlyLoading">
+          <div class="spin"></div><span>Loading all videos…</span>
+        </div>
+        <div id="amMonthlyContent" style="display:none"></div>
+      </div>
+
+      <!-- Growth Speed panel -->
+      <div class="am-panel" id="amPanel-growth">
+        <div class="am-loading" id="amGrowthLoading">
+          <div class="spin"></div><span>Calculating growth velocity…</span>
+        </div>
+        <div id="amGrowthContent" style="display:none"></div>
+      </div>
+
+      <!-- vs Competitors panel -->
+      <div class="am-panel" id="amPanel-compare">
+        <div id="amCompareContent"></div>
+      </div>
+
+      <!-- Growth Timeline panel -->
+      <div class="am-panel" id="amPanel-timeline">
+        <div class="am-loading" id="amTimelineLoading">
+          <div class="spin"></div><span>Loading snapshot history…</span>
+        </div>
+        <div id="amTimelineContent" style="display:none"></div>
+      </div>
+    </div>
   </div>
 
-  <!-- SEARCH -->
-  <div class="page" id="page-search">
-    <div class="pg-head">
-      <div>
-        <div class="pg-title">Search Channels</div>
-        <div class="pg-sub">Find any YouTube channel and add it to your tracking list</div>
+  <!-- Top Nav -->
+  <nav class="topnav">
+    <div class="topnav-inner">
+      <div style="display:flex;align-items:center">
+        <div class="nav-brand" onclick="sp('dash')">YT<span>Tracker</span></div>
+        <div class="nav-links">
+          <button class="nav-link on" id="nav-dash" onclick="sp('dash')">Dashboard</button>
+          <button class="nav-link" id="nav-channels" onclick="sp('channels')">
+            My Channels <span class="nav-cnt" id="sbBadge"></span>
+          </button>
+          <button class="nav-link" id="nav-search" onclick="sp('search')">Search</button>
+        </div>
+      </div>
+      <div class="nav-right">
+        <span style="font-size:11px;color:var(--t3);margin-right:6px;opacity:.6">Press / to search</span>
+        <button class="nav-icon-btn" id="refAllBtn" onclick="refreshAll()" title="Refresh all channels">refresh</button>
       </div>
     </div>
-    <div class="sr-wrap">
-      <div class="sr-input-wrap">
-        <div class="sr-bar">
-          <span style="font-family:'Material Symbols Outlined';font-size:20px;color:var(--t3);line-height:1">search</span>
-          <input class="sr-inp" id="srInput" type="text" placeholder="Search for a YouTube channel… (or press / from anywhere)" autocomplete="off"/>
-          <button class="btn btn-pr" id="srBtn" onclick="doSearch()">Search</button>
+  </nav>
+
+  <!-- Mobile Nav -->
+  <nav class="mob-nav">
+    <button class="mob-nav-btn on" id="mob-dash" onclick="sp('dash')">
+      <span class="msi" style="font-family:'Material Symbols Outlined'">grid_view</span>
+      <span>Dashboard</span>
+    </button>
+    <button class="mob-nav-btn" id="mob-channels" onclick="sp('channels')">
+      <span class="msi" style="font-family:'Material Symbols Outlined'">subscriptions</span>
+      <span>Channels</span>
+    </button>
+    <button class="mob-nav-btn" id="mob-search" onclick="sp('search')">
+      <span class="msi" style="font-family:'Material Symbols Outlined'">search</span>
+      <span>Search</span>
+    </button>
+  </nav>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page on" id="page-dash">
+      <div id="dashMain">
+        <div style="display:flex;align-items:center;gap:12px;color:var(--t3);font-size:13px;padding:60px 0">
+          <div class="spin"></div>Loading…
         </div>
-        <!-- Autocomplete dropdown —  anchored to .sr-input-wrap -->
-        <div id="srDropdown" class="sr-dropdown" style="display:none"></div>
       </div>
-      <div class="err" id="srErr"></div>
-      <!-- skeleton -->
-      <div class="sr-skel" id="srSkel" style="display:none">
-        <div class="sr-banner-ph"></div>
-        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
-          <div style="display:flex;gap:16px;align-items:center">
-            <div class="sk" style="width:64px;height:64px;border-radius:50%;flex-shrink:0"></div>
-            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
-              <div class="sk" style="height:18px;width:45%"></div>
-              <div class="sk" style="height:12px;width:30%"></div>
+    </div>
+
+    <!-- MY CHANNELS -->
+    <div class="page" id="page-channels">
+      <div class="pg-head">
+        <div>
+          <div class="pg-title">My Channels</div>
+          <div class="pg-sub"><span class="mono" id="chCntLbl"></span> channels tracked</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="chSortSel" onchange="setChSort(this.value)"
+            style="background:var(--sf-high);border:1px solid var(--bd2);color:var(--t2);padding:6px 10px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;outline:none">
+            <option value="subscribers_raw">Sort: Subscribers</option>
+            <option value="total_views_raw">Sort: Total Views</option>
+            <option value="avg_views_raw">Sort: Avg Views</option>
+          </select>
+          <button class="btn btn-gh" onclick="exportCSV()">
+            <span
+              style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">download</span>
+            Export CSV
+          </button>
+          <button class="btn btn-gh" onclick="refreshAll()">
+            <span
+              style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">refresh</span>
+            Refresh All
+          </button>
+          <button class="btn btn-pr" id="addTgl" onclick="toggleAdd()">
+            <span
+              style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">add</span>
+            Add Channel
+          </button>
+        </div>
+      </div>
+      <div class="add-panel" id="addPanel">
+        <div class="add-hd">Search and add a YouTube channel to track</div>
+        <div class="add-row">
+          <div class="add-inp-wrap">
+            <input class="add-inp" id="addInput" type="text" placeholder="Channel name or @handle…" autocomplete="off"
+              onkeydown="if(event.key==='Enter'){closeAddSuggestions();addCh();}" />
+            <!-- Autocomplete dropdown for Add Channel -->
+            <div id="addDropdown" class="add-dropdown" style="display:none"></div>
+          </div>
+          <button class="btn btn-pr" id="addBtn" onclick="addCh()">Add</button>
+          <button class="btn btn-gh" onclick="toggleAdd()">Cancel</button>
+        </div>
+        <div class="err" id="addErr"></div>
+      </div>
+      <div id="chTbl"></div>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="page" id="page-search">
+      <div class="pg-head">
+        <div>
+          <div class="pg-title">Search Channels</div>
+          <div class="pg-sub">Find any YouTube channel and add it to your tracking list</div>
+        </div>
+      </div>
+      <div class="sr-wrap">
+        <div class="sr-input-wrap">
+          <div class="sr-bar">
+            <span
+              style="font-family:'Material Symbols Outlined';font-size:20px;color:var(--t3);line-height:1">search</span>
+            <input class="sr-inp" id="srInput" type="text"
+              placeholder="Search for a YouTube channel… (or press / from anywhere)" autocomplete="off" />
+            <button class="btn btn-pr" id="srBtn" onclick="doSearch()">Search</button>
+          </div>
+          <!-- Autocomplete dropdown —  anchored to .sr-input-wrap -->
+          <div id="srDropdown" class="sr-dropdown" style="display:none"></div>
+        </div>
+        <div class="err" id="srErr"></div>
+        <!-- skeleton -->
+        <div class="sr-skel" id="srSkel" style="display:none">
+          <div class="sr-banner-ph"></div>
+          <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;gap:16px;align-items:center">
+              <div class="sk" style="width:64px;height:64px;border-radius:50%;flex-shrink:0"></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+                <div class="sk" style="height:18px;width:45%"></div>
+                <div class="sk" style="height:12px;width:30%"></div>
+              </div>
+              <div class="sk" style="height:36px;width:120px;border-radius:8px"></div>
             </div>
-            <div class="sk" style="height:36px;width:120px;border-radius:8px"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
-            <div class="sk" style="height:56px;border-radius:10px"></div>
-            <div class="sk" style="height:56px;border-radius:10px"></div>
-            <div class="sk" style="height:56px;border-radius:10px"></div>
-            <div class="sk" style="height:56px;border-radius:10px"></div>
-          </div>
-          <div style="display:flex;gap:12px;align-items:center">
-            <div class="sk" style="height:80px;width:140px;border-radius:8px;flex-shrink:0"></div>
-            <div style="flex:1;display:flex;flex-direction:column;gap:6px">
-              <div class="sk" style="height:14px;width:70%"></div>
-              <div class="sk" style="height:10px;width:40%"></div>
-              <div style="display:grid;grid-template-columns:repeat(3,80px);gap:8px;margin-top:4px">
-                <div class="sk" style="height:9px;border-radius:4px"></div>
-                <div class="sk" style="height:9px;border-radius:4px"></div>
-                <div class="sk" style="height:9px;border-radius:4px"></div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+              <div class="sk" style="height:56px;border-radius:10px"></div>
+              <div class="sk" style="height:56px;border-radius:10px"></div>
+              <div class="sk" style="height:56px;border-radius:10px"></div>
+              <div class="sk" style="height:56px;border-radius:10px"></div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center">
+              <div class="sk" style="height:80px;width:140px;border-radius:8px;flex-shrink:0"></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                <div class="sk" style="height:14px;width:70%"></div>
+                <div class="sk" style="height:10px;width:40%"></div>
+                <div style="display:grid;grid-template-columns:repeat(3,80px);gap:8px;margin-top:4px">
+                  <div class="sk" style="height:9px;border-radius:4px"></div>
+                  <div class="sk" style="height:9px;border-radius:4px"></div>
+                  <div class="sk" style="height:9px;border-radius:4px"></div>
+                </div>
               </div>
             </div>
           </div>
         </div>
+        <div id="srRes" style="display:none"></div>
       </div>
-      <div id="srRes" style="display:none"></div>
     </div>
-  </div>
 
-</div><!-- /main -->
+  </div><!-- /main -->
 
-<script src="static/app.js" defer></script>
+  <script src="static/app.js" defer></script>
 </body>
+
 </html>

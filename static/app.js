@@ -2771,7 +2771,7 @@ function renderSearch(d){
       <a class="sr-vid" href="${esc(vid.url)}" target="_blank" rel="noopener">
         <img class="sr-vthumb" src="${esc(vid.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
         <div class="sr-vbody">
-          <div class="sr-vbadge">âœ¦ Latest Upload</div>
+          <div class="sr-vbadge">✦ Latest Upload</div>
           <div class="sr-vtitle">${esc(vid.title)}</div>
           <div class="sr-vdate">Published ${vid.date}</div>
           <div class="sr-vstats">

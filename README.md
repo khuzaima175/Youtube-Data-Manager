@@ -4,19 +4,21 @@ A professional, visually sophisticated web application for tracking YouTube chan
 
 ## 🚀 Features
 
-- 📊 **Dashboard** — Hero card for your primary channel with competitor leaderboards and video comparisons.
-- 📋 **Channel Tracking** — Track multiple channels with real-time stats and automated data enrichment.
-- 🔍 **Search & Add** — Find any YouTube channel and add it to your tracking list instantly.
-- 📈 **Deep Analytics**:
-  - Engagement trends and subscriber growth via Supabase snapshots.
-  - Video performance analysis (views, likes, comments).
-  - Average views and performance vs. channel average.
+- 🍱 **Bento Box UI** — A minimalist, interactive dashboard design utilizing hover states and visual cues (sparklines, progress bars) for an intuitive analytics experience.
+- 📊 **Dashboard** — Hero card for your primary channel with competitor leaderboards and detailed video comparisons.
+- 📌 **Smart Channel Sorting** — Dynamic sorting logic that automatically pins your primary channel to the top of your list for immediate access.
+- 🎛️ **Advanced Analytics & Filtering**:
+  - View engagement trends and subscriber growth via Supabase snapshots.
+  - Toggle between regular videos and Shorts for specialized performance analysis.
+  - Filter popular video rankings by time range.
+- 📋 **Channel Tracking** — Track multiple channels with real-time stats, dynamic leaderboards, and automated data enrichment.
+- 🔍 **Search & Add** — Find any YouTube channel instantly with highly optimized search autocomplete.
 - ⚡ **Performance & Stability**:
   - **Cold Start Protection**: Includes a `/ping` route for UptimeRobot monitoring.
   - **Optimized API Calls**: Reuses the YouTube API client to eliminate discovery doc lag.
   - **Supabase Persistence**: Scalable cloud database for your channel list and snapshots.
 - 📥 **Data Export** — Export all your tracked channel data as a CSV for external analysis.
-- 📱 **Responsive Design** — Fully optimized for desktop, tablet, and mobile viewing.
+- 📱 **Responsive Design** — Fully responsive grid layouts optimized for desktop, tablet, and mobile viewing.
 
 ## 🛠️ Technology Stack
 
