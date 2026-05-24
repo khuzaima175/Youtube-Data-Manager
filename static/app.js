@@ -2108,12 +2108,26 @@ function renderChannelSkeletons(n=6){
 }
 
 
+/* Returns true when user is on a touch/mobile device */
+function isMobile(){
+  return window.matchMedia('(max-width:800px)').matches;
+}
+
 function handleCardClick(event, channelId){
   if(event.target.closest('.cc-acts') || event.target.closest('.cc-expand-vid') || event.target.closest('.cc-view-link')) return;
-  const ch = all.find(c => c.id === channelId);
-  if(!ch) return;
-  if(ch.is_primary) openAnalyticsModal(channelId);
-  else openAnalyticsModal(channelId);
+  const card = event.currentTarget;
+  // On mobile: first tap expands card, second tap (on already-expanded) opens modal
+  if(isMobile()){
+    if(!card.classList.contains('expanded')){
+      // Close any other open cards first
+      document.querySelectorAll('.ch-card.expanded').forEach(c=>{ if(c!==card) c.classList.remove('expanded'); });
+      card.classList.add('expanded');
+      return;
+    }
+    // Already expanded — open modal on second tap
+    card.classList.remove('expanded');
+  }
+  openAnalyticsModal(channelId);
 }
 
 async function renderChannels(){
@@ -2156,7 +2170,7 @@ async function renderChannels(){
 
     return `
 <div class="ch-card au ${isMine?'mine':''}" id="ctr-${esc(ch.id)}"
-  onclick="openAnalyticsModal('${esc(ch.id)}')"
+  onclick="handleCardClick(event,'${esc(ch.id)}')"
   style="animation-delay:${index * 0.04}s">
 
   <!-- Actions overlay — unchanged -->
@@ -2414,131 +2428,121 @@ async function loadFastestGrowing(channels) {
     </div>`;
 }
 
-async function loadUploadVelocity(channels) {
-  const el = document.getElementById('dashVelocity');
-  if (!el) return;
+async function loadUploadVelocity(channels){
+  const el=document.getElementById('dashVelocity');
+  if(!el||channels.length<1){if(el)el.style.display='none';return;}
 
-  el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px;padding:20px 0"><div class="spin"></div>Building upload chart…</div>`;
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px;padding:20px 0"><div class="spin"></div>Building upload chart…</div>`;
 
-  try {
-    // ── 1. Collect last 6 months of video data per channel ──────────────
-    const now    = new Date();
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+  try{
+    // Build 6-month bucket list
+    const now=new Date();
+    const months=[];
+    for(let i=5;i>=0;i--){
+      const d=new Date(now.getFullYear(),now.getMonth()-i,1);
       months.push({
-        key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-        label: d.toLocaleString('en-US', { month: 'short' }) + " '" + String(d.getFullYear()).slice(2),
-        year:  d.getFullYear(),
-        month: d.getMonth(),
+        key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
+        label:d.toLocaleString('en-US',{month:'short'})+" '"+String(d.getFullYear()).slice(2),
       });
     }
 
-    const channelData = await Promise.all(
-      channels.map(async ch => {
-        try {
-          const r    = await fetch(`/api/channels/${ch.id}/videos/full`);
-          const vids = await r.json();
-          if (!Array.isArray(vids)) return { ch, counts: Array(6).fill(0) };
-          const counts = months.map(m =>
-            vids.filter(v => {
-              const d = new Date(v.published_at || v.date || 0);
-              return d.getFullYear() === m.year && d.getMonth() === m.month;
-            }).length
-          );
-          return { ch, counts };
-        } catch {
-          return { ch, counts: Array(6).fill(0) };
-        }
+    // Reuse _enrichCache if already populated (free, zero API calls).
+    // Only fetch from API if the channel has no cache yet.
+    // Use ?max=50 — covers 6 months for channels uploading <=8 videos/month.
+    // MrBeast uploads ~2/month so 50 covers 25 months — more than enough.
+    const videoLists=await Promise.all(
+      channels.map(async ch=>{
+        const cached=_enrichCache[ch.id];
+        if(cached&&cached.vids&&cached.vids.length>0) return cached.vids;
+        try{
+          const r=await fetch(`/api/channels/${ch.id}/videos?max=50`);
+          const vids=await r.json();
+          if(Array.isArray(vids)){
+            _enrichCache[ch.id]={ts:Date.now(),vids};
+            return vids;
+          }
+        }catch{}
+        return [];
       })
     );
 
-    // ── 2. Build SVG grouped bar chart ───────────────────────────────────
-    // Chart dimensions
-    const W       = 900, H = 220;
-    const padL    = 32, padR = 12, padT = 20, padB = 40;
-    const plotW   = W - padL - padR;
-    const plotH   = H - padT - padB;
-    const nMonths = months.length;          // 6
-    const nCh     = channelData.length;
+    // Count uploads per channel per month
+    const data=channels.map((ch,i)=>({
+      ch,
+      color:CH_COLORS[i%CH_COLORS.length],
+      counts:months.map(m=>
+        (videoLists[i]||[]).filter(v=>(v.published_at||v.date||'').startsWith(m.key)).length
+      ),
+    }));
 
-    const allCounts = channelData.flatMap(d => d.counts);
-    const maxCount  = Math.max(...allCounts, 1);
+    const totalUploads=data.flatMap(d=>d.counts).reduce((a,b)=>a+b,0);
+    if(totalUploads===0){el.style.display='none';return;}
 
-    // Assign colours from a fixed palette
-    const palette = [
-      '#00d4ff', '#f5c842', '#22c55e', '#f97316',
-      '#a855f7', '#ec4899', '#14b8a6', '#ef4444',
-    ];
+    // Build SVG grouped bar chart
+    const maxC=Math.max(...data.flatMap(d=>d.counts),1);
+    const nCh=channels.length;
+    const bW=Math.min(18,Math.max(8,Math.floor(56/nCh)));
+    const bGap=3,gGap=20;
+    const gW=nCh*(bW+bGap)+gGap;
+    const cW=months.length*gW+80,cH=180,pH=cH-50;
 
-    const groupW  = plotW / nMonths;
-    const barW    = Math.max(6, Math.min(18, Math.floor((groupW * 0.85) / nCh)));
-    const barGap  = 3;
-    const groupPad = (groupW - nCh * barW - (nCh - 1) * barGap) / 2;
+    let bars='';
 
     // Y axis grid lines
-    const yTicks = [0, Math.round(maxCount / 2), maxCount];
-    const gridLines = yTicks.map(t => {
-      const y = padT + plotH - (t / maxCount) * plotH;
-      return `
-        <line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}"
-              stroke="rgba(255,255,255,0.06)" stroke-width="1" stroke-dasharray="4 4"/>
-        <text x="${padL - 4}" y="${y + 4}" text-anchor="end"
-              fill="rgba(255,255,255,0.3)" font-size="9"
-              font-family="JetBrains Mono,monospace">${t}</text>`;
-    }).join('');
-
-    // Bars + tooltips
-    let bars = '';
-    channelData.forEach(({ ch, counts }, ci) => {
-      const colour = palette[ci % palette.length];
-      counts.forEach((count, mi) => {
-        if (count === 0) return;
-        const barH = Math.max(4, (count / maxCount) * plotH);
-        const x    = padL + mi * groupW + groupPad + ci * (barW + barGap);
-        const y    = padT + plotH - barH;
-        bars += `
-          <rect x="${x}" y="${y}" width="${barW}" height="${barH}"
-                rx="3" ry="3" fill="${colour}" opacity="0.85">
-            <title>${esc(ch.name)} — ${months[mi].label}: ${count} video${count !== 1 ? 's' : ''}</title>
-          </rect>
-          <text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle"
-                fill="${colour}" font-size="9"
-                font-family="JetBrains Mono,monospace"
-                opacity="${count > 0 ? '1' : '0'}">${count}</text>`;
-      });
+    [0,Math.round(maxC/2),maxC].forEach(t=>{
+      const y=cH-30-Math.round((t/maxC)*pH);
+      bars+=`<line x1="40" y1="${y}" x2="${cW}" y2="${y}"
+        stroke="rgba(255,255,255,0.06)" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="36" y="${y+4}" text-anchor="end"
+          fill="rgba(255,255,255,0.3)" font-size="9"
+          font-family="JetBrains Mono,monospace">${t}</text>`;
     });
 
-    // X axis month labels
-    const xLabels = months.map((m, mi) => {
-      const x = padL + mi * groupW + groupW / 2;
-      return `<text x="${x}" y="${H - 6}" text-anchor="middle"
-                    fill="rgba(255,255,255,0.45)" font-size="10"
-                    font-family="DM Sans,sans-serif">${m.label}</text>`;
-    }).join('');
+    months.forEach((m,mi)=>{
+      const gx=44+mi*gW;
+      data.forEach((d,ci)=>{
+        const c=d.counts[mi];
+        if(c===0)return;
+        const h=Math.max(6,Math.round((c/maxC)*pH));
+        const x=gx+ci*(bW+bGap),y=cH-30-h;
+        bars+=`<rect x="${x}" y="${y}" width="${bW}" height="${h}" rx="3"
+          fill="${d.color}" opacity="0.88">
+          <title>${esc(d.ch.name)} — ${m.label}: ${c} video${c!==1?'s':''}</title>
+        </rect>
+        <text x="${x+bW/2}" y="${y-4}" text-anchor="middle"
+          font-size="9" fill="${d.color}" font-weight="700"
+          font-family="JetBrains Mono,monospace">${c}</text>`;
+      });
+      bars+=`<text x="${gx+nCh*(bW+bGap)/2}" y="${cH-8}"
+        text-anchor="middle" font-size="10"
+        fill="rgba(186,201,204,0.75)" font-family="DM Sans">${m.label}</text>`;
+    });
 
-    // Legend
-    const legendItems = channelData.map(({ ch }, ci) =>
-      `<span class="vel-legend-dot" style="background:${palette[ci % palette.length]}"></span>
-       <span class="vel-legend-name">${esc(ch.name)}</span>`
+    const legend=data.map(d=>
+      `<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2)">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:2px;
+          background:${d.color};flex-shrink:0"></span>
+        ${esc(d.ch.name)}
+      </span>`
     ).join('');
 
-    el.innerHTML = `
-      <div class="dash-section-hdr">
+    el.innerHTML=`
+      <div class="dash-section-hdr" style="margin-top:0">
         <span style="font-family:'Material Symbols Outlined';font-size:16px;vertical-align:middle">bar_chart</span>
-        Monthly Upload Velocity <em style="color:var(--t4);font-style:normal;font-weight:400;font-size:11px;letter-spacing:0">last 6 months</em>
+        Monthly Upload Velocity
+        <em style="color:var(--t4);font-style:normal;font-weight:400;font-size:11px;letter-spacing:0">last 6 months</em>
       </div>
       <div class="vel-wrap d2">
-        <svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet"
-             style="display:block;overflow:visible">
-          ${gridLines}
+        <svg viewBox="0 0 ${cW} ${cH}" width="100%"
+             preserveAspectRatio="xMidYMid meet"
+             style="display:block;overflow:visible;min-width:480px">
           ${bars}
-          ${xLabels}
         </svg>
-        <div class="vel-legend">${legendItems}</div>
+        <div class="vel-legend">${legend}</div>
       </div>`;
-  } catch (e) {
-    el.innerHTML = `<div class="err" style="display:block">Could not load velocity chart.</div>`;
+
+  }catch(e){
+    el.innerHTML=`<div class="err" style="display:block">Could not load velocity chart.</div>`;
   }
 }
 
