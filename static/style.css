@@ -743,14 +743,12 @@ img {
   display: flex;
   flex-direction: column;
   overflow: visible;
-  /* allow tooltip overflow */
   position: relative;
   cursor: pointer;
   transition:
     border-color var(--dur-mid) var(--e),
     box-shadow var(--dur-mid) var(--e),
     transform var(--dur-mid) var(--e);
-  /* clip children except tooltips */
   isolation: isolate;
 }
 
@@ -2197,6 +2195,7 @@ img {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  will-change: transform;
 }
 
 .drw.open {
@@ -3913,8 +3912,8 @@ body>nav.topnav::after {
   box-shadow: 0 32px 100px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
   pointer-events: none;
   transition: transform var(--dur-slow) var(--e), opacity var(--dur-mid) var(--e);
-  /* Ensure stable flex layout */
   overflow: hidden;
+  will-change: transform, opacity;
 }
 
 .am.open {
@@ -6005,5 +6004,242 @@ body>nav.topnav::after {
   .lb-row:hover .lb-arr {
     transform: none;
     color: var(--t3);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE PERFORMANCE — strip expensive GPU effects ≤800px
+   Targets: backdrop-filter, continuous animations, heavy
+   box-shadows, background-image gradients, text-shadows.
+   Goal: smooth 60fps on mid-range Android/iOS hardware.
+══════════════════════════════════════════════════════════ */
+@media (max-width: 800px) {
+
+  /* ── 1. Kill ambient orb animations & background grid ── */
+  body::before,
+  body::after {
+    animation: none;
+  }
+
+  body {
+    /* Replace triple-layer gradient + grid with a flat color — huge paint saving */
+    background-image: none;
+    background-color: var(--bg);
+  }
+
+  /* ── 2. Nav: replace expensive backdrop-filter with solid bg ── */
+  .topnav {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(12, 14, 18, 0.97);
+  }
+
+  /* ── 3. Mobile nav: same — solid bg instead of blur ── */
+  .mob-nav {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(12, 14, 18, 0.98);
+  }
+
+  /* ── 4. Overlay: no blur, just dim ── */
+  .ovrl.open {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(0, 0, 0, 0.75);
+  }
+
+  .am-ovrl.open {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(0, 0, 0, 0.8);
+  }
+
+  /* ── 5. Action buttons on card: no blur ── */
+  .cc-acts {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* ── 6. Autocomplete dropdown: no blur ── */
+  .sr-dropdown,
+  .add-dropdown {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(18, 24, 30, 0.99);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  /* ── 7. Kill all continuous animations — biggest perf win ── */
+  /* Hero glow pulse */
+  .my-hero {
+    animation: none;
+  }
+
+  /* Animated gradient border on hero hover */
+  .my-hero::before {
+    animation: none;
+  }
+
+  /* Floating icon in empty state */
+  .no-pr-ico {
+    animation: none;
+  }
+
+  /* Green badge pulse */
+  .bdg-gr {
+    animation: none;
+  }
+
+  /* Red badge pulse */
+  .bdg-rd {
+    animation: none;
+  }
+
+  /* Nav badge pulse */
+  .nav-cnt {
+    animation: none;
+  }
+
+  /* Page entry animation — just show instantly */
+  .page.on {
+    animation: none;
+  }
+
+  /* Card entry animations — skip stagger, show immediately */
+  .au {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Skeleton shimmer — replace with static dim */
+  .ch-card-skel::after {
+    animation: none;
+  }
+
+  .sk {
+    animation: none;
+    background: var(--sf-high);
+  }
+
+  /* ── 8. Simplify box-shadows ── */
+  /* Cards: thin border + minimal shadow instead of multi-layer glow */
+  .ch-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  }
+
+  .ch-card.mine:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+
+  .vr-card:hover {
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    transform: none;
+    /* also kill translateY on mobile */
+  }
+
+  .ru-card:hover {
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+    transform: none;
+  }
+
+  /* Analytics modal: simpler shadow */
+  .am {
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Drawer: simpler shadow */
+  .drw {
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ── 9. Kill text-shadows on stat values ── */
+  .cc-sb-val.gold,
+  .my-stat-val.gold,
+  .am-bento-val.gold,
+  .cc-summary-subs {
+    text-shadow: none;
+  }
+
+  .cc-sb-val.cyan,
+  .am-bento-val.cyan {
+    text-shadow: none;
+  }
+
+  .cc-sb-val.green,
+  .my-stat-val.green,
+  .am-bento-val.green {
+    text-shadow: none;
+  }
+
+  /* ── 10. Kill gradient text — expensive on mobile ── */
+  .dash-title {
+    background: none;
+    -webkit-text-fill-color: var(--t1);
+    color: var(--t1);
+  }
+
+  .pg-title {
+    background: none;
+    -webkit-text-fill-color: var(--t1);
+    color: var(--t1);
+  }
+
+  /* ── 11. Nav brand: drop text-shadow glow ── */
+  .nav-brand {
+    text-shadow: none;
+  }
+
+  .nav-brand:hover {
+    text-shadow: none;
+  }
+
+  /* ── 12. Reduce transition durations for snappier feel ── */
+  :root {
+    --dur-fast: 80ms;
+    --dur-mid: 140ms;
+    --dur-slow: 240ms;
+  }
+
+  /* ── 13. cc-expand transition — faster, less spring ── */
+  .cc-expand {
+    transition:
+      max-height 0.28s ease,
+      opacity 0.18s ease;
+  }
+
+  /* ── 14. Drawer open/close — faster ── */
+  .drw {
+    transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* ── 15. Analytics modal — faster ── */
+  .am {
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease;
+  }
+
+  /* ── 16. Kill am-bento-cell hover transform ── */
+  .am-bento-cell:hover {
+    transform: none;
+  }
+
+  .am-ms-item:hover {
+    transform: none;
+  }
+
+  .drw-cal-cell:hover {
+    transform: none;
+  }
+
+  /* ── 17. Hero border animation off ── */
+  .my-hero::before {
+    display: none;
+  }
+
+  /* ── 18. Scroll performance ── */
+  .drw-panel,
+  .am-panel,
+  .ru-grid {
+    -webkit-overflow-scrolling: touch;
   }
 }

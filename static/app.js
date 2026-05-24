@@ -317,17 +317,28 @@ async function renderDash() {
       if (all.length > 1) { loadFastestGrowing([primary, ...comps]); loadUploadVelocity([primary, ...comps]); }
     }
     setTimeout(() => {
+      // Skip count-up animation on mobile for performance
+      if (isMobile()) {
+        document.querySelectorAll('.count-up').forEach(el => {
+          const target = parseFloat(el.dataset.target || 0);
+          const suffix = el.dataset.suffix || '';
+          const v = target >= 10 ? Math.round(target) : target.toFixed(1);
+          el.textContent = v + suffix;
+        });
+        return;
+      }
       document.querySelectorAll('.count-up').forEach(el => {
         const target = parseFloat(el.dataset.target || 0);
         const suffix = el.dataset.suffix || '';
-        const dur = 1200; const step = 16; const steps = dur / step;
-        let cur = 0; const inc = target / steps;
-        const t = setInterval(() => {
-          cur = Math.min(cur + inc, target);
+        const dur = 1200; const start = performance.now();
+        const tick = (now) => {
+          const p = Math.min((now - start) / dur, 1);
+          const cur = target * p;
           const v = target >= 10 ? Math.round(cur) : cur.toFixed(1);
           el.textContent = v + suffix;
-          if (cur >= target) clearInterval(t);
-        }, step);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
       });
     }, 100);
 
@@ -443,7 +454,14 @@ function buildLB(primary, comps) {
 }
 
 function setSort(f) { sort = f; renderDash(); }
-function animateBars() { document.querySelectorAll('.lb-log-bar').forEach(b => b.style.width = (b.dataset.pct || 0) + '%'); }
+function animateBars() {
+  if (isMobile()) {
+    // On mobile: set bars immediately without animation
+    document.querySelectorAll('.lb-log-bar').forEach(b => b.style.width = (b.dataset.pct || 0) + '%');
+    return;
+  }
+  document.querySelectorAll('.lb-log-bar').forEach(b => b.style.width = (b.dataset.pct || 0) + '%');
+}
 
 /* ════════════════════════════════════════════════════════
    DRAWER LOGIC (Terminal Luxe)
@@ -2211,7 +2229,7 @@ async function renderChannels() {
     return `
 <div class="ch-card au ${isMine ? 'mine' : ''}" id="ctr-${esc(ch.id)}"
   onclick="handleCardClick(event,'${esc(ch.id)}')"
-  onmouseenter="enrichCard('${esc(ch.id)}')"
+  ${isMobile() ? '' : `onmouseenter="enrichCard('${esc(ch.id)}')"`}
   style="animation-delay:${index * 0.04}s">
 
   <!-- Actions overlay — unchanged -->
@@ -2880,6 +2898,30 @@ function setChSort(f) {
 }
 
 /* ── Init ─────────────────────────────────────────── */
+
+// Global image lazy loading: add loading="lazy" to all dynamically-inserted images
+// by patching innerHTML setter is too complex — instead we use a MutationObserver
+if ('IntersectionObserver' in window) {
+  const imgObs = new IntersectionObserver((entries, obs) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const img = e.target;
+        if (img.dataset.src) { img.src = img.dataset.src; delete img.dataset.src; }
+        obs.unobserve(img);
+      }
+    });
+  }, { rootMargin: '200px' });
+  // Observe future images via MutationObserver
+  new MutationObserver(muts => {
+    muts.forEach(m => m.addedNodes.forEach(n => {
+      if (n.nodeType !== 1) return;
+      n.querySelectorAll && n.querySelectorAll('img:not([loading])').forEach(img => {
+        img.loading = 'lazy';
+      });
+    }));
+  }).observe(document.body, { childList: true, subtree: true });
+}
+
 (async () => {
   await fetchAll();
   renderDash();
