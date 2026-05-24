@@ -8,6 +8,7 @@ import os
 import re
 import time
 import urllib.request
+import threading
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory, Response
 from flask_cors import CORS
@@ -20,33 +21,28 @@ API_KEY      = os.getenv("YOUTUBE_API_KEY", "")
 DEBUG        = os.getenv("FLASK_DEBUG", "0") == "1"
 MAX_CHANNELS = 20          # soft cap to protect API quota
 
-# ── Supabase client ───────────────────────────────────────────────────────────
+# ── Thread-local storage for API clients ──────────────────────────────────────
+_local = threading.local()
+
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 
-_sb: Client | None = None
-
 def get_sb() -> Client:
-    """Return a cached Supabase client, raising clearly if credentials are missing."""
-    global _sb
-    if _sb is None:
+    """Return a thread-local cached Supabase client, raising clearly if credentials are missing."""
+    if not hasattr(_local, "sb"):
         if not SUPABASE_URL or not SUPABASE_KEY:
             raise ValueError("SUPABASE_URL / SUPABASE_SERVICE_KEY not set in .env")
-        _sb = create_client(SUPABASE_URL, SUPABASE_KEY)
-    return _sb
-
-# ── YouTube client singleton ──────────────────────────────────────────────────
-_yt: any = None
+        _local.sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _local.sb
 
 def get_yt():
-    """Build or return the cached YouTube API client to avoid re-discovery lag."""
-    global _yt
-    if _yt is None:
+    """Build or return the thread-local cached YouTube API client to avoid re-discovery lag."""
+    if not hasattr(_local, "yt"):
         if not API_KEY:
             raise ValueError("YOUTUBE_API_KEY is not set in .env")
         # static_discovery=False or reusing the client prevents the 1s 'cold start' lag
-        _yt = build("youtube", "v3", developerKey=API_KEY)
-    return _yt
+        _local.yt = build("youtube", "v3", developerKey=API_KEY)
+    return _local.yt
 
 app = Flask(__name__, static_folder="static")
 

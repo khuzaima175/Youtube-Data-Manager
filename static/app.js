@@ -742,147 +742,159 @@ const buildCalendar = buildCalendarImproved;
 /* ════════════════════════════════════════════════════════
    CARD ASYNC ENRICHMENT (cached)
 ════════════════════════════════════════════════════════ */
-async function enrichCards(){
-  const now=Date.now();
-  const promises=all.map(async ch=>{
-    try{
-      const cached=_enrichCache[ch.id];
-      const vids=cached&&(now-cached.ts)<ENRICH_TTL
-        ? cached.vids
-        : await (async()=>{
+async function enrichCard(channelId){
+  const ch = all.find(c => c.id === channelId);
+  if(!ch) return;
+
+  const card = document.getElementById('ctr-' + channelId);
+  if(!card || card.classList.contains('enriched') || card.classList.contains('enriching')) return;
+
+  card.classList.add('enriching');
+
+  try{
+    const now=Date.now();
+    const cached=_enrichCache[ch.id];
+    const vids=cached&&(now-cached.ts)<ENRICH_TTL
+      ? cached.vids
+      : await (async()=>{
+          try {
             const r=await fetch(`/api/channels/${ch.id}/videos?max=15`);
             const v=await r.json();
             if(Array.isArray(v)) _enrichCache[ch.id]={ts:now,vids:v};
             return Array.isArray(v)?v:[];
-          })();
+          } catch {
+            return [];
+          }
+        })();
 
-      const rvEl = document.getElementById('cc-recentvids-'+ch.id);
+    const rvEl = document.getElementById('cc-recentvids-'+ch.id);
 
-      if(!vids || !vids.length){
-        if(rvEl){
-          rvEl.innerHTML='<div style="font-size:11.5px;color:var(--t4);padding:4px 0">No recent videos found.</div>';
-        }
-        const engEl = document.getElementById('cc-eng-'+ch.id);
-        if(engEl) engEl.textContent = '—';
-        const streakEl = document.getElementById('cc-streak-'+ch.id);
-        if(streakEl) streakEl.style.display = 'none';
-        const footerEl = document.getElementById('cc-footer-'+ch.id);
-        if(footerEl) footerEl.style.display = 'none';
-        return;
-      }
-
-      const card=document.getElementById('ctr-'+ch.id);
-      if(!card)return;
-      const sorted=[...vids].sort((a,b)=>new Date(b.published_at||b.date)-new Date(a.published_at||a.date));
-
-      // Recent Videos — top 3 long-form, color-coded vs channel average
+    if(!vids || !vids.length){
       if(rvEl){
-        const recent3 = sorted.filter(v => !isYouTubeShort(v)).slice(0, 3);
-        const chAvgViews = parseInt(ch.avg_views_raw || ch.avg_views || 0) || 0;
-        if(!recent3.length){ 
-          rvEl.innerHTML='<div style="font-size:11.5px;color:var(--t4);padding:4px 0">No recent long-form videos.</div>'; 
-        } else {
-          rvEl.innerHTML = `<div class="cc-rv-hdr"><span style="font-family:'Material Symbols Outlined';font-size:12px;vertical-align:middle;margin-right:4px">play_circle</span>Recent Videos</div>` +
-          recent3.map(v => {
-            const vc = v.view_count ?? v.views_raw ?? 0;
-            const pub = v.published_at ? new Date(v.published_at) : null;
-            const dateStr = (pub && !isNaN(pub.getTime())) ? pub.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : (v.date||'');
-            let vcColor = 'var(--t2)';
-            if(chAvgViews > 0){
-              if(vc >= chAvgViews*1.5) vcColor='var(--gr)';
-              else if(vc < chAvgViews*0.5) vcColor='var(--rd)';
-              else vcColor='var(--gold)';
-            }
-            return `<div class="cc-rv-row" onclick="event.stopPropagation();window.open('${esc(v.url||'')}','_blank')">
-              <div class="cc-rv-title" title="${esc(v.title||'')}">${esc(v.title||'Untitled')}</div>
-              <div class="cc-rv-meta">
-                <span class="cc-rv-views" style="color:${vcColor}">${fmtN(vc)}</span>
-                <span class="cc-rv-dot">·</span>
-                <span class="cc-rv-date">${dateStr}</span>
-              </div>
-            </div>`;
-          }).join('');
-        }
+        rvEl.innerHTML='<div style="font-size:11.5px;color:var(--t4);padding:4px 0">No recent videos found.</div>';
       }
-
-      // Fill engagement rate
-      const recent5 = vids.slice(0,5);
-      const avgEng = recent5.reduce((sum,v) => {
-        const r = calcEngagementRate(v.like_count??0, v.comment_count??0, v.view_count??v.views_raw??0);
-        return sum + (r ?? 0);
-      }, 0) / (recent5.length || 1);
       const engEl = document.getElementById('cc-eng-'+ch.id);
-      if(engEl){
-        if(avgEng > 0){
-          engEl.textContent = avgEng.toFixed(1)+'%';
-          engEl.style.color = avgEng >= 4 ? 'var(--gr)' : avgEng >= 2 ? 'var(--gold)' : 'var(--rd)';
-        } else {
-          engEl.textContent = '0.0%';
-          engEl.style.color = 'var(--rd)';
-        }
-      }
-      
-      let streak=0,lastW=-1;
-      for(const v of sorted){
-        const pubTime = new Date(v.published_at||v.date).getTime();
-        if(isNaN(pubTime)) continue;
-        const wa=Math.floor((now-pubTime)/(7*864e5));
-        if(streak===0&&wa<=1){streak=1;lastW=wa;}
-        else if(streak>0&&wa===lastW+1){streak++;lastW=wa;}
-        else if(streak>0)break;
-      }
-      
-      const streakEl=document.getElementById('cc-streak-'+ch.id);
-      if(streakEl){
-        const firstPubTime = sorted.length ? new Date(sorted[0].published_at||sorted[0].date).getTime() : NaN;
-        const daysSince=!isNaN(firstPubTime)?Math.floor((now-firstPubTime)/864e5):999;
-        if(streak>=4){streakEl.textContent=`${streak}-wk streak`;streakEl.className='badge bdg-gr';streakEl.style.display='';}
-        else if(streak>=2){streakEl.textContent=`${streak}wks`;streakEl.className='badge bdg-pr';streakEl.style.display='';}
-        else if(daysSince>28){streakEl.textContent=`${daysSince}d gap`;streakEl.className='badge bdg-rd';streakEl.style.display='';}
-        else {streakEl.style.display='none';}
-      }
+      if(engEl) engEl.textContent = '—';
+      const streakEl = document.getElementById('cc-streak-'+ch.id);
+      if(streakEl) streakEl.style.display = 'none';
+      const footerEl = document.getElementById('cc-footer-'+ch.id);
+      if(footerEl) footerEl.style.display = 'none';
+      card.classList.remove('enriching');
+      card.classList.add('enriched');
+      return;
+    }
 
-      const footerEl = document.getElementById('cc-footer-' + ch.id);
-      if(footerEl){
-        const longFormVids = sorted.filter(v => !isYouTubeShort(v));
-        if(longFormVids.length > 0){
-          const lv = longFormVids[0];
-          const pubDate = new Date(lv.published_at || lv.date);
-          const isValidDate = !isNaN(pubDate.getTime());
-          const relDays = isValidDate ? Math.max(1, Math.floor((now - pubDate.getTime()) / 864e5)) : 1;
-          const relDateStr = isValidDate
-            ? pubDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' at ' + pubDate.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
-            : (lv.published_at || lv.date || '—');
-          const vc = lv.view_count ?? lv.views_raw ?? 0;
-          const vpd = Math.round(vc / relDays);
-          const growthStr = vpd > 1000 ? `<span style="color:var(--gr)">🔥 ${fmtN(vpd)}/day</span>` : `<span style="color:var(--pr)">📈 ${fmtN(vpd)}/day</span>`;
-          
-          footerEl.innerHTML = `
-          <div class="cc-vid">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <div class="cc-vlbl">Latest Long-Form</div>
-              <div style="font-size:10px;color:var(--t3)">${relDateStr}</div>
-            </div>
-            <div style="display:flex;gap:10px;align-items:center">
-              <img class="cc-vthumb" src="${esc(lv.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
-              <div class="cc-vinfo">
-                <div class="cc-vtitle" title="${esc(lv.title)}">${esc(lv.title)}</div>
-                <div class="cc-vstats">
-                  <span style="color:var(--pr)"><span class="ms-icon">visibility</span> ${fmtN(vc)}</span>
-                  ${growthStr}
-                </div>
-              </div>
+    const sorted=[...vids].sort((a,b)=>new Date(b.published_at||b.date)-new Date(a.published_at||a.date));
+
+    // Recent Videos — top 3 long-form, color-coded vs channel average
+    if(rvEl){
+      const recent3 = sorted.filter(v => !isYouTubeShort(v)).slice(0, 3);
+      const chAvgViews = parseInt(ch.avg_views_raw || ch.avg_views || 0) || 0;
+      if(!recent3.length){ 
+        rvEl.innerHTML='<div style="font-size:11.5px;color:var(--t4);padding:4px 0">No recent long-form videos.</div>'; 
+      } else {
+        rvEl.innerHTML = `<div class="cc-rv-hdr"><span style="font-family:'Material Symbols Outlined';font-size:12px;vertical-align:middle;margin-right:4px">play_circle</span>Recent Videos</div>` +
+        recent3.map(v => {
+          const vc = v.view_count ?? v.views_raw ?? 0;
+          const pub = v.published_at ? new Date(v.published_at) : null;
+          const dateStr = (pub && !isNaN(pub.getTime())) ? pub.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : (v.date||'');
+          let vcColor = 'var(--t2)';
+          if(chAvgViews > 0){
+            if(vc >= chAvgViews*1.5) vcColor='var(--gr)';
+            else if(vc < chAvgViews*0.5) vcColor='var(--rd)';
+            else vcColor='var(--gold)';
+          }
+          return `<div class="cc-rv-row" onclick="event.stopPropagation();window.open('${esc(v.url||'')}','_blank')">
+            <div class="cc-rv-title" title="${esc(v.title||'')}">${esc(v.title||'Untitled')}</div>
+            <div class="cc-rv-meta">
+              <span class="cc-rv-views" style="color:${vcColor}">${fmtN(vc)}</span>
+              <span class="cc-rv-dot">·</span>
+              <span class="cc-rv-date">${dateStr}</span>
             </div>
           </div>`;
-          footerEl.style.display = '';
-        } else {
-          footerEl.style.display = 'none';
-        }
+        }).join('');
       }
+    }
 
-    }catch{}
-  });
-  await Promise.all(promises);
+    // Fill engagement rate
+    const recent5 = vids.slice(0,5);
+    const avgEng = recent5.reduce((sum,v) => {
+      const r = calcEngagementRate(v.like_count??0, v.comment_count??0, v.view_count??v.views_raw??0);
+      return sum + (r ?? 0);
+    }, 0) / (recent5.length || 1);
+    const engEl = document.getElementById('cc-eng-'+ch.id);
+    if(engEl){
+      if(avgEng > 0){
+        engEl.textContent = avgEng.toFixed(1)+'%';
+        engEl.style.color = avgEng >= 4 ? 'var(--gr)' : avgEng >= 2 ? 'var(--gold)' : 'var(--rd)';
+      } else {
+        engEl.textContent = '0.0%';
+        engEl.style.color = 'var(--rd)';
+      }
+    }
+    
+    let streak=0,lastW=-1;
+    for(const v of sorted){
+      const pubTime = new Date(v.published_at||v.date).getTime();
+      if(isNaN(pubTime)) continue;
+      const wa=Math.floor((now-pubTime)/(7*864e5));
+      if(streak===0&&wa<=1){streak=1;lastW=wa;}
+      else if(streak>0&&wa===lastW+1){streak++;lastW=wa;}
+      else if(streak>0)break;
+    }
+    
+    const streakEl=document.getElementById('cc-streak-'+ch.id);
+    if(streakEl){
+      const firstPubTime = sorted.length ? new Date(sorted[0].published_at||sorted[0].date).getTime() : NaN;
+      const daysSince=!isNaN(firstPubTime)?Math.floor((now-firstPubTime)/864e5):999;
+      if(streak>=4){streakEl.textContent=`${streak}-wk streak`;streakEl.className='badge bdg-gr';streakEl.style.display='';}
+      else if(streak>=2){streakEl.textContent=`${streak}wks`;streakEl.className='badge bdg-pr';streakEl.style.display='';}
+      else if(daysSince>28){streakEl.textContent=`${daysSince}d gap`;streakEl.className='badge bdg-rd';streakEl.style.display='';}
+      else {streakEl.style.display='none';}
+    }
+
+    const footerEl = document.getElementById('cc-footer-' + ch.id);
+    if(footerEl){
+      const longFormVids = sorted.filter(v => !isYouTubeShort(v));
+      if(longFormVids.length > 0){
+        const lv = longFormVids[0];
+        const pubDate = new Date(lv.published_at || lv.date);
+        const isValidDate = !isNaN(pubDate.getTime());
+        const relDays = isValidDate ? Math.max(1, Math.floor((now - pubDate.getTime()) / 864e5)) : 1;
+        const relDateStr = isValidDate
+          ? pubDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' at ' + pubDate.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
+          : (lv.published_at || lv.date || '—');
+        const vc = lv.view_count ?? lv.views_raw ?? 0;
+        const vpd = Math.round(vc / relDays);
+        const growthStr = vpd > 1000 ? `<span style="color:var(--gr)">🔥 ${fmtN(vpd)}/day</span>` : `<span style="color:var(--pr)">📈 ${fmtN(vpd)}/day</span>`;
+        
+        footerEl.innerHTML = `
+        <div class="cc-vid">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div class="cc-vlbl">Latest Long-Form</div>
+            <div style="font-size:10px;color:var(--t3)">${relDateStr}</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <img class="cc-vthumb" src="${esc(lv.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
+            <div class="cc-vinfo">
+              <div class="cc-vtitle" title="${esc(lv.title)}">${esc(lv.title)}</div>
+              <div class="cc-vstats">
+                <span style="color:var(--pr)"><span class="ms-icon">visibility</span> ${fmtN(vc)}</span>
+                ${growthStr}
+              </div>
+            </div>
+          </div>
+        </div>`;
+        footerEl.style.display = '';
+      } else {
+        footerEl.style.display = 'none';
+      }
+    }
+    card.classList.remove('enriching');
+    card.classList.add('enriched');
+  } catch (err) {
+    card.classList.remove('enriching');
+  }
 }
 
 /* Toggle accordion sections in Channel Detail Modal */
@@ -2144,6 +2156,7 @@ function isMobile(){
 function handleCardClick(event, channelId){
   if(event.target.closest('.cc-acts') || event.target.closest('.cc-expand-vid') || event.target.closest('.cc-view-link')) return;
   const card = event.currentTarget;
+  enrichCard(channelId);
   // On mobile: first tap expands card, second tap (on already-expanded) opens modal
   if(isMobile()){
     if(!card.classList.contains('expanded')){
@@ -2199,6 +2212,7 @@ async function renderChannels(){
     return `
 <div class="ch-card au ${isMine?'mine':''}" id="ctr-${esc(ch.id)}"
   onclick="handleCardClick(event,'${esc(ch.id)}')"
+  onmouseenter="enrichCard('${esc(ch.id)}')"
   style="animation-delay:${index * 0.04}s">
 
   <!-- Actions overlay — unchanged -->
@@ -2291,7 +2305,7 @@ async function renderChannels(){
   };
 
   el.innerHTML=`<div class="ch-grid">${sortedAll.map((ch, i) => renderCard(ch, i)).join('')}</div>`;
-  enrichCards();
+  // enrichCard is now triggered on demand (onmouseenter / onclick)
 }
 
 function toggleAdd(){
