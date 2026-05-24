@@ -1,105 +1,105 @@
 /* ── Analytics Utilities ──────────────────────────────── */
-function calcEngagementRate(likeCount,commentCount,viewCount){
-  if(!viewCount||parseInt(viewCount)===0)return null;
-  const rate=((parseInt(likeCount||0)+parseInt(commentCount||0))/parseInt(viewCount))*100;
+function calcEngagementRate(likeCount, commentCount, viewCount) {
+  if (!viewCount || parseInt(viewCount) === 0) return null;
+  const rate = ((parseInt(likeCount || 0) + parseInt(commentCount || 0)) / parseInt(viewCount)) * 100;
   return parseFloat(rate.toFixed(1));
 }
-function engagementColor(rate){
-  if(rate===null)return 'color:var(--t3)';
-  if(rate>=4)return 'color:var(--gr)';
-  if(rate>=2)return 'color:var(--gold)';
+function engagementColor(rate) {
+  if (rate === null) return 'color:var(--t3)';
+  if (rate >= 4) return 'color:var(--gr)';
+  if (rate >= 2) return 'color:var(--gold)';
   return 'color:var(--rd)';
 }
-function isInactive(latestVideoDate,uploadFrequencyDays){
-  if(!latestVideoDate||!uploadFrequencyDays)return false;
-  const days=Math.floor((Date.now()-new Date(latestVideoDate).getTime())/(1000*60*60*24));
-  return days>(uploadFrequencyDays*2);
+function isInactive(latestVideoDate, uploadFrequencyDays) {
+  if (!latestVideoDate || !uploadFrequencyDays) return false;
+  const days = Math.floor((Date.now() - new Date(latestVideoDate).getTime()) / (1000 * 60 * 60 * 24));
+  return days > (uploadFrequencyDays * 2);
 }
-function calcInactiveDays(latestVideoDate){
-  if(!latestVideoDate)return 0;
-  return Math.floor((Date.now()-new Date(latestVideoDate).getTime())/(1000*60*60*24));
+function calcInactiveDays(latestVideoDate) {
+  if (!latestVideoDate) return 0;
+  return Math.floor((Date.now() - new Date(latestVideoDate).getTime()) / (1000 * 60 * 60 * 24));
 }
-function isHotVideo(latestViewsPerDay,totalViews,videoCount){
-  if(!latestViewsPerDay||!totalViews||!videoCount)return false;
-  const avgVPV=parseInt(totalViews)/parseInt(videoCount);
-  const estAvgVPD=avgVPV/30;
-  return latestViewsPerDay>estAvgVPD*2.5;
+function isHotVideo(latestViewsPerDay, totalViews, videoCount) {
+  if (!latestViewsPerDay || !totalViews || !videoCount) return false;
+  const avgVPV = parseInt(totalViews) / parseInt(videoCount);
+  const estAvgVPD = avgVPV / 30;
+  return latestViewsPerDay > estAvgVPD * 2.5;
 }
-function calcRecentVsAvg(recentVideos,totalViews,totalVideoCount){
-  if(!recentVideos||recentVideos.length<3||!totalViews||!totalVideoCount)return null;
-  const last5=recentVideos.slice(0,5);
-  const last5Avg=last5.reduce((sum,v)=>sum+parseInt(v.view_count||0),0)/last5.length;
-  const allTimeAvg=parseInt(totalViews)/parseInt(totalVideoCount);
-  if(allTimeAvg===0)return null;
-  return Math.round(((last5Avg-allTimeAvg)/allTimeAvg)*100);
+function calcRecentVsAvg(recentVideos, totalViews, totalVideoCount) {
+  if (!recentVideos || recentVideos.length < 3 || !totalViews || !totalVideoCount) return null;
+  const last5 = recentVideos.slice(0, 5);
+  const last5Avg = last5.reduce((sum, v) => sum + parseInt(v.view_count || 0), 0) / last5.length;
+  const allTimeAvg = parseInt(totalViews) / parseInt(totalVideoCount);
+  if (allTimeAvg === 0) return null;
+  return Math.round(((last5Avg - allTimeAvg) / allTimeAvg) * 100);
 }
-function recentVsAvgColor(diff){
-  if(diff===null)return 'color:var(--t3)';
-  if(diff>10)return 'color:var(--gr)';
-  if(diff<-10)return 'color:var(--rd)';
+function recentVsAvgColor(diff) {
+  if (diff === null) return 'color:var(--t3)';
+  if (diff > 10) return 'color:var(--gr)';
+  if (diff < -10) return 'color:var(--rd)';
   return 'color:var(--t3)';
 }
-function formatRecentVsAvg(diff){
-  if(diff===null)return '—';
-  if(diff>-10&&diff<10)return '~avg';
-  return diff>0?`+${diff}%`:`${diff}%`;
+function formatRecentVsAvg(diff) {
+  if (diff === null) return '—';
+  if (diff > -10 && diff < 10) return '~avg';
+  return diff > 0 ? `+${diff}%` : `${diff}%`;
 }
-function calcSubViewRatio(subscriberCount,totalViews){
-  if(!totalViews||!subscriberCount||parseInt(totalViews)===0)return null;
-  return parseFloat(((parseInt(subscriberCount)/parseInt(totalViews))*100).toFixed(1));
+function calcSubViewRatio(subscriberCount, totalViews) {
+  if (!totalViews || !subscriberCount || parseInt(totalViews) === 0) return null;
+  return parseFloat(((parseInt(subscriberCount) / parseInt(totalViews)) * 100).toFixed(1));
 }
-function subViewRatioColor(ratio){
-  if(ratio===null)return 'color:var(--t3)';
-  if(ratio>=10)return 'color:var(--gr)';
-  if(ratio>=5)return 'color:var(--t1)';
+function subViewRatioColor(ratio) {
+  if (ratio === null) return 'color:var(--t3)';
+  if (ratio >= 10) return 'color:var(--gr)';
+  if (ratio >= 5) return 'color:var(--t1)';
   return 'color:var(--rd)';
 }
-function calcUploadFrequency(recentVideos){
-  if(!recentVideos||recentVideos.length<2)return null;
-  const sorted=[...recentVideos].sort((a,b)=>new Date(b.published_at)-new Date(a.published_at));
-  let totalDays=0,count=0;
-  for(let i=0;i<sorted.length-1;i++){
-    const diff=(new Date(sorted[i].published_at)-new Date(sorted[i+1].published_at))/(1000*60*60*24);
-    if(diff>0){totalDays+=diff;count++;}
+function calcUploadFrequency(recentVideos) {
+  if (!recentVideos || recentVideos.length < 2) return null;
+  const sorted = [...recentVideos].sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+  let totalDays = 0, count = 0;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const diff = (new Date(sorted[i].published_at) - new Date(sorted[i + 1].published_at)) / (1000 * 60 * 60 * 24);
+    if (diff > 0) { totalDays += diff; count++; }
   }
-  return count>0?Math.round(totalDays/count):null;
+  return count > 0 ? Math.round(totalDays / count) : null;
 }
-function viewsPerDay(viewCount,publishedAt){
-  if(!viewCount||!publishedAt)return null;
-  const days=Math.max(1,Math.floor((Date.now()-new Date(publishedAt).getTime())/(1000*60*60*24)));
-  return parseFloat((parseInt(viewCount)/days).toFixed(1));
+function viewsPerDay(viewCount, publishedAt) {
+  if (!viewCount || !publishedAt) return null;
+  const days = Math.max(1, Math.floor((Date.now() - new Date(publishedAt).getTime()) / (1000 * 60 * 60 * 24)));
+  return parseFloat((parseInt(viewCount) / days).toFixed(1));
 }
-function fmtN(n){
-  if(!n&&n!==0)return '—';
-  n=parseFloat(n);
-  if(n>=1e9)return(n/1e9).toFixed(1)+'B';
-  if(n>=1e6)return(n/1e6).toFixed(1)+'M';
-  if(n>=1e3)return(n/1e3).toFixed(1)+'K';
+function fmtN(n) {
+  if (!n && n !== 0) return '—';
+  n = parseFloat(n);
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
   return String(Math.round(n));
 }
 
 /* ── State & Utils ────────────────────────────────────── */
-let all=[];
-let sort='subscribers_raw';
-let chSort='subscribers_raw';
-const _enrichCache={};
-const ENRICH_TTL=30*60*1000;
-let _amChannelId=null;        // Currently open analytics modal channel id
-let _amFullVideos=null;       // Cached full video list for modal
-let _amSnapshots=null;        // Cached snapshots for modal
+let all = [];
+let sort = 'subscribers_raw';
+let chSort = 'subscribers_raw';
+const _enrichCache = {};
+const ENRICH_TTL = 30 * 60 * 1000;
+let _amChannelId = null;        // Currently open analytics modal channel id
+let _amFullVideos = null;       // Cached full video list for modal
+let _amSnapshots = null;        // Cached snapshots for modal
 
 /* Drawer State */
 let _drwLatestMode = 'latest';
 let _drwOpenId = null;
 let _drwVideosCache = null;
 
-const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // Route YouTube CDN images through our proxy to avoid hotlink-block
-function proxyImg(url){
-  if(!url) return '';
-  if(url.includes('ggpht.com')||url.includes('ytimg.com')||url.includes('googleusercontent.com'))
-    return '/api/img-proxy?url='+encodeURIComponent(url);
+function proxyImg(url) {
+  if (!url) return '';
+  if (url.includes('ggpht.com') || url.includes('ytimg.com') || url.includes('googleusercontent.com'))
+    return '/api/img-proxy?url=' + encodeURIComponent(url);
   return url;
 }
 
@@ -121,8 +121,8 @@ function isYouTubeShort(v) {
   } else if (v.duration && typeof v.duration === 'string') {
     // If it's MM:SS or H:MM:SS format
     const parts = v.duration.split(':').map(n => parseInt(n, 10));
-    if (parts.length === 3) dur = parts[0]*3600 + parts[1]*60 + parts[2];
-    else if (parts.length === 2) dur = parts[0]*60 + parts[1];
+    if (parts.length === 3) dur = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    else if (parts.length === 2) dur = parts[0] * 60 + parts[1];
     else dur = parseInt(v.duration, 10) || 0;
   }
 
@@ -133,131 +133,131 @@ function isYouTubeShort(v) {
   return false;
 }
 
-function toast(msg,t=''){
-  const el=document.getElementById('toast');
-  el.textContent=msg;el.className='show '+t;
-  clearTimeout(el._t);el._t=setTimeout(()=>el.className='',3000);
+function toast(msg, t = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'show ' + t;
+  clearTimeout(el._t); el._t = setTimeout(() => el.className = '', 3000);
 }
-function showErr(id,msg){const e=document.getElementById(id);e.textContent='⚠ '+msg;e.style.display='block';}
-function hideErr(id){document.getElementById(id).style.display='none';}
+function showErr(id, msg) { const e = document.getElementById(id); e.textContent = '⚠ ' + msg; e.style.display = 'block'; }
+function hideErr(id) { document.getElementById(id).style.display = 'none'; }
 
-function logoImg(url,name,cls){
-  const fb=(name||'?')[0].toUpperCase();
-  if(url)return `<img class="${cls}" src="${esc(proxyImg(url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`;
+function logoImg(url, name, cls) {
+  const fb = (name || '?')[0].toUpperCase();
+  if (url) return `<img class="${cls}" src="${esc(proxyImg(url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`;
   return `<div class="${cls}-fb" style="display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-weight:800;color:var(--t3)">${fb}</div>`;
 }
 
-function greet(){
-  const h=new Date().getHours();
-  return h<12?'Good morning':h<18?'Good afternoon':'Good evening';
+function greet() {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
 /* ── Navigation ───────────────────────────────────────── */
-function sp(p){
-  document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));
-  document.querySelectorAll('.nav-link').forEach(x=>x.classList.remove('on'));
-  document.querySelectorAll('.mob-nav-btn').forEach(x=>x.classList.remove('on'));
-  document.getElementById('page-'+p).classList.add('on');
-  const nl=document.getElementById('nav-'+p);if(nl)nl.classList.add('on');
-  const mb=document.getElementById('mob-'+p);if(mb)mb.classList.add('on');
-  if(p==='channels')renderChannels();
-  if(p==='dash')renderDash();
+function sp(p) {
+  document.querySelectorAll('.page').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('.nav-link').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('.mob-nav-btn').forEach(x => x.classList.remove('on'));
+  document.getElementById('page-' + p).classList.add('on');
+  const nl = document.getElementById('nav-' + p); if (nl) nl.classList.add('on');
+  const mb = document.getElementById('mob-' + p); if (mb) mb.classList.add('on');
+  if (p === 'channels') renderChannels();
+  if (p === 'dash') renderDash();
 }
 
 /* ── Data ─────────────────────────────────────────────── */
-async function fetchAll(){
-  const r=await fetch('/api/channels');
-  all=await r.json();
-  const b=document.getElementById('sbBadge');
-  if(b)b.textContent=all.length||'';
+async function fetchAll() {
+  const r = await fetch('/api/channels');
+  all = await r.json();
+  const b = document.getElementById('sbBadge');
+  if (b) b.textContent = all.length || '';
 }
 
 /* ── Refresh All Channels ──────────────────────────────────────── */
-async function refreshAll(){
-  const btn=document.getElementById('refAllBtn');
-  if(btn){
-    btn.style.animation='rot 0.5s linear infinite';
-    btn.disabled=true;
-    btn.title='Refreshing…';
+async function refreshAll() {
+  const btn = document.getElementById('refAllBtn');
+  if (btn) {
+    btn.style.animation = 'rot 0.5s linear infinite';
+    btn.disabled = true;
+    btn.title = 'Refreshing…';
   }
-  try{
+  try {
     await fetchAll();
-    if(!all.length){toast('No channels to refresh','e');return;}
-    toast(`Refreshing ${all.length} channel${all.length>1?'s':''}…`);
-    let done=0;
-    for(const ch of all){
-      try{
-        await fetch(`/api/channels/${ch.id}/refresh`,{method:'POST'});
-      }catch{/* individual channel failure is non-fatal */}
+    if (!all.length) { toast('No channels to refresh', 'e'); return; }
+    toast(`Refreshing ${all.length} channel${all.length > 1 ? 's' : ''}…`);
+    let done = 0;
+    for (const ch of all) {
+      try {
+        await fetch(`/api/channels/${ch.id}/refresh`, { method: 'POST' });
+      } catch {/* individual channel failure is non-fatal */ }
       done++;
-      if(done<all.length)toast(`Refreshing… ${done}/${all.length}`);
+      if (done < all.length) toast(`Refreshing… ${done}/${all.length}`);
     }
     await fetchAll();
     // Re-render whichever page is visible
-    const dashActive=document.getElementById('page-dash')?.classList.contains('on');
-    const chActive=document.getElementById('page-channels')?.classList.contains('on');
-    if(dashActive)renderDash();
-    if(chActive)renderChannels();
-    toast(`All ${all.length} channels refreshed!`,'s');
-  }catch(ex){
-    toast('Refresh failed — check console','e');
-  }finally{
-    if(btn){btn.style.animation='';btn.disabled=false;btn.title='Refresh all channels';}
+    const dashActive = document.getElementById('page-dash')?.classList.contains('on');
+    const chActive = document.getElementById('page-channels')?.classList.contains('on');
+    if (dashActive) renderDash();
+    if (chActive) renderChannels();
+    toast(`All ${all.length} channels refreshed!`, 's');
+  } catch (ex) {
+    toast('Refresh failed — check console', 'e');
+  } finally {
+    if (btn) { btn.style.animation = ''; btn.disabled = false; btn.title = 'Refresh all channels'; }
   }
 }
 
 /* ════════════════════════════════════════════════════════
    DASHBOARD
 ════════════════════════════════════════════════════════ */
-async function renderDash(){
-  const el=document.getElementById('dashMain');
-  el.innerHTML=`<div style="display:flex;align-items:center;gap:12px;color:var(--t3);font-size:13px;padding:60px 0"><div class="spin"></div>Loading…</div>`;
-  try{
+async function renderDash() {
+  const el = document.getElementById('dashMain');
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:12px;color:var(--t3);font-size:13px;padding:60px 0"><div class="spin"></div>Loading…</div>`;
+  try {
     await fetchAll();
-    const primary=all.find(c=>c.is_primary);
-    const comps=all.filter(c=>!c.is_primary);
-    let html='';
+    const primary = all.find(c => c.is_primary);
+    const comps = all.filter(c => !c.is_primary);
+    let html = '';
 
-    html+=`<div class="dash-greet">${greet()}</div>
-    <div class="dash-title">${primary?esc(primary.name)+' Analytics':'YT Tracker Dashboard'}</div>`;
+    html += `<div class="dash-greet">${greet()}</div>
+    <div class="dash-title">${primary ? esc(primary.name) + ' Analytics' : 'YT Tracker Dashboard'}</div>`;
 
-    if(!primary){
-      html+=`<div class="no-pr au">
+    if (!primary) {
+      html += `<div class="no-pr au">
         <div class="no-pr-ico"><span style="font-family:'Material Symbols Outlined';font-size:48px;color:var(--t4)">subscriptions</span></div>
         <h3>Set your primary channel</h3>
         <p>Go to <strong>My Channels</strong>, add your channel, then click <strong>Set Mine</strong> to see your analytics here.</p>
         <button class="btn btn-pr" onclick="sp('channels')">Open My Channels</button>
       </div>`;
     } else {
-      const v=primary.video||{};
-      html+=`
+      const v = primary.video || {};
+      html += `
       <div class="my-hero au" onclick="openAnalyticsModal('${esc(primary.id)}')">
         <div class="my-hero-top">
           <div class="my-hero-l">
             ${primary.logo_url
-              ?`<img class="my-hero-logo" src="${esc(proxyImg(primary.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
-              :`<div class="my-hero-logo" style="display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;color:var(--t3)">${(primary.name||'?')[0].toUpperCase()}</div>`}
+          ? `<img class="my-hero-logo" src="${esc(proxyImg(primary.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+          : `<div class="my-hero-logo" style="display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;color:var(--t3)">${(primary.name || '?')[0].toUpperCase()}</div>`}
             <div class="my-hero-text">
               <div class="my-hero-name">${esc(primary.name)}</div>
               <div class="my-hero-meta">
-                ${primary.handle?`<span>${esc(primary.handle)}</span>`:''}
-                ${primary.country?`<span class="meta-sep">•</span><span>${esc(primary.country)}</span>`:''}
-                ${primary.created?`<span class="meta-sep">•</span><span>Since ${primary.created}</span>`:''}
+                ${primary.handle ? `<span>${esc(primary.handle)}</span>` : ''}
+                ${primary.country ? `<span class="meta-sep">•</span><span>${esc(primary.country)}</span>` : ''}
+                ${primary.created ? `<span class="meta-sep">•</span><span>Since ${primary.created}</span>` : ''}
               </div>
               <div class="my-hero-hint">Click to view full analytics ›</div>
             </div>
           </div>
-          ${v.title?`
+          ${v.title ? `
           <div class="my-hero-vid" onclick="event.stopPropagation();window.open('${esc(v.url)}','_blank')">
             <div class="my-vid-lbl">Latest Upload</div>
             <div class="my-vid-mini">
               <img class="my-vid-thumb" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
               <div class="my-vid-body">
                 <div class="my-vid-title" title="${esc(v.title)}">${esc(v.title)}</div>
-                <div class="my-vid-meta"><span class="ms-icon">visibility</span> ${esc(v.views)} <span class="meta-sep">•</span> ${v.date||''}</div>
+                <div class="my-vid-meta"><span class="ms-icon">visibility</span> ${esc(v.views)} <span class="meta-sep">•</span> ${v.date || ''}</div>
               </div>
             </div>
-          </div>`:''}
+          </div>`: ''}
         </div>
         <div class="my-stats">
           <div class="my-stat"><div class="my-stat-lbl">Subscribers</div><div class="my-stat-val gold">${esc(primary.subscribers)}</div></div>
@@ -267,30 +267,30 @@ async function renderDash(){
         </div>
       </div>`
 
-      html+=`<div class="dash-section-hdr">📊 Performance</div>`;
-      html+=`<div id="dashMonthGlance" class="dash-mg-wrap au"><div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px"><div class="spin"></div>Loading this month…</div></div>`;
+      html += `<div class="dash-section-hdr">📊 Performance</div>`;
+      html += `<div id="dashMonthGlance" class="dash-mg-wrap au"><div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px"><div class="spin"></div>Loading this month…</div></div>`;
 
-      if(all.length>1)html+=buildLB(primary,comps);
+      if (all.length > 1) html += buildLB(primary, comps);
 
-      html+=`<div class="dash-section-hdr">🎬 Content</div>`;
-      html+=`<div id="dashVelocity"></div>`;
+      html += `<div class="dash-section-hdr">🎬 Content</div>`;
+      html += `<div id="dashVelocity"></div>`;
 
-      const forRace=[primary,...comps].filter(c=>c.video&&c.video.title);
-      if(forRace.length){
-        const ranked=[...forRace].sort((a,b)=>(b.video.views_raw||0)-(a.video.views_raw||0));
-        const rankIco = i => ['1','2','3'][i] || String(i+1);
-        html+=`<div class="dash-section-hdr" style="border:none;margin-bottom:0">Latest Video Face-off <em style="color:var(--t4);font-style:normal;font-weight:400;font-size:11px;margin-left:8px">${forRace.length} channels compared</em></div>
+      const forRace = [primary, ...comps].filter(c => c.video && c.video.title);
+      if (forRace.length) {
+        const ranked = [...forRace].sort((a, b) => (b.video.views_raw || 0) - (a.video.views_raw || 0));
+        const rankIco = i => ['1', '2', '3'][i] || String(i + 1);
+        html += `<div class="dash-section-hdr" style="border:none;margin-bottom:0">Latest Video Face-off <em style="color:var(--t4);font-style:normal;font-weight:400;font-size:11px;margin-left:8px">${forRace.length} channels compared</em></div>
         <div class="vr-grid d2">`;
-        forRace.forEach(ch=>{
-          const vv=ch.video,ri=ranked.findIndex(x=>x.id===ch.id),isMine=ch.id===primary.id;
-          html+=`<div class="vr-card ${isMine?'mc':''}" onclick="openAnalyticsModal('${esc(ch.id)}')">
+        forRace.forEach(ch => {
+          const vv = ch.video, ri = ranked.findIndex(x => x.id === ch.id), isMine = ch.id === primary.id;
+          html += `<div class="vr-card ${isMine ? 'mc' : ''}" onclick="openAnalyticsModal('${esc(ch.id)}')">
             <img class="vr-thumb" src="${esc(vv.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
             <div class="vr-body">
               <div class="vr-ch-row">
-                ${ch.logo_url?`<img class="vr-ch-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`:
-                  `<div class="vr-ch-logo" style="display:flex;align-items:center;justify-content:center;font-weight:700;font-size:8px;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
-                <span class="vr-ch-name" style="${isMine?'color:var(--gold)':''}">${esc(ch.name)}</span>
-                <span class="rank-badge rank-${ri+1}">${rankIco(ri)}</span>
+                ${ch.logo_url ? `<img class="vr-ch-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">` :
+              `<div class="vr-ch-logo" style="display:flex;align-items:center;justify-content:center;font-weight:700;font-size:8px;color:var(--t3)">${(ch.name || '?')[0]}</div>`}
+                <span class="vr-ch-name" style="${isMine ? 'color:var(--gold)' : ''}">${esc(ch.name)}</span>
+                <span class="rank-badge rank-${ri + 1}">${rankIco(ri)}</span>
               </div>
               <div class="vr-title" title="${esc(vv.title)}">${esc(vv.title)}</div>
               <div class="vr-views">${esc(vv.views)} <span style="font-size:11px;font-weight:400;color:var(--t3)">views</span></div>
@@ -298,48 +298,48 @@ async function renderDash(){
             </div>
           </div>`;
         });
-        html+=`</div>`;
+        html += `</div>`;
       }
 
-      html+=`<div class="dash-section-hdr">📁 Your Uploads</div>`;
-      html+=`<div class="ru-grid d4" id="ruGrid">
+      html += `<div class="dash-section-hdr">📁 Your Uploads</div>`;
+      html += `<div class="ru-grid d4" id="ruGrid">
           <div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:12.5px"><div class="spin"></div>Loading…</div>
         </div>`;
-      
-      html+=`<div id="dashFastGrow"></div>`;
+
+      html += `<div id="dashFastGrow"></div>`;
     }
 
-    el.innerHTML=html;
-    if(all.length>1)setTimeout(animateBars,60);
+    el.innerHTML = html;
+    if (all.length > 1) setTimeout(animateBars, 60);
     /* Load Feature 4 async panels */
-    if(primary){
+    if (primary) {
       loadThisMonthPanel(primary.id);
-      if(all.length>1){loadFastestGrowing([primary,...comps]);loadUploadVelocity([primary,...comps]);}
+      if (all.length > 1) { loadFastestGrowing([primary, ...comps]); loadUploadVelocity([primary, ...comps]); }
     }
-    setTimeout(()=>{
-      document.querySelectorAll('.count-up').forEach(el=>{
-        const target=parseFloat(el.dataset.target||0);
-        const suffix=el.dataset.suffix||'';
-        const dur=1200;const step=16;const steps=dur/step;
-        let cur=0;const inc=target/steps;
-        const t=setInterval(()=>{
-          cur=Math.min(cur+inc,target);
-          const v=target>=10?Math.round(cur):cur.toFixed(1);
-          el.textContent=v+suffix;
-          if(cur>=target)clearInterval(t);
-        },step);
+    setTimeout(() => {
+      document.querySelectorAll('.count-up').forEach(el => {
+        const target = parseFloat(el.dataset.target || 0);
+        const suffix = el.dataset.suffix || '';
+        const dur = 1200; const step = 16; const steps = dur / step;
+        let cur = 0; const inc = target / steps;
+        const t = setInterval(() => {
+          cur = Math.min(cur + inc, target);
+          const v = target >= 10 ? Math.round(cur) : cur.toFixed(1);
+          el.textContent = v + suffix;
+          if (cur >= target) clearInterval(t);
+        }, step);
       });
-    },100);
+    }, 100);
 
-    if(primary){
-      try{
-        const r2=await fetch(`/api/channels/${primary.id}/videos?max=6`);
-        const vids=await r2.json();
-        const ru=document.getElementById('ruGrid');
-        if(!ru)return;
-        if(!vids.length){ru.innerHTML='<p style="color:var(--t3);font-size:13px">No uploads found.</p>';return;}
-        ru.innerHTML=vids.map((v,i)=>`
-          <a class="ru-card au" style="animation-delay:${i*.04}s" href="${esc(v.url)}" target="_blank" rel="noopener">
+    if (primary) {
+      try {
+        const r2 = await fetch(`/api/channels/${primary.id}/videos?max=6`);
+        const vids = await r2.json();
+        const ru = document.getElementById('ruGrid');
+        if (!ru) return;
+        if (!vids.length) { ru.innerHTML = '<p style="color:var(--t3);font-size:13px">No uploads found.</p>'; return; }
+        ru.innerHTML = vids.map((v, i) => `
+          <a class="ru-card au" style="animation-delay:${i * .04}s" href="${esc(v.url)}" target="_blank" rel="noopener">
             <img class="ru-thumb" src="${esc(v.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
             <div class="ru-body">
               <div class="ru-title">${esc(v.title)}</div>
@@ -350,13 +350,13 @@ async function renderDash(){
               </div>
             </div>
           </a>`).join('');
-      }catch{
-        const ru=document.getElementById('ruGrid');
-        if(ru)ru.innerHTML='<p style="color:var(--t3);font-size:13px">Could not load.</p>';
+      } catch {
+        const ru = document.getElementById('ruGrid');
+        if (ru) ru.innerHTML = '<p style="color:var(--t3);font-size:13px">Could not load.</p>';
       }
     }
-  }catch(ex){
-    el.innerHTML=`<div class="err" style="display:block">Error: ${esc(String(ex))}</div>`;
+  } catch (ex) {
+    el.innerHTML = `<div class="err" style="display:block">Error: ${esc(String(ex))}</div>`;
   }
 }
 
@@ -364,9 +364,9 @@ function buildLB(primary, comps) {
   const rows_all = [primary, ...comps];
   const sorted = [...rows_all].sort((a, b) => (b[sort] || 0) - (a[sort] || 0));
 
-  const lbl  = sort === 'subscribers_raw' ? 'Subscribers'
-             : sort === 'avg_views_raw'   ? 'Avg Views'
-             : 'Total Views';
+  const lbl = sort === 'subscribers_raw' ? 'Subscribers'
+    : sort === 'avg_views_raw' ? 'Avg Views'
+      : 'Total Views';
   const lbl2 = sort === 'subscribers_raw' ? 'Avg Views' : 'Subscribers';
   const fld2 = sort === 'subscribers_raw' ? 'avg_views' : 'subscribers';
 
@@ -380,11 +380,11 @@ function buildLB(primary, comps) {
   const rk = ['1st', '2nd', '3rd'];
   let rows = '';
   sorted.forEach((ch, i) => {
-    const mine  = ch.id === primary.id;
-    const pct   = logPct(ch[sort] || 0);
+    const mine = ch.id === primary.id;
+    const pct = logPct(ch[sort] || 0);
     const dispV = sort === 'subscribers_raw' ? ch.subscribers
-                : sort === 'avg_views_raw'   ? ch.avg_views
-                : ch.total_views;
+      : sort === 'avg_views_raw' ? ch.avg_views
+        : ch.total_views;
     const vsColor = i === 0 ? 'var(--gold)' : 'var(--t3)';
     const vsText = i === 0 ? '👑 Leader' : '';
 
@@ -395,8 +395,8 @@ function buildLB(primary, comps) {
       </div>
       <div class="lb-ch">
         ${ch.logo_url
-          ? `<img class="lb-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
-          : `<div class="lb-logo-fb">${(ch.name || '?')[0].toUpperCase()}</div>`}
+        ? `<img class="lb-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+        : `<div class="lb-logo-fb">${(ch.name || '?')[0].toUpperCase()}</div>`}
         <div>
           <div class="lb-ch-name">${esc(ch.name)}${mine ? '<span class="lb-you">⭐ You</span>' : ''}</div>
           <div class="lb-ch-hdl">${esc(ch.handle || '')}</div>
@@ -425,7 +425,7 @@ function buildLB(primary, comps) {
       <span class="lb-top-t">Ranked by ${lbl}</span>
       <div class="lb-sorts">
         <button class="lsb ${sort === 'subscribers_raw' ? 'on' : ''}" onclick="setSort('subscribers_raw')">Subscribers</button>
-        <button class="lsb ${sort === 'avg_views_raw'   ? 'on' : ''}" onclick="setSort('avg_views_raw')">Avg Views</button>
+        <button class="lsb ${sort === 'avg_views_raw' ? 'on' : ''}" onclick="setSort('avg_views_raw')">Avg Views</button>
         <button class="lsb ${sort === 'total_views_raw' ? 'on' : ''}" onclick="setSort('total_views_raw')">Total Views</button>
       </div>
     </div>
@@ -442,8 +442,8 @@ function buildLB(primary, comps) {
   </div>`;
 }
 
-function setSort(f){sort=f;renderDash();}
-function animateBars(){document.querySelectorAll('.lb-log-bar').forEach(b=>b.style.width=(b.dataset.pct||0)+'%');}
+function setSort(f) { sort = f; renderDash(); }
+function animateBars() { document.querySelectorAll('.lb-log-bar').forEach(b => b.style.width = (b.dataset.pct || 0) + '%'); }
 
 /* ════════════════════════════════════════════════════════
    DRAWER LOGIC (Terminal Luxe)
@@ -454,16 +454,16 @@ function animateBars(){document.querySelectorAll('.lb-log-bar').forEach(b=>b.sty
 
 
 
-function buildWordCloud(vids){
-  if(!vids||vids.length<2)return '';
-  const stop=new Set(['the','and','for','with','how','that','this','from','your','more','have','will','are','can','all','not','into','what','when','make','were','been','its','was','but','our','you','they','their','has','had','also','about','some','after','using','use','tutorial','video','part','best','full','guide','new','top','most','these','then','than','very','just','out','get','let','now','see','too','over','back','even','each','does','off','again','here','two','into','take','much','well','made']);
-  const freq={};
-  vids.forEach(v=>{(v.title||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>3&&!stop.has(w)).forEach(w=>{freq[w]=(freq[w]||0)+1;});});
-  const top=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,14);
-  if(!top.length)return '';
-  const maxC=top[0][1];
-  const tags=top.map(([w,c])=>{
-    const op=0.45+(c/maxC)*0.55;
+function buildWordCloud(vids) {
+  if (!vids || vids.length < 2) return '';
+  const stop = new Set(['the', 'and', 'for', 'with', 'how', 'that', 'this', 'from', 'your', 'more', 'have', 'will', 'are', 'can', 'all', 'not', 'into', 'what', 'when', 'make', 'were', 'been', 'its', 'was', 'but', 'our', 'you', 'they', 'their', 'has', 'had', 'also', 'about', 'some', 'after', 'using', 'use', 'tutorial', 'video', 'part', 'best', 'full', 'guide', 'new', 'top', 'most', 'these', 'then', 'than', 'very', 'just', 'out', 'get', 'let', 'now', 'see', 'too', 'over', 'back', 'even', 'each', 'does', 'off', 'again', 'here', 'two', 'into', 'take', 'much', 'well', 'made']);
+  const freq = {};
+  vids.forEach(v => { (v.title || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !stop.has(w)).forEach(w => { freq[w] = (freq[w] || 0) + 1; }); });
+  const top = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 14);
+  if (!top.length) return '';
+  const maxC = top[0][1];
+  const tags = top.map(([w, c]) => {
+    const op = 0.45 + (c / maxC) * 0.55;
     return `<span class="drw-topic-tag">${esc(w)} <em>×${c}</em></span>`;
   }).join('');
   return `<div>
@@ -480,7 +480,7 @@ function buildWordCloud(vids){
 function buildViewsTrendImproved(longFormVids) {
   const sorted = [...longFormVids]
     .filter(v => v.published_at || v.date)
-    .sort((a,b) => new Date(a.published_at||a.date) - new Date(b.published_at||b.date))
+    .sort((a, b) => new Date(a.published_at || a.date) - new Date(b.published_at || b.date))
     .slice(-20);
 
   if (sorted.length < 2) {
@@ -488,20 +488,20 @@ function buildViewsTrendImproved(longFormVids) {
   }
 
   const values = sorted.map(v => v.view_count ?? v.views_raw ?? 0);
-  const maxV   = Math.max(...values, 1);
-  const minV   = Math.min(...values);
+  const maxV = Math.max(...values, 1);
+  const minV = Math.min(...values);
   const rangeV = maxV - minV || 1;
 
   const half = Math.floor(sorted.length / 2);
-  const recentAvg = values.slice(half).reduce((a,b)=>a+b,0) / Math.max(values.length-half,1);
-  const olderAvg  = values.slice(0,half).reduce((a,b)=>a+b,0) / Math.max(half,1);
-  const trendPct  = olderAvg > 0 ? Math.round(((recentAvg-olderAvg)/olderAvg)*100) : 0;
+  const recentAvg = values.slice(half).reduce((a, b) => a + b, 0) / Math.max(values.length - half, 1);
+  const olderAvg = values.slice(0, half).reduce((a, b) => a + b, 0) / Math.max(half, 1);
+  const trendPct = olderAvg > 0 ? Math.round(((recentAvg - olderAvg) / olderAvg) * 100) : 0;
   const trendLbl = trendPct > 10
     ? `▲ ${trendPct}% trending up`
     : trendPct < -10
-    ? `▼ ${Math.abs(trendPct)}% declining`
-    : `● ${Math.abs(trendPct)}% stable`;
-  const trendC    = trendPct > 10 ? 'var(--gr)' : trendPct < -10 ? 'var(--rd)' : 'var(--t3)';
+      ? `▼ ${Math.abs(trendPct)}% declining`
+      : `● ${Math.abs(trendPct)}% stable`;
+  const trendC = trendPct > 10 ? 'var(--gr)' : trendPct < -10 ? 'var(--rd)' : 'var(--t3)';
 
   const W = 820, H = 120, padL = 60, padR = 16, padT = 14, padB = 30;
   const plotW = W - padL - padR;
@@ -513,37 +513,37 @@ function buildViewsTrendImproved(longFormVids) {
     return [x, y];
   });
 
-  const polyline = pts.map(([x,y]) => `${x},${y}`).join(' ');
-  const areaPath = `M${pts[0][0]},${H-padB} ` +
-    pts.map(([x,y]) => `L${x},${y}`).join(' ') +
-    ` L${pts[pts.length-1][0]},${H-padB} Z`;
+  const polyline = pts.map(([x, y]) => `${x},${y}`).join(' ');
+  const areaPath = `M${pts[0][0]},${H - padB} ` +
+    pts.map(([x, y]) => `L${x},${y}`).join(' ') +
+    ` L${pts[pts.length - 1][0]},${H - padB} Z`;
 
   const yLabels = [
     { val: maxV, y: padT },
-    { val: Math.round((maxV+minV)/2), y: padT + plotH/2 },
+    { val: Math.round((maxV + minV) / 2), y: padT + plotH / 2 },
     { val: minV, y: padT + plotH },
   ];
   const yTickLines = yLabels.map(t =>
-    `<line x1="${padL}" y1="${t.y}" x2="${W-padR}" y2="${t.y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
-     <text x="${padL-6}" y="${t.y+4}" text-anchor="end" fill="rgba(255,255,255,0.3)" font-size="9" font-family="JetBrains Mono,monospace">${fmtN(t.val)}</text>`
+    `<line x1="${padL}" y1="${t.y}" x2="${W - padR}" y2="${t.y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+     <text x="${padL - 6}" y="${t.y + 4}" text-anchor="end" fill="rgba(255,255,255,0.3)" font-size="9" font-family="JetBrains Mono,monospace">${fmtN(t.val)}</text>`
   ).join('');
 
-  const dots = pts.map(([x,y], i) => {
+  const dots = pts.map(([x, y], i) => {
     const v = sorted[i];
-    const dateStr = (v.published_at||v.date||'').slice(0,10);
+    const dateStr = (v.published_at || v.date || '').slice(0, 10);
     return `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--pr)" stroke="var(--sf-low)" stroke-width="2" style="cursor:pointer">
-      <title>${esc(v.title||'')} — ${fmtN(values[i])} views • ${dateStr}</title>
+      <title>${esc(v.title || '')} — ${fmtN(values[i])} views • ${dateStr}</title>
     </circle>`;
   }).join('');
 
   const xDateLabels = [
-    { idx:0, anchor:'start' },
-    { idx: Math.floor((sorted.length-1)/2), anchor:'middle' },
-    { idx: sorted.length-1, anchor:'end' },
+    { idx: 0, anchor: 'start' },
+    { idx: Math.floor((sorted.length - 1) / 2), anchor: 'middle' },
+    { idx: sorted.length - 1, anchor: 'end' },
   ].map(({ idx, anchor }) => {
     const [x] = pts[idx];
-    const d = (sorted[idx].published_at||sorted[idx].date||'').slice(0,10);
-    return `<text x="${x}" y="${H-4}" text-anchor="${anchor}" fill="rgba(255,255,255,0.25)" font-size="9" font-family="JetBrains Mono,monospace">${d}</text>`;
+    const d = (sorted[idx].published_at || sorted[idx].date || '').slice(0, 10);
+    return `<text x="${x}" y="${H - 4}" text-anchor="${anchor}" fill="rgba(255,255,255,0.25)" font-size="9" font-family="JetBrains Mono,monospace">${d}</text>`;
   }).join('');
 
   return `
@@ -577,20 +577,20 @@ function buildCalendarImproved(longFormVids) {
 
   const dateMap = {};
   longFormVids.forEach(v => {
-    const d = (v.published_at||v.date||'').slice(0,10);
-    if (d) dateMap[d] = (dateMap[d]||0) + 1;
+    const d = (v.published_at || v.date || '').slice(0, 10);
+    if (d) dateMap[d] = (dateMap[d] || 0) + 1;
   });
 
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const totalDays = 52 * 7;
   const startDate = new Date(today); startDate.setDate(today.getDate() - totalDays + 1);
 
   const cellSize = 11, gap = 2, cols = 52, rows = 7;
   const W = cols * (cellSize + gap) + 36, H = rows * (cellSize + gap) + 24;
 
-  const dayLabels = ['S','M','T','W','T','F','S'];
-  const dayLabelSvg = dayLabels.map((d,i) =>
-    i % 2 === 1 ? `<text x="0" y="${i*(cellSize+gap)+cellSize}" fill="rgba(255,255,255,0.2)" font-size="8" font-family="JetBrains Mono,monospace">${d}</text>` : ''
+  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const dayLabelSvg = dayLabels.map((d, i) =>
+    i % 2 === 1 ? `<text x="0" y="${i * (cellSize + gap) + cellSize}" fill="rgba(255,255,255,0.2)" font-size="8" font-family="JetBrains Mono,monospace">${d}</text>` : ''
   ).join('');
 
   let cells = '', monthLabels = '', prevMonth = -1;
@@ -602,24 +602,24 @@ function buildCalendarImproved(longFormVids) {
       d.setDate(d.getDate() + dayOffset);
       if (d > today) continue;
 
-      const iso = d.toISOString().slice(0,10);
+      const iso = d.toISOString().slice(0, 10);
       const count = dateMap[iso] || 0;
       const x = 28 + col * (cellSize + gap);
       const y = row * (cellSize + gap);
 
       const fill = count === 0 ? 'rgba(255,255,255,0.04)'
         : count === 1 ? 'rgba(0,229,255,0.28)'
-        : count === 2 ? 'rgba(0,229,255,0.58)'
-        : 'rgba(0,229,255,0.88)';
+          : count === 2 ? 'rgba(0,229,255,0.58)'
+            : 'rgba(0,229,255,0.88)';
       const stroke = count > 0 ? 'rgba(0,229,255,0.15)' : 'rgba(255,255,255,0.03)';
-      const tooltip = count > 0 ? `${count} upload${count>1?'s':''} on ${iso}` : `No uploads on ${iso}`;
+      const tooltip = count > 0 ? `${count} upload${count > 1 ? 's' : ''} on ${iso}` : `No uploads on ${iso}`;
 
       cells += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" ry="2" fill="${fill}" stroke="${stroke}" stroke-width="0.5"><title>${tooltip}</title></rect>`;
 
       const m = d.getMonth();
       if (row === 0 && m !== prevMonth) {
-        const mNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        monthLabels += `<text x="${x}" y="${H-4}" fill="rgba(255,255,255,0.22)" font-size="8" font-family="JetBrains Mono,monospace">${mNames[m]}</text>`;
+        const mNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        monthLabels += `<text x="${x}" y="${H - 4}" fill="rgba(255,255,255,0.22)" font-size="8" font-family="JetBrains Mono,monospace">${mNames[m]}</text>`;
         prevMonth = m;
       }
     }
@@ -638,12 +638,12 @@ function buildCalendarImproved(longFormVids) {
   const sl = streak >= 4
     ? `${streak}-week streak`
     : streak >= 2
-    ? `${streak} weeks in a row`
-    : streak === 1
-    ? `1 upload this week`
-    : `No uploads this week`;
+      ? `${streak} weeks in a row`
+      : streak === 1
+        ? `1 upload this week`
+        : `No uploads this week`;
 
-  const totalUploads = Object.values(dateMap).reduce((s,n)=>s+n,0);
+  const totalUploads = Object.values(dateMap).reduce((s, n) => s + n, 0);
   const activeDays = Object.keys(dateMap).length;
 
   return `
@@ -652,7 +652,7 @@ function buildCalendarImproved(longFormVids) {
         <span style="font-size:11px;font-weight:700;color:var(--t2)">${totalUploads} uploads · ${activeDays} active days</span>
         <span style="font-size:11px;color:${sc};font-weight:700">${sl}</span>
       </div>
-      <svg viewBox="0 0 ${W} ${H+20}" width="100%" class="am-cal-svg">
+      <svg viewBox="0 0 ${W} ${H + 20}" width="100%" class="am-cal-svg">
         ${dayLabelSvg}
         ${cells}
         ${monthLabels}
@@ -661,7 +661,7 @@ function buildCalendarImproved(longFormVids) {
         <span style="color:var(--t4);font-size:10px">Past 52 weeks · hover cells for dates</span>
         <div style="display:flex;align-items:center;gap:5px">
           <span style="font-size:9px;color:var(--t4)">Less</span>
-          ${['rgba(255,255,255,0.04)','rgba(0,229,255,0.28)','rgba(0,229,255,0.58)','rgba(0,229,255,0.88)'].map(c=>`<span style="width:10px;height:10px;border-radius:2px;background:${c};display:inline-block"></span>`).join('')}
+          ${['rgba(255,255,255,0.04)', 'rgba(0,229,255,0.28)', 'rgba(0,229,255,0.58)', 'rgba(0,229,255,0.88)'].map(c => `<span style="width:10px;height:10px;border-radius:2px;background:${c};display:inline-block"></span>`).join('')}
           <span style="font-size:9px;color:var(--t4)">More</span>
         </div>
       </div>
@@ -742,132 +742,132 @@ const buildCalendar = buildCalendarImproved;
 /* ════════════════════════════════════════════════════════
    CARD ASYNC ENRICHMENT (cached)
 ════════════════════════════════════════════════════════ */
-async function enrichCard(channelId){
+async function enrichCard(channelId) {
   const ch = all.find(c => c.id === channelId);
-  if(!ch) return;
+  if (!ch) return;
 
   const card = document.getElementById('ctr-' + channelId);
-  if(!card || card.classList.contains('enriched') || card.classList.contains('enriching')) return;
+  if (!card || card.classList.contains('enriched') || card.classList.contains('enriching')) return;
 
   card.classList.add('enriching');
 
-  try{
-    const now=Date.now();
-    const cached=_enrichCache[ch.id];
-    const vids=cached&&(now-cached.ts)<ENRICH_TTL
+  try {
+    const now = Date.now();
+    const cached = _enrichCache[ch.id];
+    const vids = cached && (now - cached.ts) < ENRICH_TTL
       ? cached.vids
-      : await (async()=>{
-          try {
-            const r=await fetch(`/api/channels/${ch.id}/videos?max=15`);
-            const v=await r.json();
-            if(Array.isArray(v)) _enrichCache[ch.id]={ts:now,vids:v};
-            return Array.isArray(v)?v:[];
-          } catch {
-            return [];
-          }
-        })();
+      : await (async () => {
+        try {
+          const r = await fetch(`/api/channels/${ch.id}/videos?max=15`);
+          const v = await r.json();
+          if (Array.isArray(v)) _enrichCache[ch.id] = { ts: now, vids: v };
+          return Array.isArray(v) ? v : [];
+        } catch {
+          return [];
+        }
+      })();
 
-    const rvEl = document.getElementById('cc-recentvids-'+ch.id);
+    const rvEl = document.getElementById('cc-recentvids-' + ch.id);
 
-    if(!vids || !vids.length){
-      if(rvEl){
-        rvEl.innerHTML='<div style="font-size:11.5px;color:var(--t4);padding:4px 0">No recent videos found.</div>';
+    if (!vids || !vids.length) {
+      if (rvEl) {
+        rvEl.innerHTML = '<div style="font-size:11.5px;color:var(--t4);padding:4px 0">No recent videos found.</div>';
       }
-      const engEl = document.getElementById('cc-eng-'+ch.id);
-      if(engEl) engEl.textContent = '—';
-      const streakEl = document.getElementById('cc-streak-'+ch.id);
-      if(streakEl) streakEl.style.display = 'none';
-      const footerEl = document.getElementById('cc-footer-'+ch.id);
-      if(footerEl) footerEl.style.display = 'none';
+      const engEl = document.getElementById('cc-eng-' + ch.id);
+      if (engEl) engEl.textContent = '—';
+      const streakEl = document.getElementById('cc-streak-' + ch.id);
+      if (streakEl) streakEl.style.display = 'none';
+      const footerEl = document.getElementById('cc-footer-' + ch.id);
+      if (footerEl) footerEl.style.display = 'none';
       card.classList.remove('enriching');
       card.classList.add('enriched');
       return;
     }
 
-    const sorted=[...vids].sort((a,b)=>new Date(b.published_at||b.date)-new Date(a.published_at||a.date));
+    const sorted = [...vids].sort((a, b) => new Date(b.published_at || b.date) - new Date(a.published_at || a.date));
 
     // Recent Videos — top 3 long-form, color-coded vs channel average
-    if(rvEl){
+    if (rvEl) {
       const recent3 = sorted.filter(v => !isYouTubeShort(v)).slice(0, 3);
       const chAvgViews = parseInt(ch.avg_views_raw || ch.avg_views || 0) || 0;
-      if(!recent3.length){ 
-        rvEl.innerHTML='<div style="font-size:11.5px;color:var(--t4);padding:4px 0">No recent long-form videos.</div>'; 
+      if (!recent3.length) {
+        rvEl.innerHTML = '<div style="font-size:11.5px;color:var(--t4);padding:4px 0">No recent long-form videos.</div>';
       } else {
         rvEl.innerHTML = `<div class="cc-rv-hdr"><span style="font-family:'Material Symbols Outlined';font-size:12px;vertical-align:middle;margin-right:4px">play_circle</span>Recent Videos</div>` +
-        recent3.map(v => {
-          const vc = v.view_count ?? v.views_raw ?? 0;
-          const pub = v.published_at ? new Date(v.published_at) : null;
-          const dateStr = (pub && !isNaN(pub.getTime())) ? pub.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : (v.date||'');
-          let vcColor = 'var(--t2)';
-          if(chAvgViews > 0){
-            if(vc >= chAvgViews*1.5) vcColor='var(--gr)';
-            else if(vc < chAvgViews*0.5) vcColor='var(--rd)';
-            else vcColor='var(--gold)';
-          }
-          return `<div class="cc-rv-row" onclick="event.stopPropagation();window.open('${esc(v.url||'')}','_blank')">
-            <div class="cc-rv-title" title="${esc(v.title||'')}">${esc(v.title||'Untitled')}</div>
+          recent3.map(v => {
+            const vc = v.view_count ?? v.views_raw ?? 0;
+            const pub = v.published_at ? new Date(v.published_at) : null;
+            const dateStr = (pub && !isNaN(pub.getTime())) ? pub.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : (v.date || '');
+            let vcColor = 'var(--t2)';
+            if (chAvgViews > 0) {
+              if (vc >= chAvgViews * 1.5) vcColor = 'var(--gr)';
+              else if (vc < chAvgViews * 0.5) vcColor = 'var(--rd)';
+              else vcColor = 'var(--gold)';
+            }
+            return `<div class="cc-rv-row" onclick="event.stopPropagation();window.open('${esc(v.url || '')}','_blank')">
+            <div class="cc-rv-title" title="${esc(v.title || '')}">${esc(v.title || 'Untitled')}</div>
             <div class="cc-rv-meta">
               <span class="cc-rv-views" style="color:${vcColor}">${fmtN(vc)}</span>
               <span class="cc-rv-dot">·</span>
               <span class="cc-rv-date">${dateStr}</span>
             </div>
           </div>`;
-        }).join('');
+          }).join('');
       }
     }
 
     // Fill engagement rate
-    const recent5 = vids.slice(0,5);
-    const avgEng = recent5.reduce((sum,v) => {
-      const r = calcEngagementRate(v.like_count??0, v.comment_count??0, v.view_count??v.views_raw??0);
+    const recent5 = vids.slice(0, 5);
+    const avgEng = recent5.reduce((sum, v) => {
+      const r = calcEngagementRate(v.like_count ?? 0, v.comment_count ?? 0, v.view_count ?? v.views_raw ?? 0);
       return sum + (r ?? 0);
     }, 0) / (recent5.length || 1);
-    const engEl = document.getElementById('cc-eng-'+ch.id);
-    if(engEl){
-      if(avgEng > 0){
-        engEl.textContent = avgEng.toFixed(1)+'%';
+    const engEl = document.getElementById('cc-eng-' + ch.id);
+    if (engEl) {
+      if (avgEng > 0) {
+        engEl.textContent = avgEng.toFixed(1) + '%';
         engEl.style.color = avgEng >= 4 ? 'var(--gr)' : avgEng >= 2 ? 'var(--gold)' : 'var(--rd)';
       } else {
         engEl.textContent = '0.0%';
         engEl.style.color = 'var(--rd)';
       }
     }
-    
-    let streak=0,lastW=-1;
-    for(const v of sorted){
-      const pubTime = new Date(v.published_at||v.date).getTime();
-      if(isNaN(pubTime)) continue;
-      const wa=Math.floor((now-pubTime)/(7*864e5));
-      if(streak===0&&wa<=1){streak=1;lastW=wa;}
-      else if(streak>0&&wa===lastW+1){streak++;lastW=wa;}
-      else if(streak>0)break;
+
+    let streak = 0, lastW = -1;
+    for (const v of sorted) {
+      const pubTime = new Date(v.published_at || v.date).getTime();
+      if (isNaN(pubTime)) continue;
+      const wa = Math.floor((now - pubTime) / (7 * 864e5));
+      if (streak === 0 && wa <= 1) { streak = 1; lastW = wa; }
+      else if (streak > 0 && wa === lastW + 1) { streak++; lastW = wa; }
+      else if (streak > 0) break;
     }
-    
-    const streakEl=document.getElementById('cc-streak-'+ch.id);
-    if(streakEl){
-      const firstPubTime = sorted.length ? new Date(sorted[0].published_at||sorted[0].date).getTime() : NaN;
-      const daysSince=!isNaN(firstPubTime)?Math.floor((now-firstPubTime)/864e5):999;
-      if(streak>=4){streakEl.textContent=`${streak}-wk streak`;streakEl.className='badge bdg-gr';streakEl.style.display='';}
-      else if(streak>=2){streakEl.textContent=`${streak}wks`;streakEl.className='badge bdg-pr';streakEl.style.display='';}
-      else if(daysSince>28){streakEl.textContent=`${daysSince}d gap`;streakEl.className='badge bdg-rd';streakEl.style.display='';}
-      else {streakEl.style.display='none';}
+
+    const streakEl = document.getElementById('cc-streak-' + ch.id);
+    if (streakEl) {
+      const firstPubTime = sorted.length ? new Date(sorted[0].published_at || sorted[0].date).getTime() : NaN;
+      const daysSince = !isNaN(firstPubTime) ? Math.floor((now - firstPubTime) / 864e5) : 999;
+      if (streak >= 4) { streakEl.textContent = `${streak}-wk streak`; streakEl.className = 'badge bdg-gr'; streakEl.style.display = ''; }
+      else if (streak >= 2) { streakEl.textContent = `${streak}wks`; streakEl.className = 'badge bdg-pr'; streakEl.style.display = ''; }
+      else if (daysSince > 28) { streakEl.textContent = `${daysSince}d gap`; streakEl.className = 'badge bdg-rd'; streakEl.style.display = ''; }
+      else { streakEl.style.display = 'none'; }
     }
 
     const footerEl = document.getElementById('cc-footer-' + ch.id);
-    if(footerEl){
+    if (footerEl) {
       const longFormVids = sorted.filter(v => !isYouTubeShort(v));
-      if(longFormVids.length > 0){
+      if (longFormVids.length > 0) {
         const lv = longFormVids[0];
         const pubDate = new Date(lv.published_at || lv.date);
         const isValidDate = !isNaN(pubDate.getTime());
         const relDays = isValidDate ? Math.max(1, Math.floor((now - pubDate.getTime()) / 864e5)) : 1;
         const relDateStr = isValidDate
-          ? pubDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' at ' + pubDate.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
+          ? pubDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' at ' + pubDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
           : (lv.published_at || lv.date || '—');
         const vc = lv.view_count ?? lv.views_raw ?? 0;
         const vpd = Math.round(vc / relDays);
         const growthStr = vpd > 1000 ? `<span style="color:var(--gr)">🔥 ${fmtN(vpd)}/day</span>` : `<span style="color:var(--pr)">📈 ${fmtN(vpd)}/day</span>`;
-        
+
         footerEl.innerHTML = `
         <div class="cc-vid">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -943,7 +943,7 @@ function loadDrwBestEver(channelId, container) {
       if (!longForm.length) { container.innerHTML = '<p style="color:var(--t3);font-size:12px;padding:12px 0">No long-form videos found.</p>'; return; }
       const sorted = [...longForm].sort((a, b) => (b.view_count ?? b.views_raw ?? 0) - (a.view_count ?? a.views_raw ?? 0));
       const top10 = sorted.slice(0, 10);
-      const rankSymbols = ['🥇','🥈','🥉'];
+      const rankSymbols = ['🥇', '🥈', '🥉'];
       container.innerHTML = top10.map((v, i) => {
         const vc = v.view_count ?? v.views_raw ?? 0;
         const eng = calcEngagementRate(v.like_count ?? 0, v.comment_count ?? 0, vc);
@@ -1034,12 +1034,12 @@ function renderDrwVideosTab() {
       Hot This Month <em style="font-style:normal;font-size:9px;color:var(--t4);margin-left:4px">${hot5.length} video${hot5.length > 1 ? 's' : ''}</em>
     </div>
     ${hot5.map((v, i) => {
-      const vc = v.view_count ?? v.views_raw ?? 0;
-      const eng = calcEngagementRate(v.like_count ?? 0, v.comment_count ?? 0, vc);
-      const engC = eng === null ? 'var(--t3)' : eng >= 4 ? 'var(--gr)' : eng >= 2 ? 'var(--gold)' : 'var(--rd)';
-      const rankClass = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
-      const rankSymbols = ['🥇','🥈','🥉','4','5'];
-      return `<a class="drw-hot-card" href="${esc(v.url)}" target="_blank" rel="noopener">
+    const vc = v.view_count ?? v.views_raw ?? 0;
+    const eng = calcEngagementRate(v.like_count ?? 0, v.comment_count ?? 0, vc);
+    const engC = eng === null ? 'var(--t3)' : eng >= 4 ? 'var(--gr)' : eng >= 2 ? 'var(--gold)' : 'var(--rd)';
+    const rankClass = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
+    const rankSymbols = ['🥇', '🥈', '🥉', '4', '5'];
+    return `<a class="drw-hot-card" href="${esc(v.url)}" target="_blank" rel="noopener">
         <div class="drw-hot-rank ${rankClass}">${rankSymbols[i]}</div>
         <img class="drw-hot-thumb" src="${esc(v.thumb || '')}" onerror="this.style.background='var(--sf-highest)';this.removeAttribute('src')" alt="">
         <div class="drw-hot-info">
@@ -1051,20 +1051,20 @@ function renderDrwVideosTab() {
           </div>
         </div>
       </a>`;
-    }).join('')}` : '';
+  }).join('')}` : '';
 
   const recent10Html = recent10.length > 0 ? `
     <div class="drw-vid-section-label" style="margin-top:${hot5.length > 0 ? '24px' : '0'}">
       Recent Uploads ${shortsCount > 0 ? `<span style="font-size:9px;color:var(--t4);font-weight:400;margin-left:4px">${shortsCount} Shorts hidden</span>` : ''}
     </div>
     ${recent10.map((v, ri) => {
-      const vc = v.view_count ?? v.views_raw ?? 0;
-      const lc = v.like_count ?? 0;
-      const cc = v.comment_count ?? 0;
-      const eng = calcEngagementRate(lc, cc, vc);
-      const isBest = ri === bestIdx;
-      const engC = eng === null ? 'var(--t3)' : eng >= 4 ? 'var(--gr)' : eng >= 2 ? 'var(--gold)' : 'var(--rd)';
-      return `<a href="${esc(v.url)}" target="_blank" rel="noopener" class="drw-vid-row">
+    const vc = v.view_count ?? v.views_raw ?? 0;
+    const lc = v.like_count ?? 0;
+    const cc = v.comment_count ?? 0;
+    const eng = calcEngagementRate(lc, cc, vc);
+    const isBest = ri === bestIdx;
+    const engC = eng === null ? 'var(--t3)' : eng >= 4 ? 'var(--gr)' : eng >= 2 ? 'var(--gold)' : 'var(--rd)';
+    return `<a href="${esc(v.url)}" target="_blank" rel="noopener" class="drw-vid-row">
         ${isBest ? '<span class="drw-vid-badge best">🏆 BEST</span>' : ''}
         <div class="drw-vid-title">${esc(v.title)}</div>
         <div class="drw-vid-meta">
@@ -1074,7 +1074,7 @@ function renderDrwVideosTab() {
           <span style="font-size:11px;color:var(--t3);margin-left:auto">${v.date}</span>
         </div>
       </a>`;
-    }).join('')}` : '';
+  }).join('')}` : '';
 
   const bestToggleHtml = longFormVids.length >= 5 ? `
     <button class="drw-best-toggle" id="drwBestToggle-${_drwOpenId}" onclick="toggleDrwBest('${_drwOpenId}')">
@@ -1134,23 +1134,23 @@ function renderDrwAboutTab(ch) {
    MY CHANNEL ANALYTICS MODAL — 5 Tabs
 ════════════════════════════════════════════════════════ */
 
-async function openAnalyticsModal(channelId){
-  const ch=all.find(c=>c.id===channelId);
-  if(!ch)return;
-  _amChannelId=channelId;
-  _amFullVideos=null;
-  _amSnapshots=null;
-  _amVidPreset='recent';
-  _amVidFilter='longform';
-  _amOvVids=null; // clear cache when switching channels
+async function openAnalyticsModal(channelId) {
+  const ch = all.find(c => c.id === channelId);
+  if (!ch) return;
+  _amChannelId = channelId;
+  _amFullVideos = null;
+  _amSnapshots = null;
+  _amVidPreset = 'recent';
+  _amVidFilter = 'longform';
+  _amOvVids = null; // clear cache when switching channels
 
   // Populate header
-  const logoEl=document.getElementById('amLogo');
-  logoEl.innerHTML=ch.logo_url
-    ?`<img src="${esc(proxyImg(ch.logo_url))}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
-    :`<div style="display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;color:var(--t3)">${(ch.name||'?')[0].toUpperCase()}</div>`;
-  document.getElementById('amName').textContent=ch.name||'';
-  document.getElementById('amSub').textContent=`${ch.handle||''} · ${ch.subscribers} subscribers · ${ch.total_videos} videos`;
+  const logoEl = document.getElementById('amLogo');
+  logoEl.innerHTML = ch.logo_url
+    ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
+    : `<div style="display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;color:var(--t3)">${(ch.name || '?')[0].toUpperCase()}</div>`;
+  document.getElementById('amName').textContent = ch.name || '';
+  document.getElementById('amSub').textContent = `${ch.handle || ''} · ${ch.subscribers} subscribers · ${ch.total_videos} videos`;
 
   // Add action buttons to header for competitor channels
   const actionsEl = document.getElementById('amActions');
@@ -1177,46 +1177,46 @@ async function openAnalyticsModal(channelId){
   // Show modal
   document.getElementById('analyticsModal').classList.add('open');
   document.getElementById('amOvrl').classList.add('open');
-  document.body.style.overflow='hidden';
+  document.body.style.overflow = 'hidden';
 }
 
-function closeAnalyticsModal(){
+function closeAnalyticsModal() {
   document.getElementById('analyticsModal').classList.remove('open');
   document.getElementById('amOvrl').classList.remove('open');
-  document.body.style.overflow='';
+  document.body.style.overflow = '';
 }
 
-function switchAnalyticsTab(tab, skipLoad){
-  document.querySelectorAll('.am-tab').forEach(t=>t.classList.remove('on'));
-  document.querySelectorAll('.am-panel').forEach(p=>p.classList.remove('on'));
-  const tabEl=document.getElementById('amTab-'+tab);
-  const panelEl=document.getElementById('amPanel-'+tab);
-  if(tabEl)tabEl.classList.add('on');
-  if(panelEl)panelEl.classList.add('on');
-  if(skipLoad)return;
-  if(tab==='monthly')renderAmMonthly();
-  else if(tab==='growth')renderAmGrowth();
-  else if(tab==='compare')renderAmCompare();
-  else if(tab==='timeline')renderAmTimeline();
+function switchAnalyticsTab(tab, skipLoad) {
+  document.querySelectorAll('.am-tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.am-panel').forEach(p => p.classList.remove('on'));
+  const tabEl = document.getElementById('amTab-' + tab);
+  const panelEl = document.getElementById('amPanel-' + tab);
+  if (tabEl) tabEl.classList.add('on');
+  if (panelEl) panelEl.classList.add('on');
+  if (skipLoad) return;
+  if (tab === 'monthly') renderAmMonthly();
+  else if (tab === 'growth') renderAmGrowth();
+  else if (tab === 'compare') renderAmCompare();
+  else if (tab === 'timeline') renderAmTimeline();
 }
 
 /* ── Overview: per-modal state ── */
-let _amVidPreset   = 'recent';   // 'recent' | 'hotWeek' | 'hotMonth' | 'alltime'
-let _amVidFilter   = 'longform'; // 'longform' | 'all'
-let _amOvVids      = null;  // cached video list for overview tab (fetched once per channel)
+let _amVidPreset = 'recent';   // 'recent' | 'hotWeek' | 'hotMonth' | 'alltime'
+let _amVidFilter = 'longform'; // 'longform' | 'all'
+let _amOvVids = null;  // cached video list for overview tab (fetched once per channel)
 
 function renderAmOverview(ch) {
   const thisChannelId = ch.id; // snapshot which channel we're loading for
   const subRatio = calcSubViewRatio(ch.subscriber_count ?? ch.subscribers_raw ?? 0, ch.total_views_raw ?? 0);
   const panel = document.getElementById('amPanel-overview');
-  
+
   panel.innerHTML = `
     <div class="am-overview-grid">
       <div class="am-bento-grid">
         <div class="am-bento-hero">
           <div class="am-bento-lbl">Subscribers</div>
           <div class="am-bento-val gold">${esc(ch.subscribers)}</div>
-          <div style="font-size:12px;color:var(--t3);margin-top:8px">${ch.handle||''}</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:8px">${ch.handle || ''}</div>
         </div>
         <div class="am-bento-cell">
           <div class="am-bento-lbl">Total Views</div>
@@ -1232,7 +1232,7 @@ function renderAmOverview(ch) {
         </div>
         <div class="am-bento-cell">
           <div class="am-bento-lbl">Audience %</div>
-          <div class="am-bento-val" style="color:${subViewRatioColor(subRatio)}">${subRatio!==null?subRatio+'%':'—'}</div>
+          <div class="am-bento-val" style="color:${subViewRatioColor(subRatio)}">${subRatio !== null ? subRatio + '%' : '—'}</div>
         </div>
       </div>
       <div class="am-sep-sect" id="amOvRecent-${thisChannelId}">
@@ -1255,14 +1255,14 @@ function renderAmOverview(ch) {
       _amOvVids = vids; // cache for this channel session
       const el = document.getElementById(`amOvRecent-${thisChannelId}`);
       if (!el) return;
-      
+
       if (!vids.length) {
         el.innerHTML = '<div class="am-sect-lbl">Recent Uploads</div><p style="color:var(--t3)">No uploads found.</p>';
         return;
       }
 
       const longFormVids = vids.filter(v => !isYouTubeShort(v));
-      const shortsCount  = vids.length - longFormVids.length;
+      const shortsCount = vids.length - longFormVids.length;
 
       const filterBarHtml = `
         <div class="am-vid-filter-bar">
@@ -1270,29 +1270,28 @@ function renderAmOverview(ch) {
             Recent Videos
             <span id="amVidCount-${thisChannelId}">
               <em style="font-weight:400;color:var(--t3);font-style:normal">
-                — showing ${getFilteredVideos(vids, _amVidFilter, _amVidPreset).length} of ${
-                  _amVidFilter === 'longform'
-                    ? longFormVids.length + ' long-form'
-                    : vids.length + ' total'
-                }
+                — showing ${getFilteredVideos(vids, _amVidFilter, _amVidPreset).length} of ${_amVidFilter === 'longform'
+          ? longFormVids.length + ' long-form'
+          : vids.length + ' total'
+        }
               </em>
             </span>
           </div>
           <div class="am-vid-filter-controls">
             <div class="am-vid-dropdown-wrap">
               <select class="am-vid-select" onchange="setAmVidFilter(this.value)">
-                <option value="longform" ${_amVidFilter==='longform'?'selected':''}>Long-form</option>
-                <option value="all"      ${_amVidFilter==='all'?'selected':''}>
+                <option value="longform" ${_amVidFilter === 'longform' ? 'selected' : ''}>Long-form</option>
+                <option value="all"      ${_amVidFilter === 'all' ? 'selected' : ''}>
                   All Videos${shortsCount > 0 ? ` · ${shortsCount} Shorts` : ''}
                 </option>
               </select>
             </div>
             <div class="am-vid-dropdown-wrap">
               <select class="am-vid-select" onchange="setAmVidPreset(this.value)">
-                <option value="recent"   ${_amVidPreset==='recent'?'selected':''}>5 Most Recent</option>
-                <option value="hotWeek"  ${_amVidPreset==='hotWeek'?'selected':''}>🔥 Trending (Views/Day)</option>
-                <option value="hotMonth" ${_amVidPreset==='hotMonth'?'selected':''}>📅 Best This Month</option>
-                <option value="alltime"  ${_amVidPreset==='alltime'?'selected':''}>🏆 All-Time Top 5</option>
+                <option value="recent"   ${_amVidPreset === 'recent' ? 'selected' : ''}>5 Most Recent</option>
+                <option value="hotWeek"  ${_amVidPreset === 'hotWeek' ? 'selected' : ''}>🔥 Trending (Views/Day)</option>
+                <option value="hotMonth" ${_amVidPreset === 'hotMonth' ? 'selected' : ''}>📅 Best This Month</option>
+                <option value="alltime"  ${_amVidPreset === 'alltime' ? 'selected' : ''}>🏆 All-Time Top 5</option>
               </select>
             </div>
           </div>
@@ -1338,7 +1337,7 @@ function renderAmOverview(ch) {
 function getFilteredVideos(vids, filter, preset) {
   const base = filter === 'all' ? vids : vids.filter(v => !isYouTubeShort(v));
   const now = Date.now();
-  const weekMs  = 7  * 24 * 60 * 60 * 1000;
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
   const monthMs = 30 * 24 * 60 * 60 * 1000;
 
   if (preset === 'recent') {
@@ -1398,8 +1397,8 @@ function _reRenderAmVidList() {
   const emptyMsg = _amVidPreset === 'hotWeek'
     ? 'No recent videos found to calculate trend.'
     : _amVidPreset === 'hotMonth'
-    ? 'No videos uploaded this month.'
-    : 'No videos found.';
+      ? 'No videos uploaded this month.'
+      : 'No videos found.';
   listEl.innerHTML = displayVids.length === 0
     ? `<div class="am-vid-empty">${emptyMsg}</div>`
     : displayVids.map((v, i) => buildAmVidRowRich(v, showRank ? i : null, channelAvgViews)).join('');
@@ -1409,40 +1408,39 @@ function _reRenderAmVidList() {
   if (countEl) {
     countEl.innerHTML = `
       <em style="font-weight:400;color:var(--t3);font-style:normal">
-        — showing ${displayVids.length} of ${
-          _amVidFilter === 'longform'
-            ? longFormVids.length + ' long-form'
-            : vids.length + ' total'
-        }
+        — showing ${displayVids.length} of ${_amVidFilter === 'longform'
+        ? longFormVids.length + ' long-form'
+        : vids.length + ' total'
+      }
       </em>`;
   }
 }
 
 function buildAmVidRowRich(v, rankIdx, channelAvg) {
-  const vc  = v.view_count ?? v.views_raw ?? 0;
+  const vc = v.view_count ?? v.views_raw ?? 0;
   const eng = calcEngagementRate(v.like_count ?? 0, v.comment_count ?? 0, vc);
 
   const engC = eng === null ? 'var(--t3)'
     : eng >= 4 ? 'var(--gr)'
-    : eng >= 2 ? 'var(--gold)'
-    : 'var(--rd)';
+      : eng >= 2 ? 'var(--gold)'
+        : 'var(--rd)';
 
   const viewsVsAvg = channelAvg > 0
     ? ((vc - channelAvg) / channelAvg) * 100
     : 0;
   const viewsColor = viewsVsAvg > 20 ? 'var(--gr)'
     : viewsVsAvg < -30 ? 'var(--rd)'
-    : 'var(--pr)';
+      : 'var(--pr)';
 
   const pubDate = new Date(v.published_at || v.date);
   const daysAgo = Math.floor((Date.now() - pubDate.getTime()) / 86400000);
   const relDate = daysAgo === 0 ? 'Today'
     : daysAgo === 1 ? 'Yesterday'
-    : daysAgo < 7  ? `${daysAgo}d ago`
-    : daysAgo < 30 ? `${Math.floor(daysAgo/7)}w ago`
-    : daysAgo < 365? `${Math.floor(daysAgo/30)}mo ago`
-    : `${Math.floor(daysAgo/365)}y ago`;
-  const absDate = pubDate.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      : daysAgo < 7 ? `${daysAgo}d ago`
+        : daysAgo < 30 ? `${Math.floor(daysAgo / 7)}w ago`
+          : daysAgo < 365 ? `${Math.floor(daysAgo / 30)}mo ago`
+            : `${Math.floor(daysAgo / 365)}y ago`;
+  const absDate = pubDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const isShort = isYouTubeShort(v);
 
@@ -1457,7 +1455,7 @@ function buildAmVidRowRich(v, rankIdx, channelAvg) {
         ${rankIdx === 0 ? '<span class="am-vid-rank-pill rank-gold">🥇</span>' : ''}
         ${rankIdx === 1 ? '<span class="am-vid-rank-pill rank-silver">🥈</span>' : ''}
         ${rankIdx === 2 ? '<span class="am-vid-rank-pill rank-bronze">🥉</span>' : ''}
-        ${rankIdx > 2 ? `<span class="am-vid-rank-pill" style="font-size:10px;top:6px;left:6px;font-weight:700;color:var(--t1)">#${rankIdx+1}</span>` : ''}
+        ${rankIdx > 2 ? `<span class="am-vid-rank-pill" style="font-size:10px;top:6px;left:6px;font-weight:700;color:var(--t1)">#${rankIdx + 1}</span>` : ''}
       </div>
       <div class="am-vid-rich-body">
         <div class="am-vid-rich-title">${esc(v.title)}</div>
@@ -1476,103 +1474,103 @@ function buildAmVidRowRich(v, rankIdx, channelAvg) {
 }
 
 /* ── Tab 2: Monthly Performance ─────────────────────── */
-async function renderAmMonthly(){
-  if(!_amChannelId)return;
-  const loadEl=document.getElementById('amMonthlyLoading');
-  const contEl=document.getElementById('amMonthlyContent');
-  loadEl.style.display='flex';
-  contEl.style.display='none';
+async function renderAmMonthly() {
+  if (!_amChannelId) return;
+  const loadEl = document.getElementById('amMonthlyLoading');
+  const contEl = document.getElementById('amMonthlyContent');
+  loadEl.style.display = 'flex';
+  contEl.style.display = 'none';
 
-  try{
-    if(!_amFullVideos){
-      const r=await fetch(`/api/channels/${_amChannelId}/videos/full`);
-      _amFullVideos=await r.json();
+  try {
+    if (!_amFullVideos) {
+      const r = await fetch(`/api/channels/${_amChannelId}/videos/full`);
+      _amFullVideos = await r.json();
     }
-    const allVids=_amFullVideos;
-    if(!allVids||!allVids.length){
-      contEl.innerHTML='<p style="color:var(--t3);padding:24px">No video data available.</p>';
-      loadEl.style.display='none';contEl.style.display='block';return;
+    const allVids = _amFullVideos;
+    if (!allVids || !allVids.length) {
+      contEl.innerHTML = '<p style="color:var(--t3);padding:24px">No video data available.</p>';
+      loadEl.style.display = 'none'; contEl.style.display = 'block'; return;
     }
 
     const vids = allVids.filter(v => !isYouTubeShort(v));
     const shortsCount = allVids.length - vids.length;
 
-    if(!vids.length){
-      contEl.innerHTML='<p style="color:var(--t3);padding:24px">No long-form video data available.</p>';
-      loadEl.style.display='none';contEl.style.display='block';return;
+    if (!vids.length) {
+      contEl.innerHTML = '<p style="color:var(--t3);padding:24px">No long-form video data available.</p>';
+      loadEl.style.display = 'none'; contEl.style.display = 'block'; return;
     }
 
     // Group by YYYY-MM
-    const byMonth={};
-    vids.forEach(v=>{
-      const m=v.published_at?v.published_at.slice(0,7):v.date?v.date.slice(0,7):null;
-      if(!m)return;
-      if(!byMonth[m])byMonth[m]={month:m,views:0,count:0,likes:0,comments:0};
-      byMonth[m].views+=(v.view_count||v.views_raw||0);
+    const byMonth = {};
+    vids.forEach(v => {
+      const m = v.published_at ? v.published_at.slice(0, 7) : v.date ? v.date.slice(0, 7) : null;
+      if (!m) return;
+      if (!byMonth[m]) byMonth[m] = { month: m, views: 0, count: 0, likes: 0, comments: 0 };
+      byMonth[m].views += (v.view_count || v.views_raw || 0);
       byMonth[m].count++;
-      byMonth[m].likes+=(v.like_count||0);
-      byMonth[m].comments+=(v.comment_count||0);
+      byMonth[m].likes += (v.like_count || 0);
+      byMonth[m].comments += (v.comment_count || 0);
     });
-    const months=Object.values(byMonth).sort((a,b)=>b.month.localeCompare(a.month));
-    if(!months.length){
-      contEl.innerHTML='<p style="color:var(--t3);padding:24px">No monthly data available.</p>';
-      loadEl.style.display='none';contEl.style.display='block';return;
+    const months = Object.values(byMonth).sort((a, b) => b.month.localeCompare(a.month));
+    if (!months.length) {
+      contEl.innerHTML = '<p style="color:var(--t3);padding:24px">No monthly data available.</p>';
+      loadEl.style.display = 'none'; contEl.style.display = 'block'; return;
     }
 
-    const maxViews=Math.max(...months.map(m=>m.views),1);
-    const totalMonthlyViews=months.reduce((s,m)=>s+m.views,0);
-    const avgMonthlyViews=totalMonthlyViews/months.length;
-    const bestM=months.reduce((a,b)=>b.views>a.views?b:a);
-    const worstM=months.reduce((a,b)=>b.views<a.views?b:a);
-    const totalV=totalMonthlyViews;
-    const avgV=Math.round(avgMonthlyViews);
+    const maxViews = Math.max(...months.map(m => m.views), 1);
+    const totalMonthlyViews = months.reduce((s, m) => s + m.views, 0);
+    const avgMonthlyViews = totalMonthlyViews / months.length;
+    const bestM = months.reduce((a, b) => b.views > a.views ? b : a);
+    const worstM = months.reduce((a, b) => b.views < a.views ? b : a);
+    const totalV = totalMonthlyViews;
+    const avgV = Math.round(avgMonthlyViews);
 
     // Build SVG bar chart
-    const barW=38;
-    const gap=8;
-    const chartW=Math.max(months.length*(barW+gap),500);
-    const chartH=280;
-    const plotH=chartH-52; // reserve space for labels
-    const now=new Date();
-    const thisMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const barW = 38;
+    const gap = 8;
+    const chartW = Math.max(months.length * (barW + gap), 500);
+    const chartH = 280;
+    const plotH = chartH - 52; // reserve space for labels
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     // Average line Y position
-    const avgY=chartH-52-((avgMonthlyViews/maxViews)*plotH);
+    const avgY = chartH - 52 - ((avgMonthlyViews / maxViews) * plotH);
 
-    const bars=months.map((m,i)=>{
-      const h=Math.max(6,Math.round((m.views/maxViews)*plotH));
-      const x=i*(barW+gap);
-      const y=chartH-52-h;
-      const isBest=m.month===bestM.month;
-      const isCurrent=m.month===thisMonth;
-      const isHigh=m.views>avgMonthlyViews*1.25;
-      const isLow=m.views<avgMonthlyViews*0.75;
+    const bars = months.map((m, i) => {
+      const h = Math.max(6, Math.round((m.views / maxViews) * plotH));
+      const x = i * (barW + gap);
+      const y = chartH - 52 - h;
+      const isBest = m.month === bestM.month;
+      const isCurrent = m.month === thisMonth;
+      const isHigh = m.views > avgMonthlyViews * 1.25;
+      const isLow = m.views < avgMonthlyViews * 0.75;
       let fillId;
-      if(isBest) fillId='url(#barGold)';
-      else if(isCurrent) fillId='url(#barCyan)';
-      else if(isHigh) fillId='url(#barGreen)';
-      else if(isLow) fillId='url(#barRed)';
-      else fillId='url(#barSlate)';
-      const shortM=m.month.slice(5)+"\u2019"+m.month.slice(2,4);
-      const tipData=JSON.stringify({month:m.month,views:fmtN(m.views),count:m.count,likes:m.likes?fmtN(m.likes):'—'}).replace(/"/g,'&quot;');
+      if (isBest) fillId = 'url(#barGold)';
+      else if (isCurrent) fillId = 'url(#barCyan)';
+      else if (isHigh) fillId = 'url(#barGreen)';
+      else if (isLow) fillId = 'url(#barRed)';
+      else fillId = 'url(#barSlate)';
+      const shortM = m.month.slice(5) + "\u2019" + m.month.slice(2, 4);
+      const tipData = JSON.stringify({ month: m.month, views: fmtN(m.views), count: m.count, likes: m.likes ? fmtN(m.likes) : '—' }).replace(/"/g, '&quot;');
       return `
         <g class="am-bar-g" data-tip="${tipData}" onclick="showMonthVideos('${m.month}')" style="cursor:pointer">
           <rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="5" fill="${fillId}"
             style="transition:opacity .15s,filter .15s"/>
-          ${isBest?`<text x="${x+barW/2}" y="${y-8}" text-anchor="middle" font-size="10" fill="#FFD54F" font-weight="800" font-family="DM Sans">★</text>`:''}
-          ${isCurrent?`<text x="${x+barW/2}" y="${y-8}" text-anchor="middle" font-size="9" fill="#00E5FF" font-weight="700" font-family="DM Sans">NOW</text>`:''}
-          <text x="${x+barW/2}" y="${chartH-32}" text-anchor="middle" font-size="9.5" fill="rgba(186,201,204,.8)" font-family="DM Sans">${shortM}</text>
-          <text x="${x+barW/2}" y="${chartH-18}" text-anchor="middle" font-size="9" fill="rgba(132,147,150,.6)" font-family="DM Sans">${m.count}v</text>
+          ${isBest ? `<text x="${x + barW / 2}" y="${y - 8}" text-anchor="middle" font-size="10" fill="#FFD54F" font-weight="800" font-family="DM Sans">★</text>` : ''}
+          ${isCurrent ? `<text x="${x + barW / 2}" y="${y - 8}" text-anchor="middle" font-size="9" fill="#00E5FF" font-weight="700" font-family="DM Sans">NOW</text>` : ''}
+          <text x="${x + barW / 2}" y="${chartH - 32}" text-anchor="middle" font-size="9.5" fill="rgba(186,201,204,.8)" font-family="DM Sans">${shortM}</text>
+          <text x="${x + barW / 2}" y="${chartH - 18}" text-anchor="middle" font-size="9" fill="rgba(132,147,150,.6)" font-family="DM Sans">${m.count}v</text>
         </g>`;
     }).join('');
 
     // Recent 12 months for this-month panel
-    const thisMonthData=byMonth[thisMonth]||null;
-    const lastMonthKey=new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7);
-    const lastMonthData=byMonth[lastMonthKey]||null;
-    const momDiff=thisMonthData&&lastMonthData&&lastMonthData.views>0
-      ?Math.round(((thisMonthData.views-lastMonthData.views)/lastMonthData.views)*100):null;
+    const thisMonthData = byMonth[thisMonth] || null;
+    const lastMonthKey = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
+    const lastMonthData = byMonth[lastMonthKey] || null;
+    const momDiff = thisMonthData && lastMonthData && lastMonthData.views > 0
+      ? Math.round(((thisMonthData.views - lastMonthData.views) / lastMonthData.views) * 100) : null;
 
-    contEl.innerHTML=`
+    contEl.innerHTML = `
       ${shortsCount > 0 ? `<div style="margin: 0 0 16px 0; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--bd); border-radius: 6px; font-size: 11.5px; color: var(--t3); display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 14px">ℹ️</span>
         <span><b>${shortsCount} Shorts</b> are excluded from these analytics to ensure performance data reflects long-form content.</span>
@@ -1581,12 +1579,12 @@ async function renderAmMonthly(){
       <!-- This Month Card -->
       <div class="am-month-summary">
         <div class="am-ms-item">
-          <div class="am-ms-val" style="color:var(--gold)">${thisMonthData?fmtN(thisMonthData.views):'—'}</div>
+          <div class="am-ms-val" style="color:var(--gold)">${thisMonthData ? fmtN(thisMonthData.views) : '—'}</div>
           <div class="am-ms-lbl">Views This Month</div>
-          ${momDiff!==null?`<div class="am-ms-delta" style="color:${momDiff>=0?'var(--gr)':'var(--rd)'};font-size:11px;margin-top:3px">${momDiff>=0?'+':''}${momDiff}% vs last month</div>`:''}
+          ${momDiff !== null ? `<div class="am-ms-delta" style="color:${momDiff >= 0 ? 'var(--gr)' : 'var(--rd)'};font-size:11px;margin-top:3px">${momDiff >= 0 ? '+' : ''}${momDiff}% vs last month</div>` : ''}
         </div>
         <div class="am-ms-item">
-          <div class="am-ms-val" style="color:var(--pr)">${thisMonthData?thisMonthData.count:0}</div>
+          <div class="am-ms-val" style="color:var(--pr)">${thisMonthData ? thisMonthData.count : 0}</div>
           <div class="am-ms-lbl">Videos This Month</div>
         </div>
         <div class="am-ms-item">
@@ -1630,7 +1628,7 @@ async function renderAmMonthly(){
             <!-- Average reference line -->
             <line x1="0" y1="${avgY.toFixed(1)}" x2="${chartW}" y2="${avgY.toFixed(1)}"
               stroke="rgba(255,255,255,.2)" stroke-width="1" stroke-dasharray="4,4"/>
-            <text x="4" y="${(avgY-4).toFixed(1)}" font-size="9" fill="rgba(255,255,255,.4)" font-family="DM Sans">avg</text>
+            <text x="4" y="${(avgY - 4).toFixed(1)}" font-size="9" fill="rgba(255,255,255,.4)" font-family="DM Sans">avg</text>
             ${bars}
           </svg>
         </div>
@@ -1650,17 +1648,17 @@ async function renderAmMonthly(){
       </div>
       <div id="amMonthVidsWrap" style="display:none; margin-top:24px;"></div>`;
 
-    loadEl.style.display='none';
-    contEl.style.display='block';
+    loadEl.style.display = 'none';
+    contEl.style.display = 'block';
 
     // Tooltip hover logic
-    document.querySelectorAll('.am-bar-g').forEach(g=>{
-      g.addEventListener('mouseenter',()=>{
-        const tip=document.getElementById('amBarTip');
-        if(!tip)return;
-        try{
-          const d=JSON.parse(g.dataset.tip);
-          tip.innerHTML=`
+    document.querySelectorAll('.am-bar-g').forEach(g => {
+      g.addEventListener('mouseenter', () => {
+        const tip = document.getElementById('amBarTip');
+        if (!tip) return;
+        try {
+          const d = JSON.parse(g.dataset.tip);
+          tip.innerHTML = `
             <span style="font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;color:var(--t1)">${d.month}</span>
             <span style="display:flex;flex-direction:column;align-items:center">
               <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--pr)">${d.views}</span>
@@ -1668,23 +1666,23 @@ async function renderAmMonthly(){
             </span>
             <span style="display:flex;flex-direction:column;align-items:center">
               <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--gold)">${d.count}</span>
-              <span style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-top:1px">Video${d.count!==1?'s':''}</span>
+              <span style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-top:1px">Video${d.count !== 1 ? 's' : ''}</span>
             </span>
             <span style="display:flex;flex-direction:column;align-items:center">
               <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--gr)">${d.likes}</span>
               <span style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);margin-top:1px">Likes</span>
             </span>`;
-        }catch{tip.textContent=g.dataset.tip;}
-        tip.style.opacity='1';
+        } catch { tip.textContent = g.dataset.tip; }
+        tip.style.opacity = '1';
       });
-      g.addEventListener('mouseleave',()=>{
-        const tip=document.getElementById('amBarTip');
-        if(tip){tip.style.opacity='0';}
+      g.addEventListener('mouseleave', () => {
+        const tip = document.getElementById('amBarTip');
+        if (tip) { tip.style.opacity = '0'; }
       });
     });
-  }catch(ex){
-    contEl.innerHTML=`<div class="am-err">Failed to load monthly data: ${esc(String(ex))}</div>`;
-    loadEl.style.display='none';contEl.style.display='block';
+  } catch (ex) {
+    contEl.innerHTML = `<div class="am-err">Failed to load monthly data: ${esc(String(ex))}</div>`;
+    loadEl.style.display = 'none'; contEl.style.display = 'block';
   }
 }
 
@@ -1698,17 +1696,17 @@ function showMonthVideos(month) {
     wrap.style.display = 'none';
     return;
   }
-  
-  monthVids.sort((a,b) => (b.view_count || b.views_raw || 0) - (a.view_count || a.views_raw || 0));
-  const avgViews = longFormVids.length 
-    ? longFormVids.reduce((s, v) => s + (v.view_count ?? v.views_raw ?? 0), 0) / longFormVids.length 
+
+  monthVids.sort((a, b) => (b.view_count || b.views_raw || 0) - (a.view_count || a.views_raw || 0));
+  const avgViews = longFormVids.length
+    ? longFormVids.reduce((s, v) => s + (v.view_count ?? v.views_raw ?? 0), 0) / longFormVids.length
     : 0;
 
   const mParts = month.split('-');
-  const monthLabel = new Date(mParts[0], parseInt(mParts[1])-1, 1).toLocaleDateString('en-US', {month: 'long', year: 'numeric'});
+  const monthLabel = new Date(mParts[0], parseInt(mParts[1]) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const vidsHtml = monthVids.map((v, i) => buildAmVidRowRich(v, i, avgViews)).join('');
-  
+
   wrap.innerHTML = `
     <div class="am-sect-lbl" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
       <span>Top Videos in ${monthLabel} <em style="font-style:normal;font-weight:400;color:var(--t3);margin-left:8px">${monthVids.length} videos</em></span>
@@ -1723,96 +1721,96 @@ function showMonthVideos(month) {
 }
 
 /* ── Tab 3: Top Videos ──────────────────────────────── */
-async function renderAmGrowth(){
-  if(!_amChannelId)return;
-  const loadEl=document.getElementById('amGrowthLoading');
-  const contEl=document.getElementById('amGrowthContent');
-  loadEl.style.display='flex';
-  contEl.style.display='none';
+async function renderAmGrowth() {
+  if (!_amChannelId) return;
+  const loadEl = document.getElementById('amGrowthLoading');
+  const contEl = document.getElementById('amGrowthContent');
+  loadEl.style.display = 'flex';
+  contEl.style.display = 'none';
 
-  try{
-    if(!_amFullVideos){
-      const r=await fetch(`/api/channels/${_amChannelId}/videos/full`);
-      _amFullVideos=await r.json();
+  try {
+    if (!_amFullVideos) {
+      const r = await fetch(`/api/channels/${_amChannelId}/videos/full`);
+      _amFullVideos = await r.json();
     }
-    const allVids=_amFullVideos;
-    if(!allVids||!allVids.length){
-      contEl.innerHTML='<p style="color:var(--t3);padding:24px">No video data available.</p>';
-      loadEl.style.display='none';contEl.style.display='block';return;
+    const allVids = _amFullVideos;
+    if (!allVids || !allVids.length) {
+      contEl.innerHTML = '<p style="color:var(--t3);padding:24px">No video data available.</p>';
+      loadEl.style.display = 'none'; contEl.style.display = 'block'; return;
     }
 
-    const vids=allVids.filter(v=>!isYouTubeShort(v));
-    if(!vids.length){
-      contEl.innerHTML='<p style="color:var(--t3);padding:24px">No long-form video data available.</p>';
-      loadEl.style.display='none';contEl.style.display='block';return;
+    const vids = allVids.filter(v => !isYouTubeShort(v));
+    if (!vids.length) {
+      contEl.innerHTML = '<p style="color:var(--t3);padding:24px">No long-form video data available.</p>';
+      loadEl.style.display = 'none'; contEl.style.display = 'block'; return;
     }
 
     // ── Sort by total views descending ──────────────────
-    const byViews=[...vids]
-      .map(v=>({...v, vc: v.view_count||v.views_raw||0}))
-      .sort((a,b)=>b.vc-a.vc);
+    const byViews = [...vids]
+      .map(v => ({ ...v, vc: v.view_count || v.views_raw || 0 }))
+      .sort((a, b) => b.vc - a.vc);
 
-    const channelTotalViews=byViews.reduce((s,v)=>s+v.vc,0);
+    const channelTotalViews = byViews.reduce((s, v) => s + v.vc, 0);
 
     // ── 80/20: walk down until 80% of total views hit ──
-    let cumViews=0, powerCount=0;
-    for(const v of byViews){
-      cumViews+=v.vc;
+    let cumViews = 0, powerCount = 0;
+    for (const v of byViews) {
+      cumViews += v.vc;
       powerCount++;
-      if(cumViews>=channelTotalViews*0.8) break;
+      if (cumViews >= channelTotalViews * 0.8) break;
     }
-    const powerVids=byViews.slice(0,powerCount);
-    const powerPct=Math.round((powerCount/byViews.length)*100);
-    const actualViewPct=Math.round((cumViews/channelTotalViews)*100);
+    const powerVids = byViews.slice(0, powerCount);
+    const powerPct = Math.round((powerCount / byViews.length) * 100);
+    const actualViewPct = Math.round((cumViews / channelTotalViews) * 100);
 
     // ── Topic extraction from power video titles ────────
-    const stopWords=new Set(['the','and','for','with','how','that','this','from','your','more',
-      'have','will','are','can','all','not','into','what','when','make','were','been','its',
-      'was','but','our','you','they','their','has','had','also','about','some','after','using',
-      'use','tutorial','video','part','best','full','guide','new','top','most','these','then',
-      'than','very','just','out','get','let','now','see','too','over','back','even','each',
-      'does','off','here','two','take','much','well','made','vs','with','without','my','a',
-      'an','in','on','to','of','is','it','by','at','be','do','so','we','he','she','they',
-      'ep','eps','episode','series','part','ft','feat','official']);
-    const freq={};
-    powerVids.forEach(v=>{
-      (v.title||'').toLowerCase()
-        .replace(/[^a-z0-9\s]/g,' ')
+    const stopWords = new Set(['the', 'and', 'for', 'with', 'how', 'that', 'this', 'from', 'your', 'more',
+      'have', 'will', 'are', 'can', 'all', 'not', 'into', 'what', 'when', 'make', 'were', 'been', 'its',
+      'was', 'but', 'our', 'you', 'they', 'their', 'has', 'had', 'also', 'about', 'some', 'after', 'using',
+      'use', 'tutorial', 'video', 'part', 'best', 'full', 'guide', 'new', 'top', 'most', 'these', 'then',
+      'than', 'very', 'just', 'out', 'get', 'let', 'now', 'see', 'too', 'over', 'back', 'even', 'each',
+      'does', 'off', 'here', 'two', 'take', 'much', 'well', 'made', 'vs', 'with', 'without', 'my', 'a',
+      'an', 'in', 'on', 'to', 'of', 'is', 'it', 'by', 'at', 'be', 'do', 'so', 'we', 'he', 'she', 'they',
+      'ep', 'eps', 'episode', 'series', 'part', 'ft', 'feat', 'official']);
+    const freq = {};
+    powerVids.forEach(v => {
+      (v.title || '').toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
         .split(/\s+/)
-        .filter(w=>w.length>2&&!stopWords.has(w)&&isNaN(w))
-        .forEach(w=>{freq[w]=(freq[w]||0)+1;});
+        .filter(w => w.length > 2 && !stopWords.has(w) && isNaN(w))
+        .forEach(w => { freq[w] = (freq[w] || 0) + 1; });
     });
-    const topTopics=Object.entries(freq)
-      .sort((a,b)=>b[1]-a[1])
-      .slice(0,10);
+    const topTopics = Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
 
     // ── Views/day for growth speed table ───────────────
-    const withVpd=byViews
-      .filter(v=>(v.published_at||v.date)&&v.vc>0)
-      .map(v=>{
-        const vpd=viewsPerDay(v.vc, v.published_at||v.date);
-        const daysLive=Math.max(1,Math.floor((Date.now()-new Date(v.published_at||v.date).getTime())/864e5));
-        const dateStr=(v.published_at||v.date||'').slice(0,10);
-        return {...v,vpd,daysLive,dateStr};
+    const withVpd = byViews
+      .filter(v => (v.published_at || v.date) && v.vc > 0)
+      .map(v => {
+        const vpd = viewsPerDay(v.vc, v.published_at || v.date);
+        const daysLive = Math.max(1, Math.floor((Date.now() - new Date(v.published_at || v.date).getTime()) / 864e5));
+        const dateStr = (v.published_at || v.date || '').slice(0, 10);
+        return { ...v, vpd, daysLive, dateStr };
       })
-      .sort((a,b)=>(b.vpd||0)-(a.vpd||0));
+      .sort((a, b) => (b.vpd || 0) - (a.vpd || 0));
 
-    const maxVpd=Math.max(...withVpd.map(v=>v.vpd||0),1);
-    const avgVpd=withVpd.reduce((s,v)=>s+(v.vpd||0),0)/Math.max(withVpd.length,1);
-    const hotCount=withVpd.filter(v=>(v.vpd||0)>=1000).length;
-    const goodCount=withVpd.filter(v=>(v.vpd||0)>=200&&(v.vpd||0)<1000).length;
+    const maxVpd = Math.max(...withVpd.map(v => v.vpd || 0), 1);
+    const avgVpd = withVpd.reduce((s, v) => s + (v.vpd || 0), 0) / Math.max(withVpd.length, 1);
+    const hotCount = withVpd.filter(v => (v.vpd || 0) >= 1000).length;
+    const goodCount = withVpd.filter(v => (v.vpd || 0) >= 200 && (v.vpd || 0) < 1000).length;
 
     // ── Power videos rows (top 5 shown with thumbs) ────
-    const powerRows=powerVids.slice(0,8).map((v,i)=>{
-      const barPct=Math.round((v.vc/byViews[0].vc)*100);
-      const dateStr=(v.published_at||v.date||'').slice(0,10);
+    const powerRows = powerVids.slice(0, 8).map((v, i) => {
+      const barPct = Math.round((v.vc / byViews[0].vc) * 100);
+      const dateStr = (v.published_at || v.date || '').slice(0, 10);
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd1)">
-        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t4);width:18px;text-align:right;flex-shrink:0">${i+1}</span>
-        ${v.thumb?`<img src="${esc(v.thumb)}" style="width:56px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0;background:var(--sf-highest)" onerror="this.style.background='var(--sf-highest)'" alt="">`:'<div style="width:56px;height:32px;border-radius:4px;background:var(--sf-highest);flex-shrink:0"></div>'}
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t4);width:18px;text-align:right;flex-shrink:0">${i + 1}</span>
+        ${v.thumb ? `<img src="${esc(v.thumb)}" style="width:56px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0;background:var(--sf-highest)" onerror="this.style.background='var(--sf-highest)'" alt="">` : '<div style="width:56px;height:32px;border-radius:4px;background:var(--sf-highest);flex-shrink:0"></div>'}
         <div style="flex:1;min-width:0">
-          <a href="${esc(v.url||'')}" target="_blank" rel="noopener"
+          <a href="${esc(v.url || '')}" target="_blank" rel="noopener"
             style="font-size:12.5px;font-weight:600;color:var(--t1);text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35"
-            title="${esc(v.title||'')}">${esc(v.title||'Untitled')}</a>
+            title="${esc(v.title || '')}">${esc(v.title || 'Untitled')}</a>
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
             <div style="flex:1;height:3px;background:var(--sf-highest);border-radius:2px;overflow:hidden">
               <div style="height:100%;width:${barPct}%;background:var(--gr);border-radius:2px"></div>
@@ -1827,27 +1825,27 @@ async function renderAmGrowth(){
     }).join('');
 
     // ── Growth speed rows ───────────────────────────────
-    const speedRows=withVpd.slice(0,50).map((v,i)=>{
-      const vpd=v.vpd||0;
-      const isHot=vpd>=1000, isGood=vpd>=200&&vpd<1000, isWeak=vpd<50;
-      const color=isHot?'var(--gr)':isGood?'var(--gold)':isWeak?'var(--rd)':'var(--t3)';
-      const badgeStyle=isHot
-        ?'background:rgba(86,255,167,.1);color:var(--gr);border:1px solid rgba(86,255,167,.25)'
-        :isGood
-        ?'background:rgba(255,213,79,.1);color:var(--gold);border:1px solid rgba(255,213,79,.25)'
-        :isWeak
-        ?'background:rgba(255,100,100,.08);color:var(--rd);border:1px solid rgba(255,100,100,.2)'
-        :'background:rgba(255,255,255,.05);color:var(--t3);border:1px solid var(--bd)';
-      const badgeTxt=isHot?'HOT':isGood?'GOOD':isWeak?'SLOW':'AVG';
-      const barPct=Math.round((vpd/maxVpd)*100);
+    const speedRows = withVpd.slice(0, 50).map((v, i) => {
+      const vpd = v.vpd || 0;
+      const isHot = vpd >= 1000, isGood = vpd >= 200 && vpd < 1000, isWeak = vpd < 50;
+      const color = isHot ? 'var(--gr)' : isGood ? 'var(--gold)' : isWeak ? 'var(--rd)' : 'var(--t3)';
+      const badgeStyle = isHot
+        ? 'background:rgba(86,255,167,.1);color:var(--gr);border:1px solid rgba(86,255,167,.25)'
+        : isGood
+          ? 'background:rgba(255,213,79,.1);color:var(--gold);border:1px solid rgba(255,213,79,.25)'
+          : isWeak
+            ? 'background:rgba(255,100,100,.08);color:var(--rd);border:1px solid rgba(255,100,100,.2)'
+            : 'background:rgba(255,255,255,.05);color:var(--t3);border:1px solid var(--bd)';
+      const badgeTxt = isHot ? 'HOT' : isGood ? 'GOOD' : isWeak ? 'SLOW' : 'AVG';
+      const barPct = Math.round((vpd / maxVpd) * 100);
       return `<tr style="border-bottom:1px solid rgba(255,255,255,.03);transition:background .12s"
         onmouseover="this.style.background='rgba(255,255,255,.025)'"
         onmouseout="this.style.background=''">
-        <td style="padding:9px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t4);width:28px;text-align:center">${i+1}</td>
+        <td style="padding:9px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t4);width:28px;text-align:center">${i + 1}</td>
         <td style="padding:9px 10px;max-width:0;width:99%">
-          <a href="${esc(v.url||'')}" target="_blank" rel="noopener"
+          <a href="${esc(v.url || '')}" target="_blank" rel="noopener"
             style="font-size:13.5px;font-weight:600;color:var(--t1);text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
-            title="${esc(v.title||'')}">${esc(v.title||'Untitled')}</a>
+            title="${esc(v.title || '')}">${esc(v.title || 'Untitled')}</a>
           <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
             <div style="flex:1;height:3px;background:var(--sf-highest);border-radius:2px;overflow:hidden">
               <div style="height:100%;width:${barPct}%;background:${color};border-radius:2px"></div>
@@ -1864,7 +1862,7 @@ async function renderAmGrowth(){
       </tr>`;
     }).join('');
 
-    contEl.innerHTML=`
+    contEl.innerHTML = `
 
       <!-- ── SECTION 1: Power Videos 80/20 ── -->
       <div class="am-sep-sect" style="margin-bottom:24px">
@@ -1898,11 +1896,11 @@ async function renderAmGrowth(){
 
         <!-- top 8 power videos with thumbnails -->
         <div>${powerRows}</div>
-        ${powerCount>8?`<div style="font-size:11px;color:var(--t4);margin-top:10px;text-align:center">+ ${powerCount-8} more power videos — visible in the growth table below (marked in green)</div>`:''}
+        ${powerCount > 8 ? `<div style="font-size:11px;color:var(--t4);margin-top:10px;text-align:center">+ ${powerCount - 8} more power videos — visible in the growth table below (marked in green)</div>` : ''}
       </div>
 
       <!-- ── SECTION 2: Topic Patterns ── -->
-      ${topTopics.length?`
+      ${topTopics.length ? `
       <div class="am-sep-sect" style="margin-bottom:24px">
         <div class="am-sect-lbl" style="display:flex;align-items:center;gap:7px">
           <span style="font-family:'Material Symbols Outlined';font-size:15px;vertical-align:middle">tag</span>
@@ -1910,20 +1908,20 @@ async function renderAmGrowth(){
           <span style="font-size:10px;font-weight:400;color:var(--t4);margin-left:2px">keywords from power videos</span>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
-          ${topTopics.map(([word,count],i)=>{
-            const maxC=topTopics[0][1];
-            const op=0.5+((count/maxC)*0.5);
-            const size=i<3?'13px':'12px';
-            const bg=i<3?'rgba(86,255,167,.12)':'rgba(255,255,255,.05)';
-            const border=i<3?'1px solid rgba(86,255,167,.3)':'1px solid var(--bd1)';
-            const col=i<3?'var(--gr)':'var(--t2)';
-            return `<span style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;background:${bg};border:${border};font-size:${size};font-weight:600;color:${col};opacity:${op}">
+          ${topTopics.map(([word, count], i) => {
+      const maxC = topTopics[0][1];
+      const op = 0.5 + ((count / maxC) * 0.5);
+      const size = i < 3 ? '13px' : '12px';
+      const bg = i < 3 ? 'rgba(86,255,167,.12)' : 'rgba(255,255,255,.05)';
+      const border = i < 3 ? '1px solid rgba(86,255,167,.3)' : '1px solid var(--bd1)';
+      const col = i < 3 ? 'var(--gr)' : 'var(--t2)';
+      return `<span style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;background:${bg};border:${border};font-size:${size};font-weight:600;color:${col};opacity:${op}">
               ${esc(word)}
               <em style="font-style:normal;font-size:10px;color:var(--t4);font-family:'JetBrains Mono',monospace">×${count}</em>
             </span>`;
-          }).join('')}
+    }).join('')}
         </div>
-      </div>`:''}
+      </div>`: ''}
 
       <!-- ── SECTION 3: Growth Speed Table ── -->
       <div class="am-sep-sect">
@@ -1936,7 +1934,7 @@ async function renderAmGrowth(){
           <div class="am-ms-item"><div class="am-ms-val" style="color:var(--gr)">${hotCount}</div><div class="am-ms-lbl">🔥 Hot (&gt;1K/day)</div></div>
           <div class="am-ms-item"><div class="am-ms-val" style="color:var(--gold)">${goodCount}</div><div class="am-ms-lbl">✅ Good (&gt;200/day)</div></div>
           <div class="am-ms-item"><div class="am-ms-val">${fmtN(avgVpd)}</div><div class="am-ms-lbl">Avg Views/Day</div></div>
-          <div class="am-ms-item"><div class="am-ms-val">${fmtN(withVpd[0]?.vpd||0)}</div><div class="am-ms-lbl">Fastest Video</div></div>
+          <div class="am-ms-item"><div class="am-ms-val">${fmtN(withVpd[0]?.vpd || 0)}</div><div class="am-ms-lbl">Fastest Video</div></div>
         </div>
         <div style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse">
@@ -1954,52 +1952,52 @@ async function renderAmGrowth(){
         </div>
       </div>`;
 
-    loadEl.style.display='none';contEl.style.display='block';
-  }catch(ex){
-    contEl.innerHTML=`<div class="am-err">Failed: ${esc(String(ex))}</div>`;
-    loadEl.style.display='none';contEl.style.display='block';
+    loadEl.style.display = 'none'; contEl.style.display = 'block';
+  } catch (ex) {
+    contEl.innerHTML = `<div class="am-err">Failed: ${esc(String(ex))}</div>`;
+    loadEl.style.display = 'none'; contEl.style.display = 'block';
   }
 }
 
 /* ── Tab 4: vs Competitors ──────────────────────────── */
-function renderAmCompare(){
-  const contEl=document.getElementById('amCompareContent');
-  if(!all.length){contEl.innerHTML='<p style="color:var(--t3);padding:24px">No channels to compare.</p>';return;}
+function renderAmCompare() {
+  const contEl = document.getElementById('amCompareContent');
+  if (!all.length) { contEl.innerHTML = '<p style="color:var(--t3);padding:24px">No channels to compare.</p>'; return; }
 
   const focalId = _amChannelId;
   const me = all.find(c => c.id === focalId) || all.find(c => c.is_primary) || all[0];
-  const sorted=[...all].sort((a,b)=>(b.subscribers_raw||0)-(a.subscribers_raw||0));
+  const sorted = [...all].sort((a, b) => (b.subscribers_raw || 0) - (a.subscribers_raw || 0));
 
-  const metrics=[
-    {key:'subscribers',     raw:'subscribers_raw',   label:'Subscribers',     fmt:v=>fmtN(v),  higher:true},
-    {key:'total_views',     raw:'total_views_raw',   label:'Total Views',     fmt:v=>fmtN(v),  higher:true},
-    {key:'avg_views',       raw:'avg_views_raw',     label:'Avg Views/Video', fmt:v=>fmtN(v),  higher:true},
-    {key:'total_videos',    raw:'total_videos_raw',  label:'Videos',          fmt:v=>fmtN(v),  higher:true},
+  const metrics = [
+    { key: 'subscribers', raw: 'subscribers_raw', label: 'Subscribers', fmt: v => fmtN(v), higher: true },
+    { key: 'total_views', raw: 'total_views_raw', label: 'Total Views', fmt: v => fmtN(v), higher: true },
+    { key: 'avg_views', raw: 'avg_views_raw', label: 'Avg Views/Video', fmt: v => fmtN(v), higher: true },
+    { key: 'total_videos', raw: 'total_videos_raw', label: 'Videos', fmt: v => fmtN(v), higher: true },
   ];
 
   // Header row with channel names
-  const headCells=sorted.map(ch=>`
+  const headCells = sorted.map(ch => `
     <th style="padding:10px 12px;text-align:center;min-width:100px">
       <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
-        ${ch.logo_url?`<img src="${esc(proxyImg(ch.logo_url))}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid ${ch.id===me.id?'var(--gold)':'var(--bd2)'}" onerror="this.style.background='var(--sf-highest)'" alt="">`
-          :`<div style="width:32px;height:32px;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">${(ch.name||'?')[0]}</div>`}
-        <div style="font-size:11px;font-weight:600;color:${ch.id===me.id?'var(--gold)':'var(--t2)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px" title="${esc(ch.name)}">${esc(ch.name.length>12?ch.name.slice(0,12)+'…':ch.name)}</div>
-        ${ch.id===me.id?'<span class="badge bdg-gd" style="font-size:9px">⭐ Focused</span>':''}
+        ${ch.logo_url ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid ${ch.id === me.id ? 'var(--gold)' : 'var(--bd2)'}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">${(ch.name || '?')[0]}</div>`}
+        <div style="font-size:11px;font-weight:600;color:${ch.id === me.id ? 'var(--gold)' : 'var(--t2)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px" title="${esc(ch.name)}">${esc(ch.name.length > 12 ? ch.name.slice(0, 12) + '…' : ch.name)}</div>
+        ${ch.id === me.id ? '<span class="badge bdg-gd" style="font-size:9px">⭐ Focused</span>' : ''}
       </div>
     </th>`).join('');
 
-  const metricRows=metrics.map(m=>{
-    const vals=sorted.map(ch=>ch[m.raw]||0);
-    const best=Math.max(...vals);
-    const cells=sorted.map((ch,i)=>{
-      const v=ch[m.raw]||0;
-      const isBest=v===best&&best>0;
-      const isMe=ch.id===me.id;
-      const rank=vals.filter(x=>x>v).length+1;
-      return `<td style="padding:10px 12px;text-align:center;background:${isMe?'rgba(255,213,79,.03)':'transparent'}">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${isBest?'var(--gr)':isMe?'var(--gold)':'var(--t1)'}">${m.fmt(v)}</div>
+  const metricRows = metrics.map(m => {
+    const vals = sorted.map(ch => ch[m.raw] || 0);
+    const best = Math.max(...vals);
+    const cells = sorted.map((ch, i) => {
+      const v = ch[m.raw] || 0;
+      const isBest = v === best && best > 0;
+      const isMe = ch.id === me.id;
+      const rank = vals.filter(x => x > v).length + 1;
+      return `<td style="padding:10px 12px;text-align:center;background:${isMe ? 'rgba(255,213,79,.03)' : 'transparent'}">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${isBest ? 'var(--gr)' : isMe ? 'var(--gold)' : 'var(--t1)'}">${m.fmt(v)}</div>
         <div style="font-size:9px;color:var(--t3);margin-top:2px">#${rank}</div>
-        ${isBest?'<span style="font-size:9px;color:var(--gr)">▲ Best</span>':''}
+        ${isBest ? '<span style="font-size:9px;color:var(--gr)">▲ Best</span>' : ''}
       </td>`;
     }).join('');
     return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
@@ -2008,7 +2006,7 @@ function renderAmCompare(){
     </tr>`;
   }).join('');
 
-  contEl.innerHTML=`
+  contEl.innerHTML = `
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse">
         <thead><tr style="border-bottom:1px solid var(--bd)">
@@ -2021,22 +2019,22 @@ function renderAmCompare(){
 }
 
 /* ── Tab 5: Growth Timeline ─────────────────────────── */
-async function renderAmTimeline(){
-  if(!_amChannelId)return;
-  const loadEl=document.getElementById('amTimelineLoading');
-  const contEl=document.getElementById('amTimelineContent');
-  loadEl.style.display='flex';
-  contEl.style.display='none';
+async function renderAmTimeline() {
+  if (!_amChannelId) return;
+  const loadEl = document.getElementById('amTimelineLoading');
+  const contEl = document.getElementById('amTimelineContent');
+  loadEl.style.display = 'flex';
+  contEl.style.display = 'none';
 
-  try{
-    if(!_amSnapshots){
-      const r=await fetch(`/api/snapshots/${_amChannelId}`);
-      _amSnapshots=await r.json();
+  try {
+    if (!_amSnapshots) {
+      const r = await fetch(`/api/snapshots/${_amChannelId}`);
+      _amSnapshots = await r.json();
     }
-    const snaps=_amSnapshots;
+    const snaps = _amSnapshots;
 
-    if(!snaps||snaps.length<2){
-      contEl.innerHTML=`
+    if (!snaps || snaps.length < 2) {
+      contEl.innerHTML = `
         <div style="text-align:center;padding:48px 24px">
           <div style="font-size:32px;margin-bottom:12px">📈</div>
           <div style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;margin-bottom:8px">Building your timeline…</div>
@@ -2044,40 +2042,40 @@ async function renderAmTimeline(){
             The growth timeline needs at least 2 data points.<br>
             Hit <strong>Refresh</strong> on your channel today, then again tomorrow — your trajectory will appear here.
           </div>
-          ${snaps.length===1?`<div style="margin-top:16px;font-size:12px;color:var(--pr)">✅ First snapshot recorded on ${snaps[0].date}</div>`:''}
+          ${snaps.length === 1 ? `<div style="margin-top:16px;font-size:12px;color:var(--pr)">✅ First snapshot recorded on ${snaps[0].date}</div>` : ''}
         </div>`;
-      loadEl.style.display='none';contEl.style.display='block';return;
+      loadEl.style.display = 'none'; contEl.style.display = 'block'; return;
     }
 
-    const sorted=[...snaps].sort((a,b)=>a.date.localeCompare(b.date));
-    const maxSubs=Math.max(...sorted.map(s=>s.subscribers||0),1);
-    const minSubs=Math.min(...sorted.map(s=>s.subscribers||0),0);
-    const rangeS=Math.max(maxSubs-minSubs,1);
+    const sorted = [...snaps].sort((a, b) => a.date.localeCompare(b.date));
+    const maxSubs = Math.max(...sorted.map(s => s.subscribers || 0), 1);
+    const minSubs = Math.min(...sorted.map(s => s.subscribers || 0), 0);
+    const rangeS = Math.max(maxSubs - minSubs, 1);
 
-    const W=600,H=140,pad=32;
-    const ptSubs=sorted.map((s,i)=>{
-      const x=pad+(i/(sorted.length-1))*(W-pad*2);
-      const y=H-pad-((s.subscribers-minSubs)/rangeS)*(H-pad*2);
+    const W = 600, H = 140, pad = 32;
+    const ptSubs = sorted.map((s, i) => {
+      const x = pad + (i / (sorted.length - 1)) * (W - pad * 2);
+      const y = H - pad - ((s.subscribers - minSubs) / rangeS) * (H - pad * 2);
       return `${x},${y}`;
     }).join(' ');
 
-    const maxViews=Math.max(...sorted.map(s=>s.views||0),1);
-    const minViews=Math.min(...sorted.map(s=>s.views||0),0);
-    const rangeV=Math.max(maxViews-minViews,1);
-    const ptViews=sorted.map((s,i)=>{
-      const x=pad+(i/(sorted.length-1))*(W-pad*2);
-      const y=H-pad-((s.views-minViews)/rangeV)*(H-pad*2);
+    const maxViews = Math.max(...sorted.map(s => s.views || 0), 1);
+    const minViews = Math.min(...sorted.map(s => s.views || 0), 0);
+    const rangeV = Math.max(maxViews - minViews, 1);
+    const ptViews = sorted.map((s, i) => {
+      const x = pad + (i / (sorted.length - 1)) * (W - pad * 2);
+      const y = H - pad - ((s.views - minViews) / rangeV) * (H - pad * 2);
       return `${x},${y}`;
     }).join(' ');
 
-    const subsGain=(sorted[sorted.length-1].subscribers||0)-(sorted[0].subscribers||0);
-    const viewsGain=(sorted[sorted.length-1].views||0)-(sorted[0].views||0);
-    const trackingDays=Math.max(1,Math.floor((new Date(sorted[sorted.length-1].date)-new Date(sorted[0].date))/864e5)+1);
+    const subsGain = (sorted[sorted.length - 1].subscribers || 0) - (sorted[0].subscribers || 0);
+    const viewsGain = (sorted[sorted.length - 1].views || 0) - (sorted[0].views || 0);
+    const trackingDays = Math.max(1, Math.floor((new Date(sorted[sorted.length - 1].date) - new Date(sorted[0].date)) / 864e5) + 1);
 
-    contEl.innerHTML=`
+    contEl.innerHTML = `
       <div class="am-month-summary">
-        <div class="am-ms-item"><div class="am-ms-val" style="color:${subsGain>=0?'var(--gr)':'var(--rd)'}">${subsGain>=0?'+':''}${fmtN(subsGain)}</div><div class="am-ms-lbl">Subscriber Change</div></div>
-        <div class="am-ms-item"><div class="am-ms-val" style="color:${viewsGain>=0?'var(--gr)':'var(--rd)'}">${viewsGain>=0?'+':''}${fmtN(viewsGain)}</div><div class="am-ms-lbl">View Change</div></div>
+        <div class="am-ms-item"><div class="am-ms-val" style="color:${subsGain >= 0 ? 'var(--gr)' : 'var(--rd)'}">${subsGain >= 0 ? '+' : ''}${fmtN(subsGain)}</div><div class="am-ms-lbl">Subscriber Change</div></div>
+        <div class="am-ms-item"><div class="am-ms-val" style="color:${viewsGain >= 0 ? 'var(--gr)' : 'var(--rd)'}">${viewsGain >= 0 ? '+' : ''}${fmtN(viewsGain)}</div><div class="am-ms-lbl">View Change</div></div>
         <div class="am-ms-item"><div class="am-ms-val">${trackingDays}</div><div class="am-ms-lbl">Days Tracked</div></div>
         <div class="am-ms-item"><div class="am-ms-val">${sorted.length}</div><div class="am-ms-lbl">Snapshots</div></div>
       </div>
@@ -2090,15 +2088,15 @@ async function renderAmTimeline(){
               <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
             </linearGradient>
           </defs>
-          <polygon points="${ptSubs} ${pad+(sorted.length-1)/(sorted.length-1)*(W-pad*2)},${H-pad} ${pad},${H-pad}" fill="url(#subsFill)"/>
+          <polygon points="${ptSubs} ${pad + (sorted.length - 1) / (sorted.length - 1) * (W - pad * 2)},${H - pad} ${pad},${H - pad}" fill="url(#subsFill)"/>
           <polyline points="${ptSubs}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          ${sorted.map((s,i)=>{
-            const x=pad+(i/(sorted.length-1))*(W-pad*2);
-            const y=H-pad-((s.subscribers-minSubs)/rangeS)*(H-pad*2);
-            return `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--gold)" stroke="var(--sf-low)" stroke-width="2"/>`;
-          }).join('')}
-          <text x="${pad}" y="${H-4}" font-size="10" fill="rgba(255,255,255,.35)">${sorted[0].date}</text>
-          <text x="${W-pad}" y="${H-4}" font-size="10" text-anchor="end" fill="rgba(255,255,255,.35)">${sorted[sorted.length-1].date}</text>
+          ${sorted.map((s, i) => {
+      const x = pad + (i / (sorted.length - 1)) * (W - pad * 2);
+      const y = H - pad - ((s.subscribers - minSubs) / rangeS) * (H - pad * 2);
+      return `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--gold)" stroke="var(--sf-low)" stroke-width="2"/>`;
+    }).join('')}
+          <text x="${pad}" y="${H - 4}" font-size="10" fill="rgba(255,255,255,.35)">${sorted[0].date}</text>
+          <text x="${W - pad}" y="${H - 4}" font-size="10" text-anchor="end" fill="rgba(255,255,255,.35)">${sorted[sorted.length - 1].date}</text>
         </svg>
       </div>
       <div class="am-sep-sect">
@@ -2110,33 +2108,32 @@ async function renderAmTimeline(){
               <stop offset="100%" stop-color="var(--pr)" stop-opacity="0"/>
             </linearGradient>
           </defs>
-          <polygon points="${ptViews} ${pad+(sorted.length-1)/(sorted.length-1)*(W-pad*2)},${H-pad} ${pad},${H-pad}" fill="url(#viewsFill)"/>
+          <polygon points="${ptViews} ${pad + (sorted.length - 1) / (sorted.length - 1) * (W - pad * 2)},${H - pad} ${pad},${H - pad}" fill="url(#viewsFill)"/>
           <polyline points="${ptViews}" fill="none" stroke="var(--pr)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-          ${sorted.map((s,i)=>{
-            const x=pad+(i/(sorted.length-1))*(W-pad*2);
-            const y=H-pad-((s.views-minViews)/rangeV)*(H-pad*2);
-            return `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--pr)" stroke="var(--sf-low)" stroke-width="2"/>`;
-          }).join('')}
-          <text x="${pad}" y="${H-4}" font-size="10" fill="rgba(255,255,255,.35)">${sorted[0].date}</text>
-          <text x="${W-pad}" y="${H-4}" font-size="10" text-anchor="end" fill="rgba(255,255,255,.35)">${sorted[sorted.length-1].date}</text>
+          ${sorted.map((s, i) => {
+      const x = pad + (i / (sorted.length - 1)) * (W - pad * 2);
+      const y = H - pad - ((s.views - minViews) / rangeV) * (H - pad * 2);
+      return `<circle cx="${x}" cy="${y}" r="3.5" fill="var(--pr)" stroke="var(--sf-low)" stroke-width="2"/>`;
+    }).join('')}
+          <text x="${pad}" y="${H - 4}" font-size="10" fill="rgba(255,255,255,.35)">${sorted[0].date}</text>
+          <text x="${W - pad}" y="${H - 4}" font-size="10" text-anchor="end" fill="rgba(255,255,255,.35)">${sorted[sorted.length - 1].date}</text>
         </svg>
       </div>`;
-    loadEl.style.display='none';contEl.style.display='block';
-  }catch(ex){
-    contEl.innerHTML=`<div class="am-err">Failed: ${esc(String(ex))}</div>`;
-    loadEl.style.display='none';contEl.style.display='block';
+    loadEl.style.display = 'none'; contEl.style.display = 'block';
+  } catch (ex) {
+    contEl.innerHTML = `<div class="am-err">Failed: ${esc(String(ex))}</div>`;
+    loadEl.style.display = 'none'; contEl.style.display = 'block';
   }
 }
 
 /* ════════════════════════════════════════════════════════
    MY CHANNELS
 ════════════════════════════════════════════════════════ */
-function renderChannelSkeletons(n=6){
+function renderChannelSkeletons(n = 6) {
   const tbl = document.getElementById('chTbl');
-  if(!tbl) return;
-  tbl.innerHTML = `<div class="ch-grid">${
-    Array.from({length: n}, (_,i) => `
-      <div class="ch-card-skel" style="animation-delay:${i*0.04}s">
+  if (!tbl) return;
+  tbl.innerHTML = `<div class="ch-grid">${Array.from({ length: n }, (_, i) => `
+      <div class="ch-card-skel" style="animation-delay:${i * 0.04}s">
         <div class="ch-skel-av"></div>
         <div class="ch-skel-lines">
           <div class="ch-skel-name"></div>
@@ -2144,25 +2141,27 @@ function renderChannelSkeletons(n=6){
         </div>
         <div class="ch-skel-num"></div>
       </div>`).join('')
-  }</div>`;
+    }</div>`;
 }
 
 
 /* Returns true when user is on a touch/mobile device */
-function isMobile(){
+function isMobile() {
   return window.matchMedia('(max-width:800px)').matches;
 }
 
-function handleCardClick(event, channelId){
-  if(event.target.closest('.cc-acts') || event.target.closest('.cc-expand-vid') || event.target.closest('.cc-view-link')) return;
+function handleCardClick(event, channelId) {
+  if (event.target.closest('.cc-acts') || event.target.closest('.cc-expand-vid') || event.target.closest('.cc-view-link')) return;
   const card = event.currentTarget;
   enrichCard(channelId);
-  // On mobile: first tap expands card, second tap (on already-expanded) opens modal
-  if(isMobile()){
-    if(!card.classList.contains('expanded')){
+  // On mobile: first tap expands card, second tap opens modal
+  if (isMobile()) {
+    if (!card.classList.contains('expanded')) {
       // Close any other open cards first
-      document.querySelectorAll('.ch-card.expanded').forEach(c=>{ if(c!==card) c.classList.remove('expanded'); });
+      document.querySelectorAll('.ch-card.expanded').forEach(c => { if (c !== card) c.classList.remove('expanded'); });
       card.classList.add('expanded');
+      // Scroll card into view smoothly
+      setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60);
       return;
     }
     // Already expanded — open modal on second tap
@@ -2171,14 +2170,14 @@ function handleCardClick(event, channelId){
   openAnalyticsModal(channelId);
 }
 
-async function renderChannels(){
+async function renderChannels() {
   renderChannelSkeletons(all.length || 6);
   await fetchAll();
-  const el=document.getElementById('chTbl');
-  const cnt=document.getElementById('chCntLbl');
-  if(cnt)cnt.textContent=all.length?all.length:'';
-  if(!all.length){
-    el.innerHTML=`<div class="no-pr" style="margin-top:24px">
+  const el = document.getElementById('chTbl');
+  const cnt = document.getElementById('chCntLbl');
+  if (cnt) cnt.textContent = all.length ? all.length : '';
+  if (!all.length) {
+    el.innerHTML = `<div class="no-pr" style="margin-top:24px">
       <div class="no-pr-ico"><span style="font-family:'Material Symbols Outlined';font-size:48px;color:var(--t4)">subscriptions</span></div>
       <h3>No channels yet</h3>
       <p>Add channels to start tracking competitor analytics and performance metrics.</p>
@@ -2186,38 +2185,38 @@ async function renderChannels(){
     </div>`;
     return;
   }
-  const primary=all.find(c=>c.is_primary);
-  const competitors=all.filter(c=>!c.is_primary).sort((a,b)=>(b[chSort]||0)-(a[chSort]||0));
-  const sortedAll=primary?[primary,...competitors]:competitors;
+  const primary = all.find(c => c.is_primary);
+  const competitors = all.filter(c => !c.is_primary).sort((a, b) => (b[chSort] || 0) - (a[chSort] || 0));
+  const sortedAll = primary ? [primary, ...competitors] : competitors;
 
   const renderCard = (ch, index) => {
-    const isMine=ch.is_primary;
-    const v=ch.video||{};
-    const chSub=ch.subscriber_count??ch.subscribers_raw??0;
-    const chVidCnt=ch.video_count??ch.total_videos_raw??0;
-    const chTotViews=ch.total_views_raw??0;
-    const cardVcount=v.view_count??v.views_raw??0;
-    const cardLcount=v.like_count??0;
-    const cardCcount=v.comment_count??0;
-    const vidDateStr=v.published_at||v.date;
-    const cardVpd=vidDateStr?viewsPerDay(cardVcount,vidDateStr):null;
-    const cardHot=isHotVideo(cardVpd,chTotViews,chVidCnt);
-    const cardEngRate=calcEngagementRate(cardLcount,cardCcount,cardVcount);
-    const cardSubRatio=calcSubViewRatio(chSub,chTotViews);
-    const chAvgRaw=ch.avg_views_raw??0;
-    const cardVsAvg=(chAvgRaw>0&&cardVcount>0)?Math.round(((cardVcount-chAvgRaw)/chAvgRaw)*100):null;
-    const relDays=vidDateStr?Math.floor((Date.now()-new Date(vidDateStr).getTime())/(864e5)):null;
-    const relDate=relDays===null?'—':relDays===0?'Today':relDays===1?'1d ago':relDays<30?`${relDays}d ago`:relDays<365?`${Math.floor(relDays/30)}mo ago`:`${Math.floor(relDays/365)}y ago`;
+    const isMine = ch.is_primary;
+    const v = ch.video || {};
+    const chSub = ch.subscriber_count ?? ch.subscribers_raw ?? 0;
+    const chVidCnt = ch.video_count ?? ch.total_videos_raw ?? 0;
+    const chTotViews = ch.total_views_raw ?? 0;
+    const cardVcount = v.view_count ?? v.views_raw ?? 0;
+    const cardLcount = v.like_count ?? 0;
+    const cardCcount = v.comment_count ?? 0;
+    const vidDateStr = v.published_at || v.date;
+    const cardVpd = vidDateStr ? viewsPerDay(cardVcount, vidDateStr) : null;
+    const cardHot = isHotVideo(cardVpd, chTotViews, chVidCnt);
+    const cardEngRate = calcEngagementRate(cardLcount, cardCcount, cardVcount);
+    const cardSubRatio = calcSubViewRatio(chSub, chTotViews);
+    const chAvgRaw = ch.avg_views_raw ?? 0;
+    const cardVsAvg = (chAvgRaw > 0 && cardVcount > 0) ? Math.round(((cardVcount - chAvgRaw) / chAvgRaw) * 100) : null;
+    const relDays = vidDateStr ? Math.floor((Date.now() - new Date(vidDateStr).getTime()) / (864e5)) : null;
+    const relDate = relDays === null ? '—' : relDays === 0 ? 'Today' : relDays === 1 ? '1d ago' : relDays < 30 ? `${relDays}d ago` : relDays < 365 ? `${Math.floor(relDays / 30)}mo ago` : `${Math.floor(relDays / 365)}y ago`;
 
     return `
-<div class="ch-card au ${isMine?'mine':''}" id="ctr-${esc(ch.id)}"
+<div class="ch-card au ${isMine ? 'mine' : ''}" id="ctr-${esc(ch.id)}"
   onclick="handleCardClick(event,'${esc(ch.id)}')"
   onmouseenter="enrichCard('${esc(ch.id)}')"
   style="animation-delay:${index * 0.04}s">
 
   <!-- Actions overlay — unchanged -->
   <div class="cc-acts" onclick="event.stopPropagation()">
-    ${!isMine?`<button class="cc-act gold" title="Set as My Channel" onclick="setPrimary('${esc(ch.id)}')"><span class="msi" style="font-size:16px">star</span></button>`:''}
+    ${!isMine ? `<button class="cc-act gold" title="Set as My Channel" onclick="setPrimary('${esc(ch.id)}')"><span class="msi" style="font-size:16px">star</span></button>` : ''}
     <button class="cc-act" title="Refresh" onclick="ref1('${esc(ch.id)}')"><span class="msi" style="font-size:16px">refresh</span></button>
     <button class="cc-act danger" title="Remove" onclick="rmCh('${esc(ch.id)}')"><span class="msi" style="font-size:16px">delete</span></button>
   </div>
@@ -2226,17 +2225,17 @@ async function renderChannels(){
   <div class="cc-top">
     <div class="cc-av">
       ${ch.logo_url
-        ?`<img class="cc-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
-        :`<div class="cc-logo-fb">${(ch.name||'?')[0].toUpperCase()}</div>`}
-      ${isMine?'<div class="cc-crown"><span style="font-family:\'Material Symbols Outlined\'">star</span></div>':''}
+        ? `<img class="cc-logo" src="${esc(proxyImg(ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+        : `<div class="cc-logo-fb">${(ch.name || '?')[0].toUpperCase()}</div>`}
+      ${isMine ? '<div class="cc-crown"><span style="font-family:\'Material Symbols Outlined\'">star</span></div>' : ''}
     </div>
     <div class="cc-ident">
       <div class="cc-name">${esc(ch.name)}</div>
-      ${ch.handle?`<div class="cc-handle">${esc(ch.handle)}</div>`:''}
+      ${ch.handle ? `<div class="cc-handle">${esc(ch.handle)}</div>` : ''}
       <div class="cc-tags">
-        ${isMine?'<span class="badge bdg-gd">⭐ My Channel</span>':'<span class="badge bdg-dim">Competitor</span>'}
-        ${ch.country?`<span class="badge bdg-dim">${esc(ch.country)}</span>`:''}
-        ${cardHot?'<span class="badge bdg-rd">🔥 Hot</span>':''}
+        ${isMine ? '<span class="badge bdg-gd">⭐ My Channel</span>' : '<span class="badge bdg-dim">Competitor</span>'}
+        ${ch.country ? `<span class="badge bdg-dim">${esc(ch.country)}</span>` : ''}
+        ${cardHot ? '<span class="badge bdg-rd">🔥 Hot</span>' : ''}
         <span class="badge" id="cc-streak-${esc(ch.id)}" style="display:none"></span>
       </div>
     </div>
@@ -2255,7 +2254,7 @@ async function renderChannels(){
       <!-- 4-cell stats strip -->
       <div class="cc-stats-row">
         <div class="cc-sb">
-          <div class="cc-sb-val" style="${subViewRatioColor(cardSubRatio)}">${cardSubRatio!==null?cardSubRatio+'%':'—'}</div>
+          <div class="cc-sb-val" style="${subViewRatioColor(cardSubRatio)}">${cardSubRatio !== null ? cardSubRatio + '%' : '—'}</div>
           <div class="cc-sb-lbl">Audience %</div>
         </div>
         <div class="cc-sb">
@@ -2263,7 +2262,7 @@ async function renderChannels(){
           <div class="cc-sb-lbl">Avg Views</div>
         </div>
         <div class="cc-sb">
-          <div class="cc-sb-val" style="${cardVpd&&cardVpd>1000?'color:var(--pr)':''}">${cardVpd?fmtN(cardVpd):'—'}</div>
+          <div class="cc-sb-val" style="${cardVpd && cardVpd > 1000 ? 'color:var(--pr)' : ''}">${cardVpd ? fmtN(cardVpd) : '—'}</div>
           <div class="cc-sb-lbl">Views/Day</div>
         </div>
         <div class="cc-sb">
@@ -2279,7 +2278,7 @@ async function renderChannels(){
 
       <!-- Latest upload footer -->
       <div class="cc-footer" id="cc-footer-${esc(ch.id)}" style="${v.title ? '' : 'display:none'}">
-        ${v.title?`
+        ${v.title ? `
         <div class="cc-vid">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <div class="cc-vlbl">Latest Upload</div>
@@ -2295,7 +2294,15 @@ async function renderChannels(){
               </div>
             </div>
           </div>
-        </div>`:''}
+        </div>`: ''}
+      </div>
+
+    </div>
+
+      <!-- Mobile: tap again to open full analytics -->
+      <div class="cc-mobile-hint" onclick="event.stopPropagation();openAnalyticsModal('${esc(ch.id)}')">
+        <span style="font-family:'Material Symbols Outlined';font-size:14px;line-height:1">bar_chart</span>
+        Tap to open full analytics
       </div>
 
     </div>
@@ -2304,110 +2311,110 @@ async function renderChannels(){
 </div>`;
   };
 
-  el.innerHTML=`<div class="ch-grid">${sortedAll.map((ch, i) => renderCard(ch, i)).join('')}</div>`;
+  el.innerHTML = `<div class="ch-grid">${sortedAll.map((ch, i) => renderCard(ch, i)).join('')}</div>`;
   // enrichCard is now triggered on demand (onmouseenter / onclick)
 }
 
-function toggleAdd(){
-  const p=document.getElementById('addPanel');
+function toggleAdd() {
+  const p = document.getElementById('addPanel');
   p.classList.toggle('open');
-  const o=p.classList.contains('open');
-  const btn=document.getElementById('addTgl');
-  btn.innerHTML=o
-    ?`<span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">close</span> Cancel`
-    :`<span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">add</span> Add Channel`;
-  if(o)setTimeout(()=>document.getElementById('addInput').focus(),50);
+  const o = p.classList.contains('open');
+  const btn = document.getElementById('addTgl');
+  btn.innerHTML = o
+    ? `<span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">close</span> Cancel`
+    : `<span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;vertical-align:middle">add</span> Add Channel`;
+  if (o) setTimeout(() => document.getElementById('addInput').focus(), 50);
 }
 
-async function addCh(){
+async function addCh() {
   closeAddSuggestions();
-  const q=document.getElementById('addInput').value.trim();
-  if(!q){showErr('addErr','Please enter a channel name.');return;}
+  const q = document.getElementById('addInput').value.trim();
+  if (!q) { showErr('addErr', 'Please enter a channel name.'); return; }
   hideErr('addErr');
-  const btn=document.getElementById('addBtn');
-  btn.disabled=true;btn.textContent='Adding…';
-  try{
-    const r=await fetch('/api/channels/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q})});
-    const res=await r.json();
-    if(r.status===409){showErr('addErr','Already in your list.');return;}
-    if(!r.ok){showErr('addErr',res.error||'Could not add.');return;}
-    document.getElementById('addInput').value='';
+  const btn = document.getElementById('addBtn');
+  btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    const r = await fetch('/api/channels/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q }) });
+    const res = await r.json();
+    if (r.status === 409) { showErr('addErr', 'Already in your list.'); return; }
+    if (!r.ok) { showErr('addErr', res.error || 'Could not add.'); return; }
+    document.getElementById('addInput').value = '';
     toggleAdd();
     await renderChannels();
-    toast('Channel added!','s');
-  }catch{showErr('addErr','Network error.');}
-  finally{btn.disabled=false;btn.textContent='Add';}
+    toast('Channel added!', 's');
+  } catch { showErr('addErr', 'Network error.'); }
+  finally { btn.disabled = false; btn.textContent = 'Add'; }
 }
 
-async function setPrimary(id){
-  try{
-    const r=await fetch(`/api/channels/${id}/set-primary`,{method:'POST'});
-    if(!r.ok){toast('Could not set primary','e');return;}
-    toast('Set as My Channel!','s');
+async function setPrimary(id) {
+  try {
+    const r = await fetch(`/api/channels/${id}/set-primary`, { method: 'POST' });
+    if (!r.ok) { toast('Could not set primary', 'e'); return; }
+    toast('Set as My Channel!', 's');
     await renderChannels();
     renderDash();
-  }catch{toast('Network error','e');}
+  } catch { toast('Network error', 'e'); }
 }
 
-async function rmCh(id){
-  const row=document.getElementById('ctr-'+id);
-  if(row){row.style.transition='opacity .2s,transform .2s';row.style.opacity='0';row.style.transform='translateX(8px)';}
-  await new Promise(r=>setTimeout(r,220));
-  await fetch(`/api/channels/${id}`,{method:'DELETE'});
-  toast('Channel removed','e');
+async function rmCh(id) {
+  const row = document.getElementById('ctr-' + id);
+  if (row) { row.style.transition = 'opacity .2s,transform .2s'; row.style.opacity = '0'; row.style.transform = 'translateX(8px)'; }
+  await new Promise(r => setTimeout(r, 220));
+  await fetch(`/api/channels/${id}`, { method: 'DELETE' });
+  toast('Channel removed', 'e');
   await renderChannels();
 }
 
-async function ref1(id){
-  const btn=document.getElementById('ref-'+id);
-  if(btn){btn.style.opacity='.4';btn.disabled=true;}
-  try{
-    const r=await fetch(`/api/channels/${id}/refresh`,{method:'POST'});
-    if(!r.ok){toast('Refresh failed','e');return;}
-    toast('Stats updated!','s');
+async function ref1(id) {
+  const btn = document.getElementById('ref-' + id);
+  if (btn) { btn.style.opacity = '.4'; btn.disabled = true; }
+  try {
+    const r = await fetch(`/api/channels/${id}/refresh`, { method: 'POST' });
+    if (!r.ok) { toast('Refresh failed', 'e'); return; }
+    toast('Stats updated!', 's');
     await renderChannels();
-  }catch{toast('Refresh failed','e');}
-  finally{if(btn){btn.style.opacity='';btn.disabled=false;}}
+  } catch { toast('Refresh failed', 'e'); }
+  finally { if (btn) { btn.style.opacity = ''; btn.disabled = false; } }
 }
 
 
 
-const CH_COLORS=['#00E5FF','#FFD54F','#56FFA7','#FF7043','#BA68C8','#4FC3F7','#AED581','#F06292'];
+const CH_COLORS = ['#00E5FF', '#FFD54F', '#56FFA7', '#FF7043', '#BA68C8', '#4FC3F7', '#AED581', '#F06292'];
 
-async function loadThisMonthPanel(primaryId){
-  const el=document.getElementById('dashMonthGlance');
-  if(!el)return;
-  try{
-    const [vRes,sRes]=await Promise.all([
+async function loadThisMonthPanel(primaryId) {
+  const el = document.getElementById('dashMonthGlance');
+  if (!el) return;
+  try {
+    const [vRes, sRes] = await Promise.all([
       fetch(`/api/channels/${primaryId}/videos/full`),
       fetch(`/api/snapshots/${primaryId}`)
     ]);
-    const [vids,snaps]=await Promise.all([vRes.json(),sRes.json()]);
-    if(!vids||!vids.length){el.style.display='none';return;}
-    const now=new Date();
-    const tm=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    const lmd=new Date(now.getFullYear(),now.getMonth()-1,1);
-    const lm=`${lmd.getFullYear()}-${String(lmd.getMonth()+1).padStart(2,'0')}`;
-    const tmV=vids.filter(v=>(v.published_at||v.date||'').startsWith(tm));
-    const lmV=vids.filter(v=>(v.published_at||v.date||'').startsWith(lm));
-    const tmViews=tmV.reduce((s,v)=>s+(v.view_count||v.views_raw||0),0);
-    const lmViews=lmV.reduce((s,v)=>s+(v.view_count||v.views_raw||0),0);
-    const tmLikes=tmV.reduce((s,v)=>s+(v.like_count||0),0);
-    const tmCmts=tmV.reduce((s,v)=>s+(v.comment_count||0),0);
-    const eng=tmViews>0?((tmLikes+tmCmts)/tmViews*100).toFixed(1):null;
-    const mom=lmViews>0?Math.round(((tmViews-lmViews)/lmViews)*100):null;
-    
+    const [vids, snaps] = await Promise.all([vRes.json(), sRes.json()]);
+    if (!vids || !vids.length) { el.style.display = 'none'; return; }
+    const now = new Date();
+    const tm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const lmd = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lm = `${lmd.getFullYear()}-${String(lmd.getMonth() + 1).padStart(2, '0')}`;
+    const tmV = vids.filter(v => (v.published_at || v.date || '').startsWith(tm));
+    const lmV = vids.filter(v => (v.published_at || v.date || '').startsWith(lm));
+    const tmViews = tmV.reduce((s, v) => s + (v.view_count || v.views_raw || 0), 0);
+    const lmViews = lmV.reduce((s, v) => s + (v.view_count || v.views_raw || 0), 0);
+    const tmLikes = tmV.reduce((s, v) => s + (v.like_count || 0), 0);
+    const tmCmts = tmV.reduce((s, v) => s + (v.comment_count || 0), 0);
+    const eng = tmViews > 0 ? ((tmLikes + tmCmts) / tmViews * 100).toFixed(1) : null;
+    const mom = lmViews > 0 ? Math.round(((tmViews - lmViews) / lmViews) * 100) : null;
+
     // Calculate values for rendering
     const viewsThisMonth = tmViews;
     const videosThisMonth = tmV.length;
     const videosLastMonth = lmV.length;
     const engRate = eng !== null ? parseFloat(eng) : 0;
-    
+
     const deltaViews = mom !== null ? mom : 0;
     const deltaClass = deltaViews > 0 ? 'up' : deltaViews < 0 ? 'down' : 'flat';
-    const deltaSign  = deltaViews > 0 ? '▲' : deltaViews < 0 ? '▼' : '●';
+    const deltaSign = deltaViews > 0 ? '▲' : deltaViews < 0 ? '▼' : '●';
 
-    el.innerHTML=`
+    el.innerHTML = `
       <div class="dash-mg-card">
         <div class="dash-mg-icon" style="font-family: 'Segoe UI Emoji', sans-serif;">👁</div>
         <div class="dash-mg-val">${fmtN(viewsThisMonth)}</div>
@@ -2429,7 +2436,7 @@ async function loadThisMonthPanel(primaryId){
         </div>
       </div>
     `;
-  }catch(e){el.style.display='none';}
+  } catch (e) { el.style.display = 'none'; }
 }
 
 async function loadFastestGrowing(channels) {
@@ -2453,8 +2460,8 @@ async function loadFastestGrowing(channels) {
       <div class="fg-badge">🚀 Highest View Efficiency</div>
       <div class="fg-body">
         ${top.ch.logo_url
-          ? `<img class="fg-logo" src="${esc(proxyImg(top.ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
-          : `<div class="fg-logo-fb">${(top.ch.name || '?')[0]}</div>`}
+      ? `<img class="fg-logo" src="${esc(proxyImg(top.ch.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">`
+      : `<div class="fg-logo-fb">${(top.ch.name || '?')[0]}</div>`}
         <div class="fg-info">
           <div class="fg-name">${esc(top.ch.name)}${isPrimary ? ' <span class="lb-you">⭐ You</span>' : ''}</div>
           <div class="fg-stat">
@@ -2470,21 +2477,21 @@ async function loadFastestGrowing(channels) {
     </div>`;
 }
 
-async function loadUploadVelocity(channels){
-  const el=document.getElementById('dashVelocity');
-  if(!el||channels.length<1){if(el)el.style.display='none';return;}
+async function loadUploadVelocity(channels) {
+  const el = document.getElementById('dashVelocity');
+  if (!el || channels.length < 1) { if (el) el.style.display = 'none'; return; }
 
-  el.innerHTML=`<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px;padding:20px 0"><div class="spin"></div>Building upload chart…</div>`;
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;color:var(--t3);font-size:13px;padding:20px 0"><div class="spin"></div>Building upload chart…</div>`;
 
-  try{
+  try {
     // Build 6-month bucket list
-    const now=new Date();
-    const months=[];
-    for(let i=5;i>=0;i--){
-      const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       months.push({
-        key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
-        label:d.toLocaleString('en-US',{month:'short'})+" '"+String(d.getFullYear()).slice(2),
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: d.toLocaleString('en-US', { month: 'short' }) + " '" + String(d.getFullYear()).slice(2),
       });
     }
 
@@ -2492,75 +2499,75 @@ async function loadUploadVelocity(channels){
     // Only fetch from API if the channel has no cache yet.
     // Use ?max=50 — covers 6 months for channels uploading <=8 videos/month.
     // MrBeast uploads ~2/month so 50 covers 25 months — more than enough.
-    const videoLists=await Promise.all(
-      channels.map(async ch=>{
-        const cached=_enrichCache[ch.id];
-        if(cached&&cached.vids&&cached.vids.length>0) return cached.vids;
-        try{
-          const r=await fetch(`/api/channels/${ch.id}/videos?max=50`);
-          const vids=await r.json();
-          if(Array.isArray(vids)){
-            _enrichCache[ch.id]={ts:Date.now(),vids};
+    const videoLists = await Promise.all(
+      channels.map(async ch => {
+        const cached = _enrichCache[ch.id];
+        if (cached && cached.vids && cached.vids.length > 0) return cached.vids;
+        try {
+          const r = await fetch(`/api/channels/${ch.id}/videos?max=50`);
+          const vids = await r.json();
+          if (Array.isArray(vids)) {
+            _enrichCache[ch.id] = { ts: Date.now(), vids };
             return vids;
           }
-        }catch{}
+        } catch { }
         return [];
       })
     );
 
     // Count uploads per channel per month
-    const data=channels.map((ch,i)=>({
+    const data = channels.map((ch, i) => ({
       ch,
-      color:CH_COLORS[i%CH_COLORS.length],
-      counts:months.map(m=>
-        (videoLists[i]||[]).filter(v=>(v.published_at||v.date||'').startsWith(m.key)).length
+      color: CH_COLORS[i % CH_COLORS.length],
+      counts: months.map(m =>
+        (videoLists[i] || []).filter(v => (v.published_at || v.date || '').startsWith(m.key)).length
       ),
     }));
 
-    const totalUploads=data.flatMap(d=>d.counts).reduce((a,b)=>a+b,0);
-    if(totalUploads===0){el.style.display='none';return;}
+    const totalUploads = data.flatMap(d => d.counts).reduce((a, b) => a + b, 0);
+    if (totalUploads === 0) { el.style.display = 'none'; return; }
 
     // Build SVG grouped bar chart
-    const maxC=Math.max(...data.flatMap(d=>d.counts),1);
-    const nCh=channels.length;
-    const bW=Math.min(18,Math.max(8,Math.floor(56/nCh)));
-    const bGap=3,gGap=20;
-    const gW=nCh*(bW+bGap)+gGap;
-    const cW=months.length*gW+80,cH=180,pH=cH-50;
+    const maxC = Math.max(...data.flatMap(d => d.counts), 1);
+    const nCh = channels.length;
+    const bW = Math.min(18, Math.max(8, Math.floor(56 / nCh)));
+    const bGap = 3, gGap = 20;
+    const gW = nCh * (bW + bGap) + gGap;
+    const cW = months.length * gW + 80, cH = 180, pH = cH - 50;
 
-    let bars='';
+    let bars = '';
 
     // Y axis grid lines
-    [0,Math.round(maxC/2),maxC].forEach(t=>{
-      const y=cH-30-Math.round((t/maxC)*pH);
-      bars+=`<line x1="40" y1="${y}" x2="${cW}" y2="${y}"
+    [0, Math.round(maxC / 2), maxC].forEach(t => {
+      const y = cH - 30 - Math.round((t / maxC) * pH);
+      bars += `<line x1="40" y1="${y}" x2="${cW}" y2="${y}"
         stroke="rgba(255,255,255,0.06)" stroke-width="1" stroke-dasharray="4 3"/>
-        <text x="36" y="${y+4}" text-anchor="end"
+        <text x="36" y="${y + 4}" text-anchor="end"
           fill="rgba(255,255,255,0.3)" font-size="9"
           font-family="JetBrains Mono,monospace">${t}</text>`;
     });
 
-    months.forEach((m,mi)=>{
-      const gx=44+mi*gW;
-      data.forEach((d,ci)=>{
-        const c=d.counts[mi];
-        if(c===0)return;
-        const h=Math.max(6,Math.round((c/maxC)*pH));
-        const x=gx+ci*(bW+bGap),y=cH-30-h;
-        bars+=`<rect x="${x}" y="${y}" width="${bW}" height="${h}" rx="3"
+    months.forEach((m, mi) => {
+      const gx = 44 + mi * gW;
+      data.forEach((d, ci) => {
+        const c = d.counts[mi];
+        if (c === 0) return;
+        const h = Math.max(6, Math.round((c / maxC) * pH));
+        const x = gx + ci * (bW + bGap), y = cH - 30 - h;
+        bars += `<rect x="${x}" y="${y}" width="${bW}" height="${h}" rx="3"
           fill="${d.color}" opacity="0.88">
-          <title>${esc(d.ch.name)} — ${m.label}: ${c} video${c!==1?'s':''}</title>
+          <title>${esc(d.ch.name)} — ${m.label}: ${c} video${c !== 1 ? 's' : ''}</title>
         </rect>
-        <text x="${x+bW/2}" y="${y-4}" text-anchor="middle"
+        <text x="${x + bW / 2}" y="${y - 4}" text-anchor="middle"
           font-size="9" fill="${d.color}" font-weight="700"
           font-family="JetBrains Mono,monospace">${c}</text>`;
       });
-      bars+=`<text x="${gx+nCh*(bW+bGap)/2}" y="${cH-8}"
+      bars += `<text x="${gx + nCh * (bW + bGap) / 2}" y="${cH - 8}"
         text-anchor="middle" font-size="10"
         fill="rgba(186,201,204,0.75)" font-family="DM Sans">${m.label}</text>`;
     });
 
-    const legend=data.map(d=>
+    const legend = data.map(d =>
       `<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2)">
         <span style="display:inline-block;width:10px;height:10px;border-radius:2px;
           background:${d.color};flex-shrink:0"></span>
@@ -2568,7 +2575,7 @@ async function loadUploadVelocity(channels){
       </span>`
     ).join('');
 
-    el.innerHTML=`
+    el.innerHTML = `
       <div class="dash-section-hdr" style="margin-top:0">
         <span style="font-family:'Material Symbols Outlined';font-size:16px;vertical-align:middle">bar_chart</span>
         Monthly Upload Velocity
@@ -2583,227 +2590,227 @@ async function loadUploadVelocity(channels){
         <div class="vel-legend">${legend}</div>
       </div>`;
 
-  }catch(e){
-    el.innerHTML=`<div class="err" style="display:block">Could not load velocity chart.</div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="err" style="display:block">Could not load velocity chart.</div>`;
   }
 }
 
 /* ════════════════════════════════════════════════════════
    SEARCH — with AUTOCOMPLETE DROPDOWN
 ════════════════════════════════════════════════════════ */
-let _srDebounce=null;
-let _srQuotaCount=0;
-let _srQuotaReset=Date.now();
-const SR_QUOTA_MAX=10;     // max autocomplete calls per minute
-const SR_QUOTA_WINDOW=60000; // 60 seconds
+let _srDebounce = null;
+let _srQuotaCount = 0;
+let _srQuotaReset = Date.now();
+const SR_QUOTA_MAX = 10;     // max autocomplete calls per minute
+const SR_QUOTA_WINDOW = 60000; // 60 seconds
 
 // Replace the existing keydownâ€only listener with full keyup debounce
-document.getElementById('srInput').addEventListener('keydown',e=>{
-  if(e.key==='Enter'){closeSuggestions();doSearch();}
-  if(e.key==='Escape')closeSuggestions();
+document.getElementById('srInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { closeSuggestions(); doSearch(); }
+  if (e.key === 'Escape') closeSuggestions();
 });
 
-document.getElementById('srInput').addEventListener('keyup',e=>{
-  if(['Enter','Escape','ArrowDown','ArrowUp'].includes(e.key))return;
-  const q=document.getElementById('srInput').value.trim();
+document.getElementById('srInput').addEventListener('keyup', e => {
+  if (['Enter', 'Escape', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+  const q = document.getElementById('srInput').value.trim();
   clearTimeout(_srDebounce);
-  if(q.length<2){closeSuggestions();return;}
-  _srDebounce=setTimeout(()=>doAutocomplete(q),500);
+  if (q.length < 2) { closeSuggestions(); return; }
+  _srDebounce = setTimeout(() => doAutocomplete(q), 500);
 });
 
-document.getElementById('srInput').addEventListener('blur',()=>{
+document.getElementById('srInput').addEventListener('blur', () => {
   // Delay to allow click on suggestion row
-  setTimeout(closeSuggestions,220);
+  setTimeout(closeSuggestions, 220);
 });
 
-async function doAutocomplete(q){
+async function doAutocomplete(q) {
   // Quota guard: max SR_QUOTA_MAX calls per SR_QUOTA_WINDOW ms
-  const now=Date.now();
-  if(now-_srQuotaReset>SR_QUOTA_WINDOW){_srQuotaCount=0;_srQuotaReset=now;}
-  if(_srQuotaCount>=SR_QUOTA_MAX){
-    showSuggestions([],true);return;
+  const now = Date.now();
+  if (now - _srQuotaReset > SR_QUOTA_WINDOW) { _srQuotaCount = 0; _srQuotaReset = now; }
+  if (_srQuotaCount >= SR_QUOTA_MAX) {
+    showSuggestions([], true); return;
   }
   _srQuotaCount++;
 
-  try{
-    const r=await fetch('/api/channels/search-suggest?q='+encodeURIComponent(q));
-    if(!r.ok){closeSuggestions();return;}
-    const items=await r.json();
-    showSuggestions(items,false);
-  }catch{
+  try {
+    const r = await fetch('/api/channels/search-suggest?q=' + encodeURIComponent(q));
+    if (!r.ok) { closeSuggestions(); return; }
+    const items = await r.json();
+    showSuggestions(items, false);
+  } catch {
     closeSuggestions();
   }
 }
 
-function showSuggestions(items, rateLimited){
-  const dd=document.getElementById('srDropdown');
-  if(!dd)return;
-  if(rateLimited){
-    dd.innerHTML=`<div class="sug-msg">⚡ Too many searches — please wait a moment</div>`;
-    dd.style.display='block';return;
+function showSuggestions(items, rateLimited) {
+  const dd = document.getElementById('srDropdown');
+  if (!dd) return;
+  if (rateLimited) {
+    dd.innerHTML = `<div class="sug-msg">⚡ Too many searches — please wait a moment</div>`;
+    dd.style.display = 'block'; return;
   }
-  if(!items||!items.length){dd.style.display='none';return;}
-  dd.innerHTML=items.map(ch=>`
+  if (!items || !items.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = items.map(ch => `
     <div class="sug-row" onclick="selectSuggestion('${esc(ch.id)}')">
       <div class="sug-avatar">
         ${ch.logo_url
-          ?`<img src="${esc(proxyImg(ch.logo_url))}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
-          :`<div style="width:100%;height:100%;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
+      ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
+      : `<div style="width:100%;height:100%;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--t3)">${(ch.name || '?')[0]}</div>`}
       </div>
       <div class="sug-info">
         <div class="sug-name">${esc(ch.name)}</div>
-        <div class="sug-handle">${esc(ch.handle||'')} · ${esc(ch.subscribers)} subs</div>
+        <div class="sug-handle">${esc(ch.handle || '')} · ${esc(ch.subscribers)} subs</div>
       </div>
       <div class="sug-select">Select</div>
     </div>`).join('');
-  dd.style.display='block';
+  dd.style.display = 'block';
 }
 
-async function selectSuggestion(channelId){
+async function selectSuggestion(channelId) {
   closeSuggestions();
   // Fetch full channel by ID using channels.list (1 unit, NOT search.list which is 100 units)
-  document.getElementById('srRes').style.display='none';
-  document.getElementById('srSkel').style.display='block';
-  document.getElementById('srBtn').disabled=true;
-  try{
-    const r=await fetch('/api/channel-by-id/'+encodeURIComponent(channelId));
-    const d=await r.json();
-    if(!r.ok){showErr('srErr',d.error||'Not found.');return;}
+  document.getElementById('srRes').style.display = 'none';
+  document.getElementById('srSkel').style.display = 'block';
+  document.getElementById('srBtn').disabled = true;
+  try {
+    const r = await fetch('/api/channel-by-id/' + encodeURIComponent(channelId));
+    const d = await r.json();
+    if (!r.ok) { showErr('srErr', d.error || 'Not found.'); return; }
     renderSearch(d);
-  }catch{showErr('srErr','Network error.');}
-  finally{document.getElementById('srSkel').style.display='none';document.getElementById('srBtn').disabled=false;}
+  } catch { showErr('srErr', 'Network error.'); }
+  finally { document.getElementById('srSkel').style.display = 'none'; document.getElementById('srBtn').disabled = false; }
 }
 
-function closeSuggestions(){
-  const dd=document.getElementById('srDropdown');
-  if(dd)dd.style.display='none';
+function closeSuggestions() {
+  const dd = document.getElementById('srDropdown');
+  if (dd) dd.style.display = 'none';
 }
 
 /* ════════════════════════════════════════════════════════
    ADD CHANNEL PANEL — AUTOCOMPLETE
 ════════════════════════════════════════════════════════ */
-let _addDebounce=null;
+let _addDebounce = null;
 
 // Attach listeners directly — app.js uses defer so DOM is already ready when this runs
-(function initAddAutocomplete(){
-  const inp=document.getElementById('addInput');
-  if(!inp)return;
-  inp.addEventListener('keyup',e=>{
-    if(['Enter','Escape','ArrowDown','ArrowUp'].includes(e.key)){if(e.key==='Escape')closeAddSuggestions();return;}
-    const q=inp.value.trim();
+(function initAddAutocomplete() {
+  const inp = document.getElementById('addInput');
+  if (!inp) return;
+  inp.addEventListener('keyup', e => {
+    if (['Enter', 'Escape', 'ArrowDown', 'ArrowUp'].includes(e.key)) { if (e.key === 'Escape') closeAddSuggestions(); return; }
+    const q = inp.value.trim();
     clearTimeout(_addDebounce);
-    if(q.length<2){closeAddSuggestions();return;}
-    _addDebounce=setTimeout(()=>doAddAutocomplete(q),380);
+    if (q.length < 2) { closeAddSuggestions(); return; }
+    _addDebounce = setTimeout(() => doAddAutocomplete(q), 380);
   });
-  inp.addEventListener('blur',()=>setTimeout(closeAddSuggestions,220));
+  inp.addEventListener('blur', () => setTimeout(closeAddSuggestions, 220));
 })();
 
-async function doAddAutocomplete(q){
+async function doAddAutocomplete(q) {
   // Reuse the same quota guard as the search page
-  const now=Date.now();
-  if(now-_srQuotaReset>SR_QUOTA_WINDOW){_srQuotaCount=0;_srQuotaReset=now;}
-  if(_srQuotaCount>=SR_QUOTA_MAX){showAddSuggestions([],true);return;}
+  const now = Date.now();
+  if (now - _srQuotaReset > SR_QUOTA_WINDOW) { _srQuotaCount = 0; _srQuotaReset = now; }
+  if (_srQuotaCount >= SR_QUOTA_MAX) { showAddSuggestions([], true); return; }
   _srQuotaCount++;
-  try{
-    const r=await fetch('/api/channels/search-suggest?q='+encodeURIComponent(q));
-    if(!r.ok){closeAddSuggestions();return;}
-    const items=await r.json();
-    showAddSuggestions(items,false);
-  }catch{closeAddSuggestions();}
+  try {
+    const r = await fetch('/api/channels/search-suggest?q=' + encodeURIComponent(q));
+    if (!r.ok) { closeAddSuggestions(); return; }
+    const items = await r.json();
+    showAddSuggestions(items, false);
+  } catch { closeAddSuggestions(); }
 }
 
-function showAddSuggestions(items,rateLimited){
-  const dd=document.getElementById('addDropdown');
-  if(!dd)return;
-  if(rateLimited){
-    dd.innerHTML=`<div class="sug-msg">⚡ Too many searches — please wait</div>`;
-    dd.style.display='block';return;
+function showAddSuggestions(items, rateLimited) {
+  const dd = document.getElementById('addDropdown');
+  if (!dd) return;
+  if (rateLimited) {
+    dd.innerHTML = `<div class="sug-msg">⚡ Too many searches — please wait</div>`;
+    dd.style.display = 'block'; return;
   }
-  if(!items||!items.length){dd.style.display='none';return;}
-  dd.innerHTML=items.map(ch=>`
+  if (!items || !items.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = items.map(ch => `
     <div class="sug-row" onclick="selectAddSuggestion('${esc(ch.id)}','${esc(ch.name)}')">
       <div class="sug-avatar">
         ${ch.logo_url
-          ?`<img src="${esc(proxyImg(ch.logo_url))}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
-          :`<div style="width:100%;height:100%;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--t3)">${(ch.name||'?')[0]}</div>`}
+      ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.style.background='var(--sf-highest)'" alt="">`
+      : `<div style="width:100%;height:100%;border-radius:50%;background:var(--sf-highest);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--t3)">${(ch.name || '?')[0]}</div>`}
       </div>
       <div class="sug-info">
         <div class="sug-name">${esc(ch.name)}</div>
-        <div class="sug-handle">${esc(ch.handle||'')} · ${esc(ch.subscribers)} subs</div>
+        <div class="sug-handle">${esc(ch.handle || '')} · ${esc(ch.subscribers)} subs</div>
       </div>
       <div class="sug-select">+ Add</div>
     </div>`).join('');
-  dd.style.display='block';
+  dd.style.display = 'block';
 }
 
-async function selectAddSuggestion(channelId, channelName){
+async function selectAddSuggestion(channelId, channelName) {
   closeAddSuggestions();
-  const inp=document.getElementById('addInput');
-  if(inp)inp.value=channelName||channelId;
+  const inp = document.getElementById('addInput');
+  if (inp) inp.value = channelName || channelId;
   hideErr('addErr');
-  const btn=document.getElementById('addBtn');
-  if(btn){btn.disabled=true;btn.textContent='Adding…';}
-  try{
-    const r=await fetch('/api/channels/add',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({channel_id:channelId})
+  const btn = document.getElementById('addBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+  try {
+    const r = await fetch('/api/channels/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel_id: channelId })
     });
-    const res=await r.json();
-    if(r.status===409){showErr('addErr','Already in your list.');return;}
-    if(!r.ok){showErr('addErr',res.error||'Could not add.');return;}
-    if(inp)inp.value='';
+    const res = await r.json();
+    if (r.status === 409) { showErr('addErr', 'Already in your list.'); return; }
+    if (!r.ok) { showErr('addErr', res.error || 'Could not add.'); return; }
+    if (inp) inp.value = '';
     toggleAdd();
     await renderChannels();
-    toast('Channel added!','s');
-  }catch{showErr('addErr','Network error.');}
-  finally{if(btn){btn.disabled=false;btn.textContent='Add';}}
+    toast('Channel added!', 's');
+  } catch { showErr('addErr', 'Network error.'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Add'; } }
 }
 
-function closeAddSuggestions(){
-  const dd=document.getElementById('addDropdown');
-  if(dd)dd.style.display='none';
+function closeAddSuggestions() {
+  const dd = document.getElementById('addDropdown');
+  if (dd) dd.style.display = 'none';
 }
 
-async function doSearch(){
-  const q=document.getElementById('srInput').value.trim();
-  if(!q){showErr('srErr','Please enter a channel name.');return;}
+async function doSearch() {
+  const q = document.getElementById('srInput').value.trim();
+  if (!q) { showErr('srErr', 'Please enter a channel name.'); return; }
   hideErr('srErr');
   closeSuggestions();
-  document.getElementById('srRes').style.display='none';
-  document.getElementById('srRes').innerHTML='';
-  document.getElementById('srSkel').style.display='block';
-  document.getElementById('srBtn').disabled=true;
-  try{
-    const r=await fetch('/api/channel?q='+encodeURIComponent(q));
-    const d=await r.json();
-    if(!r.ok){showErr('srErr',d.error||'Something went wrong.');return;}
+  document.getElementById('srRes').style.display = 'none';
+  document.getElementById('srRes').innerHTML = '';
+  document.getElementById('srSkel').style.display = 'block';
+  document.getElementById('srBtn').disabled = true;
+  try {
+    const r = await fetch('/api/channel?q=' + encodeURIComponent(q));
+    const d = await r.json();
+    if (!r.ok) { showErr('srErr', d.error || 'Something went wrong.'); return; }
     renderSearch(d);
-  }catch{showErr('srErr','Network error.');}
-  finally{document.getElementById('srSkel').style.display='none';document.getElementById('srBtn').disabled=false;}
+  } catch { showErr('srErr', 'Network error.'); }
+  finally { document.getElementById('srSkel').style.display = 'none'; document.getElementById('srBtn').disabled = false; }
 }
 
-function renderSearch(d){
-  const vid=d.video||{};
-  const inList=all.some(c=>c.id===d.id);
-  document.getElementById('srRes').innerHTML=`
+function renderSearch(d) {
+  const vid = d.video || {};
+  const inList = all.some(c => c.id === d.id);
+  document.getElementById('srRes').innerHTML = `
     <div class="sr-card au">
       ${d.banner_url
-        ?`<img class="sr-banner" src="${esc(proxyImg(d.banner_url))}" onerror="this.outerHTML='<div class=sr-banner-ph></div>'" alt="">`
-        :'<div class="sr-banner-ph"></div>'}
+      ? `<img class="sr-banner" src="${esc(proxyImg(d.banner_url))}" onerror="this.outerHTML='<div class=sr-banner-ph></div>'" alt="">`
+      : '<div class="sr-banner-ph"></div>'}
       <div class="sr-head">
         <img class="sr-logo" src="${esc(proxyImg(d.logo_url))}" onerror="this.style.background='var(--sf-highest)'" alt="">
         <div class="sr-meta">
           <div class="sr-name">${esc(d.name)}</div>
           <div class="sr-sub">
-            ${d.handle?`<span class="badge bdg-pr">${esc(d.handle)}</span>`:''}
-            ${d.country?`<span class="badge bdg-dim">${esc(d.country)}</span>`:''}
-            ${d.created?`<span style="font-size:12px;color:var(--t3)">Since ${d.created}</span>`:''}
+            ${d.handle ? `<span class="badge bdg-pr">${esc(d.handle)}</span>` : ''}
+            ${d.country ? `<span class="badge bdg-dim">${esc(d.country)}</span>` : ''}
+            ${d.created ? `<span style="font-size:12px;color:var(--t3)">Since ${d.created}</span>` : ''}
           </div>
         </div>
-        <button class="btn ${inList?'btn-gh':'btn-pr'} sr-save" id="sav-${esc(d.id)}"
-          onclick="toggleSave(${JSON.stringify(d).replace(/"/g,'&quot;')})">
-          ${inList?'✓ Tracking':'+ Track Channel'}
+        <button class="btn ${inList ? 'btn-gh' : 'btn-pr'} sr-save" id="sav-${esc(d.id)}"
+          onclick="toggleSave(${JSON.stringify(d).replace(/"/g, '&quot;')})">
+          ${inList ? '✓ Tracking' : '+ Track Channel'}
         </button>
       </div>
       <div class="sr-stats">
@@ -2812,8 +2819,8 @@ function renderSearch(d){
         <div class="sr-st"><div class="sr-st-ico">🎬</div><div class="sr-st-val" style="color:var(--pr)">${esc(d.total_videos)}</div><div class="sr-st-lbl">Videos</div></div>
         <div class="sr-st"><div class="sr-st-ico">📊</div><div class="sr-st-val" style="color:var(--gr)">${esc(d.avg_views)}</div><div class="sr-st-lbl">Avg Views</div></div>
       </div>
-      ${d.description?`<div class="sr-desc"><div class="sr-desc-l">About</div><div class="sr-desc-t">${esc(d.description)}${d.description.length>=300?'…':''}</div></div>`:''}
-      ${vid.title?`
+      ${d.description ? `<div class="sr-desc"><div class="sr-desc-l">About</div><div class="sr-desc-t">${esc(d.description)}${d.description.length >= 300 ? '…' : ''}</div></div>` : ''}
+      ${vid.title ? `
       <a class="sr-vid" href="${esc(vid.url)}" target="_blank" rel="noopener">
         <img class="sr-vthumb" src="${esc(vid.thumb)}" onerror="this.style.background='var(--sf-highest)'" alt="">
         <div class="sr-vbody">
@@ -2826,54 +2833,54 @@ function renderSearch(d){
             <div class="srv"><span class="srv-v">${esc(vid.comments)}</span><span class="srv-l">💬 Comments</span></div>
           </div>
         </div>
-      </a>`:''}
+      </a>`: ''}
     </div>`;
-  document.getElementById('srRes').style.display='block';
+  document.getElementById('srRes').style.display = 'block';
 }
 
-async function toggleSave(d){
-  const btn=document.getElementById('sav-'+d.id);
-  const inList=all.some(c=>c.id===d.id);
-  if(inList){
-    await fetch(`/api/channels/${d.id}`,{method:'DELETE'});
-    all=all.filter(c=>c.id!==d.id);
-    if(btn){btn.textContent='+ Track Channel';btn.className='btn btn-pr sr-save';}
-    toast('Channel removed','e');
-  }else{
-    if(btn){btn.disabled=true;btn.textContent='Adding…';}
-    try{
-      const r=await fetch('/api/channels/add',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({channel_id:d.id})
+async function toggleSave(d) {
+  const btn = document.getElementById('sav-' + d.id);
+  const inList = all.some(c => c.id === d.id);
+  if (inList) {
+    await fetch(`/api/channels/${d.id}`, { method: 'DELETE' });
+    all = all.filter(c => c.id !== d.id);
+    if (btn) { btn.textContent = '+ Track Channel'; btn.className = 'btn btn-pr sr-save'; }
+    toast('Channel removed', 'e');
+  } else {
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+    try {
+      const r = await fetch('/api/channels/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel_id: d.id })
       });
-      const res=await r.json();
-      if(r.ok||r.status===409){
-        if(!all.some(c=>c.id===d.id))all.push(res.channel||d);
-        if(btn){btn.textContent='✓ Tracking';btn.className='btn btn-gh sr-save';btn.disabled=false;}
-        toast('Channel added!','s');
-      }else{toast(res.error||'Error','e');if(btn){btn.disabled=false;btn.textContent='+ Track Channel';}}
-    }catch{toast('Network error','e');if(btn){btn.disabled=false;btn.textContent='+ Track Channel';}}
+      const res = await r.json();
+      if (r.ok || r.status === 409) {
+        if (!all.some(c => c.id === d.id)) all.push(res.channel || d);
+        if (btn) { btn.textContent = '✓ Tracking'; btn.className = 'btn btn-gh sr-save'; btn.disabled = false; }
+        toast('Channel added!', 's');
+      } else { toast(res.error || 'Error', 'e'); if (btn) { btn.disabled = false; btn.textContent = '+ Track Channel'; } }
+    } catch { toast('Network error', 'e'); if (btn) { btn.disabled = false; btn.textContent = '+ Track Channel'; } }
   }
 }
 
 /* ══ Export CSV ══════════════════════════════════════ */
-function exportCSV(){
-  const a=document.createElement('a');
-  a.href='/api/export/csv';
-  a.download='yt_tracker_channels.csv';
+function exportCSV() {
+  const a = document.createElement('a');
+  a.href = '/api/export/csv';
+  a.download = 'yt_tracker_channels.csv';
   a.click();
-  toast('Exporting CSV…','s');
+  toast('Exporting CSV…', 's');
 }
 
 /* ══ Sort Channels ══════════════════════════════════ */
-function setChSort(f){
-  chSort=f;
+function setChSort(f) {
+  chSort = f;
   renderChannels();
 }
 
 /* ── Init ─────────────────────────────────────────── */
-(async()=>{
+(async () => {
   await fetchAll();
   renderDash();
 })();
