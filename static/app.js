@@ -756,21 +756,37 @@ async function enrichCards(){
             return Array.isArray(v)?v:[];
           })();
 
-      if(!vids.length)return;
+      const rvEl = document.getElementById('cc-recentvids-'+ch.id);
+
+      if(!vids || !vids.length){
+        if(rvEl){
+          rvEl.innerHTML='<div style="font-size:11.5px;color:var(--t4);padding:4px 0">No recent videos found.</div>';
+        }
+        const engEl = document.getElementById('cc-eng-'+ch.id);
+        if(engEl) engEl.textContent = '—';
+        const streakEl = document.getElementById('cc-streak-'+ch.id);
+        if(streakEl) streakEl.style.display = 'none';
+        const footerEl = document.getElementById('cc-footer-'+ch.id);
+        if(footerEl) footerEl.style.display = 'none';
+        return;
+      }
+
       const card=document.getElementById('ctr-'+ch.id);
       if(!card)return;
       const sorted=[...vids].sort((a,b)=>new Date(b.published_at||b.date)-new Date(a.published_at||a.date));
 
       // Recent Videos — top 3 long-form, color-coded vs channel average
-      const rvEl = document.getElementById('cc-recentvids-'+ch.id);
       if(rvEl){
         const recent3 = sorted.filter(v => !isYouTubeShort(v)).slice(0, 3);
         const chAvgViews = parseInt(ch.avg_views_raw || ch.avg_views || 0) || 0;
-        if(!recent3.length){ rvEl.innerHTML=''; } else {
+        if(!recent3.length){ 
+          rvEl.innerHTML='<div style="font-size:11.5px;color:var(--t4);padding:4px 0">No recent long-form videos.</div>'; 
+        } else {
           rvEl.innerHTML = `<div class="cc-rv-hdr"><span style="font-family:'Material Symbols Outlined';font-size:12px;vertical-align:middle;margin-right:4px">play_circle</span>Recent Videos</div>` +
           recent3.map(v => {
             const vc = v.view_count ?? v.views_raw ?? 0;
-            const dateStr = v.published_at ? new Date(v.published_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : (v.date||'');
+            const pub = v.published_at ? new Date(v.published_at) : null;
+            const dateStr = (pub && !isNaN(pub.getTime())) ? pub.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : (v.date||'');
             let vcColor = 'var(--t2)';
             if(chAvgViews > 0){
               if(vc >= chAvgViews*1.5) vcColor='var(--gr)';
@@ -794,16 +810,23 @@ async function enrichCards(){
       const avgEng = recent5.reduce((sum,v) => {
         const r = calcEngagementRate(v.like_count??0, v.comment_count??0, v.view_count??v.views_raw??0);
         return sum + (r ?? 0);
-      }, 0) / recent5.length;
+      }, 0) / (recent5.length || 1);
       const engEl = document.getElementById('cc-eng-'+ch.id);
-      if(engEl && avgEng > 0){
-        engEl.textContent = avgEng.toFixed(1)+'%';
-        engEl.style.color = avgEng >= 4 ? 'var(--gr)' : avgEng >= 2 ? 'var(--gold)' : 'var(--rd)';
+      if(engEl){
+        if(avgEng > 0){
+          engEl.textContent = avgEng.toFixed(1)+'%';
+          engEl.style.color = avgEng >= 4 ? 'var(--gr)' : avgEng >= 2 ? 'var(--gold)' : 'var(--rd)';
+        } else {
+          engEl.textContent = '0.0%';
+          engEl.style.color = 'var(--rd)';
+        }
       }
       
       let streak=0,lastW=-1;
       for(const v of sorted){
-        const wa=Math.floor((now-new Date(v.published_at||v.date).getTime())/(7*864e5));
+        const pubTime = new Date(v.published_at||v.date).getTime();
+        if(isNaN(pubTime)) continue;
+        const wa=Math.floor((now-pubTime)/(7*864e5));
         if(streak===0&&wa<=1){streak=1;lastW=wa;}
         else if(streak>0&&wa===lastW+1){streak++;lastW=wa;}
         else if(streak>0)break;
@@ -811,10 +834,12 @@ async function enrichCards(){
       
       const streakEl=document.getElementById('cc-streak-'+ch.id);
       if(streakEl){
-        const daysSince=sorted.length?Math.floor((now-new Date(sorted[0].published_at||sorted[0].date).getTime())/864e5):999;
+        const firstPubTime = sorted.length ? new Date(sorted[0].published_at||sorted[0].date).getTime() : NaN;
+        const daysSince=!isNaN(firstPubTime)?Math.floor((now-firstPubTime)/864e5):999;
         if(streak>=4){streakEl.textContent=`${streak}-wk streak`;streakEl.className='badge bdg-gr';streakEl.style.display='';}
         else if(streak>=2){streakEl.textContent=`${streak}wks`;streakEl.className='badge bdg-pr';streakEl.style.display='';}
         else if(daysSince>28){streakEl.textContent=`${daysSince}d gap`;streakEl.className='badge bdg-rd';streakEl.style.display='';}
+        else {streakEl.style.display='none';}
       }
 
       const footerEl = document.getElementById('cc-footer-' + ch.id);
@@ -823,8 +848,11 @@ async function enrichCards(){
         if(longFormVids.length > 0){
           const lv = longFormVids[0];
           const pubDate = new Date(lv.published_at || lv.date);
-          const relDays = Math.max(1, Math.floor((now - pubDate.getTime()) / 864e5));
-          const relDateStr = pubDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' at ' + pubDate.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+          const isValidDate = !isNaN(pubDate.getTime());
+          const relDays = isValidDate ? Math.max(1, Math.floor((now - pubDate.getTime()) / 864e5)) : 1;
+          const relDateStr = isValidDate
+            ? pubDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' at ' + pubDate.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
+            : (lv.published_at || lv.date || '—');
           const vc = lv.view_count ?? lv.views_raw ?? 0;
           const vpd = Math.round(vc / relDays);
           const growthStr = vpd > 1000 ? `<span style="color:var(--gr)">🔥 ${fmtN(vpd)}/day</span>` : `<span style="color:var(--pr)">📈 ${fmtN(vpd)}/day</span>`;
@@ -2535,7 +2563,7 @@ async function loadUploadVelocity(channels){
       <div class="vel-wrap d2">
         <svg viewBox="0 0 ${cW} ${cH}" width="100%"
              preserveAspectRatio="xMidYMid meet"
-             style="display:block;overflow:visible;min-width:480px">
+             style="display:block;overflow:visible">
           ${bars}
         </svg>
         <div class="vel-legend">${legend}</div>

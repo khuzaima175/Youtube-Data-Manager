@@ -38,13 +38,14 @@
   --dur-slow:   380ms;
 }
 
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;overflow-x:hidden}
 body{
   font-family: 'Outfit', system-ui, sans-serif;
   background: var(--bg);
   color: var(--t1);
   min-height: 100vh;
   overflow-x: hidden;
+  max-width: 100vw;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -200,7 +201,7 @@ a{color:inherit;text-decoration:none}img{display:block}
 .mob-nav{display:none}
 
 /* ── Main & Pages ────────────────── */
-.main{max-width:1440px;margin:0 auto;padding:32px 36px 80px}
+.main{max-width:1440px;margin:0 auto;padding:32px 36px 80px;min-width:0;width:100%}
 .page{display:none}.page.on{display:block}
 
 /* ── Animations ──────────────────── */
@@ -548,16 +549,19 @@ a{color:inherit;text-decoration:none}img{display:block}
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
-  padding-left: 10px;
+  padding-left: 8px;
+  min-width: 72px;
+  max-width: 120px;
 }
 .cc-summary-subs {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--gold);
   letter-spacing: -1px;
   line-height: 1;
   text-shadow: 0 0 20px rgba(245,200,66,0.4);
+  white-space: nowrap;
 }
 .cc-summary-lbl {
   font-size: 10px;
@@ -565,12 +569,14 @@ a{color:inherit;text-decoration:none}img{display:block}
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: var(--t3);
+  white-space: nowrap;
 }
 .cc-summary-sub2 {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--t2);
   margin-top: 2px;
+  white-space: nowrap;
 }
 
 /* Expandable body — collapses below the always-visible .cc-top */
@@ -2921,11 +2927,11 @@ body>nav.topnav::after{
   .my-stat:nth-child(odd):last-child { border-right: none; }
   .my-stat-val { font-size: 17px; }
 
-  /* This Month at a Glance: stack to 1 col */
+  /* This Month at a Glance: 2 cols on tablet */
   .dash-mg-wrap {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
-    padding: 16px;
+    padding: 0;
   }
 
   /* Channel cards grid: single column */
@@ -3108,8 +3114,10 @@ body>nav.topnav::after{
   .sr-vid { margin: 0 14px 16px; }
 
   /* Upload velocity: make SVG scroll */
-  .vel-wrap { padding: 14px 12px 6px; overflow-x: auto; }
+  .vel-wrap { padding: 14px 12px 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .vel-legend { gap: 4px 10px; }
+  /* Prevent SVG from stretching the page */
+  .vel-wrap svg { min-width: unset !important; display: block; }
 
   /* Recent uploads: reduce card width */
   .ru-card { flex: 0 0 180px; }
@@ -3204,6 +3212,9 @@ body>nav.topnav::after{
   .pg-head > div:last-child {
     grid-template-columns: 1fr;
   }
+
+  /* This Month at a Glance: single column on phone */
+  .dash-mg-wrap { grid-template-columns: 1fr; }
 
   /* My Channel hero */
   .my-hero-logo { width: 46px; height: 46px; }
