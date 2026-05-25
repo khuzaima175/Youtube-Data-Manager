@@ -2320,7 +2320,7 @@ async function renderChannels() {
       <!-- Mobile: tap again to open full analytics -->
       <div class="cc-mobile-hint" onclick="event.stopPropagation();openAnalyticsModal('${esc(ch.id)}')">
         <span style="font-family:'Material Symbols Outlined';font-size:14px;line-height:1">bar_chart</span>
-        Tap to open full analytics
+        View Full Analytics
       </div>
 
     </div>
