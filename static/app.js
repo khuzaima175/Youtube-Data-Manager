@@ -1955,7 +1955,7 @@ async function renderAmGrowth() {
           <div class="am-ms-item"><div class="am-ms-val">${fmtN(withVpd[0]?.vpd || 0)}</div><div class="am-ms-lbl">Fastest Video</div></div>
         </div>
         <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse">
+          <table class="am-speed-table" style="width:100%;border-collapse:collapse">
             <thead><tr style="border-bottom:1px solid var(--bd)">
               <th style="padding:6px 10px;text-align:left;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">#</th>
               <th style="padding:6px 10px;text-align:left;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Title</th>
