@@ -750,6 +750,7 @@ img {
     box-shadow var(--dur-mid) var(--e),
     transform var(--dur-mid) var(--e);
   isolation: isolate;
+  min-width: 0;
 }
 
 /* clip overflow only on the card body */
@@ -766,6 +767,7 @@ img {
 .ch-card.mine {
   border-color: rgba(245, 200, 66, 0.35);
   background: linear-gradient(160deg, rgba(245, 200, 66, 0.05) 0%, var(--sf) 50%);
+  grid-column: 1 / -1;
 }
 
 .ch-card.mine:hover {
@@ -832,6 +834,7 @@ img {
   z-index: 1;
   overflow: hidden;
   /* needed for rounded corners */
+  min-width: 0;
 }
 
 .cc-av {
@@ -952,6 +955,7 @@ img {
   border-top: 1px solid transparent;
   border-radius: 0 0 14px 14px;
   background: var(--sf-lowest);
+  min-width: 0;
 }
 
 .ch-card:hover .cc-expand {
@@ -966,6 +970,7 @@ img {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
 }
 
 .cc-recentvids {
@@ -974,6 +979,7 @@ img {
   gap: 0;
   margin: 6px 0 2px;
   min-height: 20px;
+  min-width: 0;
 }
 
 .cc-rv-loading {
@@ -3926,6 +3932,7 @@ body>nav.topnav::after {
     opacity: 0;
     transform: translateY(12px) scale(0.995);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
