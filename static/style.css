@@ -3284,3 +3284,167 @@ button {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ==============================================================================
+   PHASE 10: WAYFINDING, INBOX & ALWAYS-ON INTELLIGENCE STYLES
+   ============================================================================== */
+
+/* -- W1.1 Section Scroll-Spy Rail -------------------------------------------- */
+.dash-spy-rail {
+  position: fixed;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 80;
+  padding: 10px 8px;
+  background: rgba(14, 18, 26, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-l);
+  box-shadow: var(--sh-1);
+  opacity: 0.35;
+  transition: opacity var(--d-1), transform var(--d-1);
+}
+
+.dash-spy-rail:hover {
+  opacity: 1;
+}
+
+.dash-spy-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 3px 4px;
+  border-radius: var(--r-s);
+  transition: all var(--d-1);
+}
+
+.spy-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-2);
+  transition: all var(--d-1);
+}
+
+.spy-label {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--t3);
+  opacity: 0;
+  transform: translateX(4px);
+  transition: all var(--d-1);
+  white-space: nowrap;
+}
+
+.dash-spy-rail:hover .spy-label {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.dash-spy-item.on .spy-dot {
+  background: var(--acc);
+  transform: scale(1.4);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+}
+
+.dash-spy-item.on .spy-label {
+  color: var(--acc);
+}
+
+/* -- W1.3 Spotlight Onboarding Tour ------------------------------------------ */
+.spotlight-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+}
+
+.spotlight-card {
+  position: fixed;
+  z-index: 9999;
+  width: 320px;
+  padding: 16px;
+  background: var(--bg-1);
+  border: 1px solid var(--acc);
+  border-radius: var(--r-m);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 229, 255, 0.2);
+  animation: popIn 0.25s var(--e-out);
+}
+
+/* -- W2.1 Bell Inbox Popover ------------------------------------------------ */
+.bell-inbox-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 380px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-m);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  z-index: 100;
+  display: none;
+  overflow: hidden;
+  animation: popIn 0.2s var(--e-out);
+}
+
+.bell-inbox-popover.open {
+  display: block;
+}
+
+.bell-inbox-item {
+  padding: 10px 12px;
+  border-radius: var(--r-s);
+  border: 1px solid var(--line-1);
+  background: var(--bg-2);
+  cursor: pointer;
+  transition: all var(--d-1);
+}
+
+.bell-inbox-item:hover {
+  border-color: var(--line-2);
+  transform: translateY(-1px);
+}
+
+.bell-inbox-item.unread {
+  border-left: 3px solid var(--acc);
+  background: rgba(0, 229, 255, 0.04);
+}
+
+.bell-inbox-item.read {
+  opacity: 0.75;
+}
+
+/* -- W2.4 Staleness Banner --------------------------------------------------- */
+.staleness-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin-bottom: 16px;
+  background: rgba(255, 171, 0, 0.12);
+  border: 1px solid rgba(255, 171, 0, 0.35);
+  border-radius: var(--r-s);
+  font-size: 11.5px;
+  color: var(--t1);
+  animation: fadeIn 0.3s var(--e-out);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1180px) {
+  .dash-spy-rail { display: none; }
+}
+
+@media (max-width: 768px) {
+  .bell-inbox-popover {
+    right: -40px;
+    width: calc(100vw - 32px);
+  }
+}

@@ -79,15 +79,22 @@
           <span class="msi" style="font-size:16px">person</span>
         </button>
 
+        <!-- Bell Inbox Button -->
+        <button class="icon-btn" id="bellBtn" style="position:relative;margin-left:4px" onclick="toggleBellInbox()" title="Alert Inbox & Field Feed">
+          <span class="msi" style="font-size:16px">notifications</span>
+          <span id="bellBadge" class="nav-cnt" style="position:absolute;top:-4px;right:-4px;background:var(--down);color:#fff;display:none">0</span>
+        </button>
+
         <button class="icon-btn" style="margin-left:4px" onclick="openCommandPalette()" title="Command Palette (Ctrl+K)">
           <span class="msi" style="font-size:16px">terminal</span>
         </button>
-        <button class="icon-btn" onclick="openShortcutsModal()" title="Keyboard Shortcuts (?)">
+        <button class="icon-btn" onclick="openShortcutsModal()" title="Help & Metric Glossary (?)">
           <span class="msi" style="font-size:16px">help</span>
         </button>
 
-        <!-- My Pulse Popover -->
+        <!-- Popovers -->
         <div class="my-pulse-popover" id="myPulsePopover"></div>
+        <div class="bell-inbox-popover" id="bellPopover"></div>
       </div>
     </div>
   </nav>
@@ -96,6 +103,9 @@
        MAIN CONTENT CONTAINER
        ══════════════════════════════════════════════════════════════════════════ -->
   <div class="main">
+
+    <!-- Staleness / Offline Banner -->
+    <div id="stalenessBanner" style="display:none" class="staleness-banner"></div>
 
     <!-- PAGE 1: DASHBOARD (Comparison-First Command Center) -->
     <div class="page on" id="page-dash">
@@ -284,19 +294,77 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════════
-       SHORTCUTS CHEAT SHEET MODAL (?)
+       HELP & METRIC GLOSSARY MODAL (?)
        ══════════════════════════════════════════════════════════════════════════ -->
   <div class="cmd-ovrl" id="scOvrl" onclick="closeShortcutsModal()"></div>
   <div class="sc-modal" id="scModal">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div style="font-family:var(--f-disp);font-size:16px;font-weight:700;color:var(--t1)">Keyboard Shortcuts</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="vid-seg" id="helpModalSeg">
+        <button class="vid-seg-btn on" id="helpTabShortcuts" onclick="switchHelpTab('shortcuts')">⌨️ Shortcuts</button>
+        <button class="vid-seg-btn" id="helpTabGlossary" onclick="switchHelpTab('glossary')">📖 Metric Glossary</button>
+      </div>
       <button class="icon-btn" onclick="closeShortcutsModal()"><span class="msi">close</span></button>
     </div>
-    <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+
+    <!-- Panel 1: Shortcuts -->
+    <div id="helpPanelShortcuts" style="display:flex;flex-direction:column;gap:10px;font-size:13px">
       <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--t2)">Quick Search</span><span class="badge bdg-dim">/</span></div>
       <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--t2)">Command Palette</span><span class="badge bdg-dim">Ctrl + K / ⌘ + K</span></div>
       <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--t2)">Close Overlays / Modals</span><span class="badge bdg-dim">Esc</span></div>
-      <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--t2)">Shortcuts Helper</span><span class="badge bdg-dim">?</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--t2)">Shortcuts & Glossary</span><span class="badge bdg-dim">?</span></div>
+      <div style="padding-top:10px;border-top:1px solid var(--line-1);display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--t2)">Onboarding Tour</span>
+        <button class="btn btn-gh btn-sm" onclick="closeShortcutsModal();startSpotlightTour()">Replay Tour 🚀</button>
+      </div>
+    </div>
+
+    <!-- Panel 2: Metric Glossary -->
+    <div id="helpPanelGlossary" style="display:none;flex-direction:column;gap:12px;max-height:60vh;overflow-y:auto;font-size:12px">
+      <div class="glossary-item">
+        <div style="font-weight:700;color:var(--acc);margin-bottom:2px">⚡ Velocity (/day)</div>
+        <div style="color:var(--t2);line-height:1.4">Views accrued per day ($views / age$). Measures current virality velocity rather than lifetime cumulative total.</div>
+      </div>
+      <div class="glossary-item">
+        <div style="font-weight:700;color:var(--down);margin-bottom:2px">🔥 hotScore</div>
+        <div style="color:var(--t2);line-height:1.4">Formula $recentAvg \times \log_2(n+1)$ measuring niche interest and current viewer appetite for a specific topic.</div>
+      </div>
+      <div class="glossary-item">
+        <div style="font-weight:700;color:var(--up);margin-bottom:2px">📈 Topic Momentum</div>
+        <div style="color:var(--t2);line-height:1.4">Ratio of recent average views to older historical views for a topic ($>1.2\times$ = surging trend).</div>
+      </div>
+      <div class="glossary-item">
+        <div style="font-weight:700;color:var(--warn);margin-bottom:2px">⚔️ Threat Overlap (Jaccard Index)</div>
+        <div style="color:var(--t2);line-height:1.4">Mathematical topic overlap percentage ($|A \cap B| / |A \cup B|$) comparing your top-20 topics against a rival's catalog.</div>
+      </div>
+      <div class="glossary-item">
+        <div style="font-weight:700;color:var(--up);margin-bottom:2px">🌲 Evergreen Fingerprint</div>
+        <div style="color:var(--t2);line-height:1.4">Percentage of a channel's top-10 videos that are $>1\text{ year old}$. Distinguishes long-tail compounders from hype chasers.</div>
+      </div>
+      <div class="glossary-item">
+        <div style="font-weight:700;color:var(--down);margin-bottom:2px">⚡ Collision Shadow</div>
+        <div style="color:var(--t2);line-height:1.4">Flags your underperforming drops that were published within $\pm 24\text{h}$ of a competitor $\ge 1.8\times$ your size on a shared topic.</div>
+      </div>
+      <div class="glossary-item">
+        <div style="font-weight:700;color:var(--me);margin-bottom:2px">▲/▼ Health Multipliers</div>
+        <div style="color:var(--t2);line-height:1.4">Ratio of a video's view performance against your long-form 30-video average ($▲ \ge 1.3\times$ = Overperformer, $▼ \le 0.7\times$ = Underperformer).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       SPOTLIGHT ONBOARDING TOUR
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="spotlightOverlay" class="spotlight-overlay" style="display:none" onclick="nextTourStep()"></div>
+  <div id="spotlightCard" class="spotlight-card" style="display:none">
+    <div id="spotlightStepLbl" style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--acc);margin-bottom:4px">Step 1 of 6</div>
+    <div id="spotlightTitle" style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px">Welcome to YT Tracker</div>
+    <div id="spotlightBody" style="font-size:12px;color:var(--t2);line-height:1.45;margin-bottom:12px">Tour explanation...</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <button class="btn btn-gh btn-sm" onclick="skipTour()">Skip Tour</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-gh btn-sm" id="tourPrevBtn" onclick="prevTourStep()">← Back</button>
+        <button class="btn btn-acc btn-sm" id="tourNextBtn" onclick="nextTourStep()">Next →</button>
+      </div>
     </div>
   </div>
 

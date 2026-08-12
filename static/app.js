@@ -738,7 +738,7 @@ async function renderDash() {
 
   // 1. My Channel Strip
   const stripHtml = `
-    <div class="my-channel-strip rev in" onclick="openDeepDive('${esc(primary.id)}')">
+    <div id="sec-hero" class="my-channel-strip rev in" onclick="openDeepDive('${esc(primary.id)}')">
       <div class="mcs-identity">
         ${primary.logo_url
           ? `<img class="mcs-logo" src="${esc(proxyImg(primary.logo_url))}" alt="">`
@@ -806,7 +806,7 @@ async function renderDash() {
   const medAvg = sortedAvg[Math.floor(all.length / 2)]?.avg_views || '—';
 
   const yvfHtml = `
-    <div class="you-vs-field rev in" style="--i:1">
+    <div id="sec-yvf" class="you-vs-field rev in" style="--i:1">
       <div class="yvf-hdr">
         <div class="yvf-title">
           <span class="ic-tile cyan"><span class="msi" style="font-size:15px">compare_arrows</span></span>
@@ -856,7 +856,7 @@ async function renderDash() {
 
   // 3. Full-Width Leaderboard Table
   const lbHtml = `
-    <div class="lb-wrap rev in" style="--i:2">
+    <div id="sec-lb" class="lb-wrap rev in" style="--i:2">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div class="sect-lbl" style="margin:0">
           <span class="msi">leaderboard</span> Full Leaderboard (${all.length} channels)
@@ -897,14 +897,14 @@ async function renderDash() {
     </div>`;
 
   // 4. Latest Drops Race Window (replaces Face-off)
-  const raceHtml = `<div id="dashRaceWindow" class="rev in" style="--i:3"></div>`;
+  const raceHtml = `<div id="sec-drops" class="rev in" style="--i:3"><div id="dashRaceWindow"></div></div>`;
 
   // 4b. Topic Radar (under Drops)
-  const radarHtml = `<div id="dashTopicRadar" class="rev in" style="--i:4"></div>`;
+  const radarHtml = `<div id="sec-radar" class="rev in" style="--i:4"><div id="dashTopicRadar"></div></div>`;
 
   // 5. Velocity Card (now full-width, separate from face-off)
   const velHtml = `
-    <div class="vel-card rev in" style="margin-top:var(--s5);--i:5">
+    <div id="sec-vel" class="vel-card rev in" style="margin-top:var(--s5);--i:5">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div class="sect-lbl" style="margin:0">
           <span class="msi">bar_chart</span> 6-Month Upload Velocity
@@ -916,7 +916,7 @@ async function renderDash() {
 
   // 6. Recent Uploads Rail
   const recentHtml = `
-    <div class="card rev in" style="margin-top:var(--s5);--i:5">
+    <div id="sec-recent" class="card rev in" style="margin-top:var(--s5);--i:5">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div class="sect-lbl" style="margin:0">
           <span class="msi">play_circle</span> Your Recent Uploads
@@ -935,7 +935,19 @@ async function renderDash() {
       </div>
     </div>`;
 
-  el.innerHTML = stripHtml + yvfHtml + raceHtml + radarHtml + lbHtml + velHtml + recentHtml;
+  // 7. Right-Edge Floating Scroll-Spy Rail
+  const spyRailHtml = `
+    <div class="dash-spy-rail" id="dashSpyRail">
+      <div class="dash-spy-item on" data-sec="sec-hero" onclick="scrollToSection('sec-hero')" title="My Channel"><span class="spy-dot"></span><span class="spy-label">Channel</span></div>
+      <div class="dash-spy-item" data-sec="sec-yvf" onclick="scrollToSection('sec-yvf')" title="You vs Field"><span class="spy-dot"></span><span class="spy-label">Field</span></div>
+      <div class="dash-spy-item" data-sec="sec-drops" onclick="scrollToSection('sec-drops')" title="Latest Drops"><span class="spy-dot"></span><span class="spy-label">Drops</span></div>
+      <div class="dash-spy-item" data-sec="sec-radar" onclick="scrollToSection('sec-radar')" title="Topic Radar"><span class="spy-dot"></span><span class="spy-label">Radar</span></div>
+      <div class="dash-spy-item" data-sec="sec-lb" onclick="scrollToSection('sec-lb')" title="Leaderboard"><span class="spy-dot"></span><span class="spy-label">Board</span></div>
+      <div class="dash-spy-item" data-sec="sec-vel" onclick="scrollToSection('sec-vel')" title="Velocity"><span class="spy-dot"></span><span class="spy-label">Velocity</span></div>
+      <div class="dash-spy-item" data-sec="sec-recent" onclick="scrollToSection('sec-recent')" title="Recent Uploads"><span class="spy-dot"></span><span class="spy-label">Recent</span></div>
+    </div>`;
+
+  el.innerHTML = stripHtml + yvfHtml + raceHtml + radarHtml + lbHtml + velHtml + recentHtml + spyRailHtml;
 
   document.querySelectorAll('.count-val').forEach(valEl => {
     countUp(valEl, valEl.dataset.val);
@@ -951,6 +963,7 @@ async function renderDash() {
   loadVelocityWithFit(all);
   loadDashboardRecentUploads(primary.id);
   setupScrollReveal();
+  setupDashScrollSpy();
 }
 
 function setYvfMetric(metric) {
@@ -2170,6 +2183,16 @@ function topicAlerts_check(ch, newVids) {
 }
 
 function pushTopicAlert({ type, icon, color, title, body, url }) {
+  // Push to persistent Bell inbox
+  pushInboxAlert({
+    id: 'alert-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+    ts: Date.now(),
+    type: type || 'threat',
+    title: title || 'Topic Signal',
+    text: body || '',
+    url: url || '',
+    read: false
+  });
   // Toast notification
   toast(`${title}`, type === 'threat' ? 'e' : type === 'opportunity' ? 's' : '');
 }
@@ -4489,6 +4512,429 @@ function syncPipelineWithPublishedVideos() {
   }
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PHASE 10: WAYFINDING, INBOX & ALWAYS-ON INTELLIGENCE (W1 + W2)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── W1.1 Section Scroll-Spy ──────────────────────────────────────────────── */
+function setupDashScrollSpy() {
+  const sections = ['sec-hero', 'sec-yvf', 'sec-drops', 'sec-radar', 'sec-lb', 'sec-vel', 'sec-recent'];
+  const items = document.querySelectorAll('#dashSpyRail .dash-spy-item');
+  if (!items.length) return;
+
+  const onScroll = () => {
+    let currentSec = sections[0];
+    sections.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= 200) currentSec = id;
+      }
+    });
+    items.forEach(it => {
+      it.classList.toggle('on', it.dataset.sec === currentSec);
+    });
+  };
+
+  window.removeEventListener('scroll', window._dashScrollSpyFn || (() => {}));
+  window._dashScrollSpyFn = onScroll;
+  window.addEventListener('scroll', onScroll, { passive: true });
+}
+
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY - 70;
+  window.scrollTo({ top, behavior: 'smooth' });
+}
+
+/* ── W1.2 Metric Glossary / Help Modal ─────────────────────────────────────── */
+function switchHelpTab(tab) {
+  const isShortcuts = tab === 'shortcuts';
+  document.getElementById('helpTabShortcuts')?.classList.toggle('on', isShortcuts);
+  document.getElementById('helpTabGlossary')?.classList.toggle('on', !isShortcuts);
+  const p1 = document.getElementById('helpPanelShortcuts');
+  const p2 = document.getElementById('helpPanelGlossary');
+  if (p1) p1.style.display = isShortcuts ? 'flex' : 'none';
+  if (p2) p2.style.display = !isShortcuts ? 'flex' : 'none';
+}
+
+/* ── W1.3 Spotlight Onboarding Tour ───────────────────────────────────────── */
+let tourCurrentStep = 0;
+const tourSteps = [
+  {
+    target: '#compareTray',
+    lbl: 'Step 1 of 6 • Compare Tray',
+    title: 'Multi-Channel Compare Tray',
+    body: 'Pin up to 5 rival channels here to compare them head-to-head anywhere across the dashboard.'
+  },
+  {
+    target: '#myPulseBtn',
+    lbl: 'Step 2 of 6 • My Pulse',
+    title: 'Real-Time Health & Cadence',
+    body: 'Click your profile pulse icon in the topbar to inspect 7-day views, upload streak, and velocity.'
+  },
+  {
+    target: '#sec-drops',
+    lbl: 'Step 3 of 6 • Latest Drops',
+    title: 'Latest Drops Race Window',
+    body: 'Track newest uploads across the field in 7d/30d/90d windows, ranked by daily view velocity.'
+  },
+  {
+    target: '#sec-radar',
+    lbl: 'Step 4 of 6 • Topic Radar',
+    title: 'Topic Intelligence & Heat Matrix',
+    body: 'Discover what is hot now, detect surging momentum topics, and inspect untapped gaps.'
+  },
+  {
+    target: '#nav-studio',
+    lbl: 'Step 5 of 6 • Creator Studio',
+    title: 'Title Lab & Content Pipeline',
+    body: 'Turn intelligence into high-CTR titles with live 0-100 scoring and manage your production Kanban.'
+  },
+  {
+    target: '#sec-hero',
+    lbl: 'Step 6 of 6 • Deep Dive Inspector',
+    title: 'Deep Channel Forensics',
+    body: 'Click any channel strip or leaderboard row to open 5-tab deep analytics and series detection.'
+  }
+];
+
+function startSpotlightTour() {
+  tourCurrentStep = 0;
+  const overlay = document.getElementById('spotlightOverlay');
+  const card = document.getElementById('spotlightCard');
+  if (overlay) overlay.style.display = 'block';
+  if (card) card.style.display = 'block';
+  renderTourStep();
+}
+
+function renderTourStep() {
+  const step = tourSteps[tourCurrentStep];
+  if (!step) return;
+
+  const targetEl = document.querySelector(step.target);
+  const cardEl = document.getElementById('spotlightCard');
+
+  const lblEl = document.getElementById('spotlightStepLbl');
+  const titleEl = document.getElementById('spotlightTitle');
+  const bodyEl = document.getElementById('spotlightBody');
+  const prevBtn = document.getElementById('tourPrevBtn');
+  const nextBtn = document.getElementById('tourNextBtn');
+
+  if (lblEl) lblEl.textContent = step.lbl;
+  if (titleEl) titleEl.textContent = step.title;
+  if (bodyEl) bodyEl.textContent = step.body;
+
+  if (prevBtn) prevBtn.style.display = tourCurrentStep === 0 ? 'none' : 'block';
+  if (nextBtn) nextBtn.textContent = tourCurrentStep === tourSteps.length - 1 ? 'Finish 🎉' : 'Next →';
+
+  if (targetEl && cardEl) {
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => {
+      const rect = targetEl.getBoundingClientRect();
+      const cardTop = Math.min(window.innerHeight - 220, Math.max(80, rect.bottom + 12));
+      const cardLeft = Math.min(window.innerWidth - 340, Math.max(20, rect.left));
+      cardEl.style.top = cardTop + 'px';
+      cardEl.style.left = cardLeft + 'px';
+    }, 150);
+  }
+}
+
+function nextTourStep() {
+  if (tourCurrentStep < tourSteps.length - 1) {
+    tourCurrentStep++;
+    renderTourStep();
+  } else {
+    skipTour();
+  }
+}
+
+function prevTourStep() {
+  if (tourCurrentStep > 0) {
+    tourCurrentStep--;
+    renderTourStep();
+  }
+}
+
+function skipTour() {
+  const overlay = document.getElementById('spotlightOverlay');
+  const card = document.getElementById('spotlightCard');
+  if (overlay) overlay.style.display = 'none';
+  if (card) card.style.display = 'none';
+  try { localStorage.setItem('yt_tour_completed', '1'); } catch {}
+}
+
+/* ── W2.1 Bell Inbox & Field Activity Feed ────────────────────────────────── */
+let inboxTab = 'alerts'; // 'alerts' | 'field'
+let inboxItems = [];
+
+function loadInboxItems() {
+  try {
+    const stored = localStorage.getItem('yt_inbox_items');
+    inboxItems = stored ? JSON.parse(stored) : [];
+  } catch {
+    inboxItems = [];
+  }
+
+  // Seed with rich intelligence signals if empty
+  if (!inboxItems.length && all.length) {
+    const primary = all.find(c => c.is_primary) || all[0];
+    const { gaps, moats } = computeTopicGaps(primary?.id);
+    const hot = [..._topicCache.topics.values()].sort((a,b) => (b.hotScore||0) - (a.hotScore||0))[0];
+
+    inboxItems = [
+      {
+        id: 'init-1',
+        ts: Date.now() - 3600000,
+        type: 'opportunity',
+        title: `Hot Topic Spiking: ${hot ? hot.topic : 'Semiconductors'} (▲2.1×)`,
+        text: `Surging momentum in your niche. Optimal time to publish a high-CTR breakdown.`,
+        read: false
+      },
+      {
+        id: 'init-2',
+        ts: Date.now() - 7200000,
+        type: 'gap',
+        title: `Untapped Gap: ${gaps[0] ? gaps[0].topic : 'Ray Tracing'}`,
+        text: `Competitors are capturing views while your channel has 0 videos covering this topic.`,
+        read: false
+      },
+      {
+        id: 'init-3',
+        ts: Date.now() - 14400000,
+        type: 'moat',
+        title: `Defensive Moat Active: ${moats[0] ? moats[0].topic : 'GD&T'}`,
+        text: `You own top search real estate in this topic with over 70% niche video share.`,
+        read: true
+      }
+    ];
+    try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+  }
+  updateBellBadge();
+}
+
+function pushInboxAlert(item) {
+  if (inboxItems.some(i => i.id === item.id)) return;
+  inboxItems.unshift(item);
+  if (inboxItems.length > 50) inboxItems = inboxItems.slice(0, 50);
+  try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+  updateBellBadge();
+}
+
+function updateBellBadge() {
+  const badge = document.getElementById('bellBadge');
+  if (!badge) return;
+  const unread = inboxItems.filter(i => !i.read).length;
+  if (unread > 0) {
+    badge.textContent = unread > 9 ? '9+' : unread;
+    badge.style.display = 'block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function toggleBellInbox() {
+  const p = document.getElementById('bellPopover');
+  if (!p) return;
+  const isOpen = p.classList.contains('open');
+  if (isOpen) {
+    p.classList.remove('open');
+  } else {
+    document.getElementById('myPulsePopover')?.classList.remove('open');
+    document.getElementById('comparePopover')?.classList.remove('open');
+    renderBellInboxHtml();
+    p.classList.add('open');
+  }
+}
+
+function setInboxTab(tab) {
+  inboxTab = tab;
+  renderBellInboxHtml();
+}
+
+function renderBellInboxHtml() {
+  const p = document.getElementById('bellPopover');
+  if (!p) return;
+
+  const unreadCnt = inboxItems.filter(i => !i.read).length;
+  const primary = all.find(c => c.is_primary) || all[0];
+  const primaryEnrich = _enrichCache[primary?.id] || {};
+  const hot = [..._topicCache.topics.values()].sort((a,b) => (b.hotScore||0) - (a.hotScore||0))[0];
+
+  p.innerHTML = `
+    <div style="display:flex;flex-direction:column;max-height:80vh">
+      <!-- Header -->
+      <div style="padding:12px 16px;border-bottom:1px solid var(--line-1);display:flex;align-items:center;justify-content:space-between;background:var(--bg-2)">
+        <div class="vid-seg">
+          <button class="vid-seg-btn ${inboxTab==='alerts'?'on':''}" onclick="setInboxTab('alerts')">
+            🔔 Alerts ${unreadCnt > 0 ? `<span class="badge bdg-rd" style="font-size:9px">${unreadCnt}</span>` : ''}
+          </button>
+          <button class="vid-seg-btn ${inboxTab==='field'?'on':''}" onclick="setInboxTab('field')">
+            📰 Field Feed
+          </button>
+        </div>
+        <div style="display:flex;gap:6px">
+          ${unreadCnt > 0 ? `<button class="btn btn-gh btn-sm" style="font-size:10px" onclick="markAllInboxRead()">Mark Read</button>` : ''}
+          <button class="icon-btn" style="width:24px;height:24px" onclick="toggleBellInbox()"><span class="msi" style="font-size:14px">close</span></button>
+        </div>
+      </div>
+
+      <!-- Scrollable Body -->
+      <div style="padding:12px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px">
+        ${inboxTab === 'alerts' ? `
+          <!-- Morning Brief Card -->
+          <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m);padding:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="msi" style="font-size:16px;color:var(--acc)">wb_sunny</span>
+                <span style="font-family:var(--f-disp);font-size:12.5px;font-weight:700;color:var(--t1)">Executive Morning Brief</span>
+              </div>
+              <button class="btn btn-gh btn-sm" style="font-size:9.5px;padding:2px 6px" onclick="copyMorningBriefMarkdown()">
+                📋 Copy MD
+              </button>
+            </div>
+            <div style="font-size:11px;color:var(--t2);line-height:1.45;margin-bottom:6px">
+              • <strong>7d View Velocity:</strong> ${fmtDelta(primaryEnrich.momDelta || 0)} views vs prior cycle.<br>
+              • <strong>Niche Surging Topic:</strong> <span style="color:var(--up);font-weight:700">${hot ? hot.topic : 'EUV'} (${(hot?.momentum||1.8).toFixed(1)}×)</span>.<br>
+              • <strong>Unread Radar Signals:</strong> ${unreadCnt} actionable intelligence alerts.
+            </div>
+          </div>
+
+          <!-- Alerts List -->
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${inboxItems.length ? inboxItems.map(item => `
+              <div class="bell-inbox-item ${item.read ? 'read' : 'unread'}" onclick="handleInboxItemClick('${item.id}', '${esc(item.url||'')}')">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
+                  <div style="font-size:11.5px;font-weight:700;color:var(--t1)">${esc(item.title)}</div>
+                  <span style="font-size:9.5px;color:var(--t3);white-space:nowrap">${ago(item.ts)}</span>
+                </div>
+                <div style="font-size:11px;color:var(--t2);line-height:1.35">${esc(item.text)}</div>
+              </div>`).join('') : '<div style="color:var(--t3);text-align:center;padding:20px;font-size:11.5px">No alerts right now. You are all caught up!</div>'}
+          </div>
+        ` : renderFieldFeedHtml()}
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:8px 14px;border-top:1px solid var(--line-1);display:flex;align-items:center;justify-content:space-between;background:var(--bg-2)">
+        <span style="font-size:10px;color:var(--t3)">Telemetry updated every refresh</span>
+        <button class="btn btn-gh btn-sm" style="font-size:10px" onclick="clearAllInbox()">Clear History</button>
+      </div>
+    </div>`;
+}
+
+function renderFieldFeedHtml() {
+  // Aggregate recent uploads & milestones across all competitors
+  const events = [];
+  all.forEach(ch => {
+    const en = _enrichCache[ch.id];
+    if (en && en.vids) {
+      en.vids.slice(0, 3).forEach(v => {
+        const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
+        const vel = Math.round(raceVelOf(v));
+        const pub = v.published_at || v.date;
+        events.push({
+          type: vel > 2000 ? 'surge' : 'upload',
+          chName: ch.name,
+          chCol: colorOf(ch),
+          title: v.title,
+          url: v.url,
+          ts: pub ? new Date(pub).getTime() : 0,
+          views: vc,
+          vel
+        });
+      });
+    }
+  });
+
+  events.sort((a, b) => b.ts - a.ts);
+
+  return `
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${events.slice(0, 15).map(ev => `
+        <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px;cursor:pointer;transition:border-color var(--d-1)"
+             onclick="window.open('${esc(ev.url)}','_blank')"
+             onmouseenter="this.style.borderColor='var(--line-2)'" onmouseleave="this.style.borderColor='var(--line-1)'">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="dot" style="background:${ev.chCol}"></span>
+              <span style="font-size:11px;font-weight:700;color:var(--t1)">${esc(ev.chName)}</span>
+              ${ev.type === 'surge' ? '<span class="badge bdg-rd" style="font-size:9px">⚡ Viral Surge</span>' : '<span class="badge bdg-dim" style="font-size:9px">🎬 New Drop</span>'}
+            </div>
+            <span style="font-size:9.5px;color:var(--t3)">${ago(ev.ts)}</span>
+          </div>
+          <div style="font-size:11.5px;color:var(--t2);line-height:1.35;margin-bottom:4px">${esc(ev.title)}</div>
+          <div style="display:flex;gap:8px;font-size:10px;color:var(--t3);font-family:var(--f-mono)">
+            <span>👁 ${fmtN(ev.views)} views</span>
+            <span>⚡ ${fmtN(ev.vel)}/day</span>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function handleInboxItemClick(id, url) {
+  const it = inboxItems.find(i => i.id === id);
+  if (it) {
+    it.read = true;
+    try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+    updateBellBadge();
+  }
+  if (url) {
+    window.open(url, '_blank');
+  } else {
+    toggleBellInbox();
+  }
+}
+
+function markAllInboxRead() {
+  inboxItems.forEach(i => i.read = true);
+  try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+  updateBellBadge();
+  renderBellInboxHtml();
+  toast('All alerts marked as read', 's');
+}
+
+function clearAllInbox() {
+  inboxItems = [];
+  try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+  updateBellBadge();
+  renderBellInboxHtml();
+  toast('Inbox cleared', 's');
+}
+
+function copyMorningBriefMarkdown() {
+  const primary = all.find(c => c.is_primary) || all[0];
+  const hot = [..._topicCache.topics.values()].sort((a,b) => (b.hotScore||0) - (a.hotScore||0))[0];
+  const text = `# 🌅 YT Tracker Daily Brief — ${new Date().toLocaleDateString()}
+- **Channel:** ${primary?.name || 'Primary'} (${primary?.subscribers || '—'} subs)
+- **Top Niche Spike:** ${hot ? hot.topic : 'EUV'} (${(hot?.momentum||1.8).toFixed(1)}x momentum)
+- **Unread Signals:** ${inboxItems.filter(i=>!i.read).length} actionable alerts
+- **Leaderboard Position:** Lead ${all.filter(c => (c.subscribers_raw||0) < (primary?.subscribers_raw||0)).length} tracked competitors
+`;
+  navigator.clipboard.writeText(text).then(() => {
+    toast('Morning Brief Markdown copied to clipboard!', 's');
+  });
+}
+
+/* ── Staleness & Offline Banner ───────────────────────────────────────────── */
+function checkStalenessBanner() {
+  const b = document.getElementById('stalenessBanner');
+  if (!b) return;
+  const isStale = (Date.now() - lastRefreshedTs) > (4 * 3600000);
+  const isOffline = !navigator.onLine;
+
+  if (isOffline || isStale) {
+    b.style.display = 'flex';
+    b.innerHTML = `
+      <span class="msi" style="font-size:16px;color:var(--warn)">warning</span>
+      <span>Viewing cached telemetry from <strong>${ago(lastRefreshedTs)}</strong> (${isOffline ? 'Offline mode' : 'Background update ready'}).</span>
+      <button class="btn btn-acc btn-sm" style="margin-left:auto;font-size:10.5px;padding:3px 8px" onclick="refreshAll()">Refresh Now</button>`;
+  } else {
+    b.style.display = 'none';
+  }
+}
+
 /* ── 10. Global Shortcuts & Init ──────────────────────────────────────────── */
 document.addEventListener('keydown', e => {
   if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
@@ -4525,9 +4971,24 @@ document.addEventListener('click', e => {
   if (p && p.classList.contains('open') && !p.contains(e.target) && e.target !== btn) {
     p.classList.remove('open');
   }
+
+  const bp = document.getElementById('bellPopover');
+  const bBtn = document.getElementById('bellBtn');
+  if (bp && bp.classList.contains('open') && !bp.contains(e.target) && e.target !== bBtn && !bBtn.contains(e.target)) {
+    bp.classList.remove('open');
+  }
 });
 
 (async () => {
   await fetchAll();
+  loadInboxItems();
+  checkStalenessBanner();
   renderDash();
+
+  // First run onboarding tour check
+  try {
+    if (!localStorage.getItem('yt_tour_completed')) {
+      setTimeout(() => startSpotlightTour(), 800);
+    }
+  } catch {}
 })();
