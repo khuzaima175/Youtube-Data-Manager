@@ -1,0 +1,76 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   YT TRACKER — CLEAN & POLISHED DESIGN SYSTEM (SINGLE CONSOLIDATED STYLESHEET)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 00. Reset & Design Tokens ────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Surfaces */
+  --bg-0: #080c10;
+  --bg-1: #0d1218;
+  --bg-2: #121820;
+  --bg-3: #18222d;
+  --bg-hover: #1e2b38;
+  --line-1: rgba(148, 163, 184, 0.09);
+  --line-2: rgba(148, 163, 184, 0.18);
+
+  /* Text Colors */
+  --t1: #f1f5f9;
+  --t2: #94a3b8;
+  --t3: #64748b;
+  --t4: #334155;
+
+  /* Semantics */
+  --acc: #22d3ee;   /* cyan interactive */
+  --me: #f5c542;    /* gold MY channel */
+  --up: #3ddc97;    /* green good / up */
+  --down: #ff6b6b;  /* red bad / down */
+  --warn: #ffb454;  /* amber warning */
+
+  /* Backward Compatibility Aliases */
+  --pr: var(--acc);
+  --gr: var(--up);
+  --rd: var(--down);
+  --gold: var(--me);
+  --bd: var(--line-1);
+  --bd2: var(--line-2);
+  --sf: var(--bg-2);
+  --sf-high: var(--bg-3);
+
+  /* Shapes & Radii (4px grid) */
+  --r-s: 8px;
+  --r-m: 12px;
+  --r-l: 16px;
+  --r-full: 9999px;
+
+  /* Spacing Grid */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+
+  /* Typography */
+  --f-disp: 'Syne', sans-serif;
+  --f-ui: 'DM Sans', sans-serif;
+  --f-mono: 'JetBrains Mono', monospace;
+
+  /* Motion & Easing Tokens */
+  --e-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --d-1: 0.12s;
+  --d-2: 0.22s;
+  --d-3: 0.45s;
+
+  /* Shadows */
+  --sh-1: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --sh-2: 0 12px 36px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --sh-glow-acc: 0 0 20px rgba(34, 211, 238, 0.22);
+  --sh-glow-me: 0 0 20px rgba(245, 197, 66, 0.22);
+}

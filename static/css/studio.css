@@ -1,0 +1,24 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   PHASE 9: STUDIO (TITLE LAB, IDEA GENERATOR, PIPELINE KANBAN) STYLES
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.pipeline-card {
+  user-select: none;
+}
+
+.pipeline-card:active {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+
+@media (max-width: 960px) {
+  #studioSubPanel > div > div[style*="grid-template-columns:repeat(4, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  #studioSubPanel > div > div[style*="grid-template-columns:repeat(4, 1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+}

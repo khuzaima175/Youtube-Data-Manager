@@ -1,0 +1,101 @@
+/* ── 4. Print Stylesheet (@media print) ────────────────────────────────────── */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  .topnav,
+  .staleness-banner,
+  .main,
+  #page-channel,
+  .cmd-pal,
+  .cmd-ovrl,
+  #scModal,
+  #settingsModal,
+  #spotlightOverlay,
+  #spotlightCard,
+  .report-modal-hdr,
+  .report-controls-bar,
+  .dash-spy-rail,
+  #toast,
+  .achievement-toast {
+    display: none !important;
+  }
+
+  #reportModal,
+  .report-modal {
+    position: static !important;
+    display: block !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+  }
+
+  .report-preview-wrap {
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  .rep-paper {
+    background: #ffffff !important;
+    border: none !important;
+    padding: 0 !important;
+    color: #0f172a !important;
+  }
+
+  .rep-title,
+  .badge-card-title,
+  .rep-kpi-val {
+    color: #0f172a !important;
+  }
+
+  .rep-sub,
+  .rep-kpi-lbl,
+  .badge-card-desc {
+    color: #475569 !important;
+  }
+
+  .rep-kpi-card,
+  .rep-table-wrap,
+  .badge-card {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+  }
+
+  .rep-table th {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  .rep-table td {
+    color: #1e293b !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+
+  .rep-insights-box {
+    background: #f0fdfa !important;
+    border: 1px solid #99f6e4 !important;
+    color: #0f766e !important;
+  }
+
+  .rep-insights-list {
+    color: #134e4a !important;
+  }
+
+  .rep-insights-title {
+    color: #0f766e !important;
+  }
+
+  .rep-paper > * {
+    page-break-inside: avoid;
+  }
+}
