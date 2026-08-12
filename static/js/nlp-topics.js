@@ -263,7 +263,14 @@ async function topicDeepScan(chId) {
 function filterRaceByTopic(topic) {
   raceTopicFilter = raceTopicFilter === topic ? null : topic;
   renderRaceWindow();
-  document.querySelector('.race-window')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  renderTopicRadar();
+  if (typeof serializeStateToHash === 'function') serializeStateToHash();
+  if (raceTopicFilter) {
+    document.getElementById('sec-drops')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (typeof toast === 'function') toast(`Filtering Latest Drops by: "${raceTopicFilter}"`, 's');
+  } else {
+    if (typeof toast === 'function') toast('Cleared topic filter', 's');
+  }
 }
 
 function setTopicRadarRange(r) {
@@ -281,7 +288,7 @@ function renderTopicRadar() {
       <div class="topic-radar-card">
         <div class="topic-radar-hdr">
           <div class="topic-radar-title">
-            <span class="msi" style="color:var(--down)">local_fire_department</span>
+            <span class="msi" style="color:var(--down);font-size:16px">whatshot</span>
             TOPIC RADAR <span>· what's hot across your field</span>
           </div>
         </div>
@@ -307,10 +314,10 @@ function renderTopicRadar() {
   const matrixTopics = hotTopics.slice(0, 8);
   const { gaps, moats } = computeTopicGaps(primaryId);
 
-  // Active topic filter chip in race window
+  // Active topic filter chip in topic radar
   const filterChipHtml = raceTopicFilter
-    ? `<span class="badge bdg-pr" style="margin-left:8px;cursor:pointer" onclick="filterRaceByTopic(null)">
-        filter: ${esc(raceTopicFilter)} ×
+    ? `<span class="badge bdg-pr" style="margin-left:8px;cursor:pointer;display:inline-flex;align-items:center;gap:4px" onclick="event.stopPropagation();filterRaceByTopic(null)" title="Click to clear topic filter">
+        filter: ${esc(raceTopicFilter)} ✕
        </span>` : '';
 
   // Hot list
@@ -409,7 +416,7 @@ function renderTopicRadar() {
     <div class="topic-radar-card">
       <div class="topic-radar-hdr">
         <div class="topic-radar-title">
-          <span class="msi" style="color:var(--down)">local_fire_department</span>
+          <span class="msi" style="color:var(--down);font-size:16px">whatshot</span>
           TOPIC RADAR${filterChipHtml}
           <span>· what's hot across your field</span>
         </div>

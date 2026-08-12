@@ -663,7 +663,7 @@ function renderRaceWindow() {
 
   const isSlim = raceState.slim === 1;
   const filterBadgeHtml = raceTopicFilter
-    ? `<span class="badge bdg-pr" style="margin-left:8px;cursor:pointer" onclick="filterRaceByTopic(null)" title="Click to clear topic filter">
+    ? `<span class="badge bdg-pr" style="margin-left:8px;cursor:pointer;display:inline-flex;align-items:center;gap:4px" onclick="event.stopPropagation();filterRaceByTopic(null)" title="Click to clear topic filter">
         topic: ${esc(raceTopicFilter)} ✕
        </span>`
     : '';
