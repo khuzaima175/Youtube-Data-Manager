@@ -649,6 +649,8 @@ async function renderDDGrowth(ch) {
         ${snapsHtml}
       </div>
 
+      ${renderDDTimingSection(ch)}
+
       <div class="card">
         <div class="sect-lbl" style="margin:0 0 10px 0">
           <span class="msi">calendar_month</span> Upload Activity Heatmap
@@ -672,6 +674,8 @@ async function renderDDGrowth(ch) {
     });
     cell.addEventListener('mouseleave', hideTip);
   });
+
+  attachTimingTooltips(panel);
 }
 
 function renderSnapshotLineChart(snaps, col) {

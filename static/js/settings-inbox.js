@@ -285,19 +285,33 @@ let userPrefs = {
   copycatThreshold: 60,
   collisionRatio: 1.8,
   surgeVelThreshold: 2000,
-  accentColor: 'cyan'
+  accentColor: 'cyan',
+  timing: {
+    minAge: 3,
+    maxAge: 180,
+    tier1: 10,
+    tier2: 30,
+    minCellN: 3
+  }
 };
 
 try {
   const stored = localStorage.getItem('yt_user_prefs');
-  if (stored) userPrefs = { ...userPrefs, ...JSON.parse(stored) };
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    userPrefs = {
+      ...userPrefs,
+      ...parsed,
+      timing: { ...userPrefs.timing, ...(parsed.timing || {}) }
+    };
+  }
 } catch { }
 
 function saveUserPrefs() {
   try { localStorage.setItem('yt_user_prefs', JSON.stringify(userPrefs)); } catch { }
 }
 
-let settingsTab = 'topics'; // 'topics' | 'alerts' | 'data' | 'theme'
+let settingsTab = 'topics'; // 'topics' | 'alerts' | 'timing' | 'data' | 'theme'
 
 function openSettingsModal() {
   document.getElementById('settingsOvrl')?.classList.add('open');
@@ -392,6 +406,58 @@ function renderSettingsBody() {
         <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Daily view rate threshold to flag viral competitor breakout videos in Field Feed.</div>
         <input type="range" min="500" max="10000" step="500" value="${userPrefs.surgeVelThreshold}"
           style="width:100%;accent-color:var(--acc)" oninput="updateAlertPref('surgeVelThreshold', this.value, 'lblSurge', '/day', true)">
+      </div>`;
+  } else if (settingsTab === 'timing') {
+    const tm = userPrefs.timing || { minAge: 3, maxAge: 180, tier1: 10, tier2: 30, minCellN: 3 };
+    body.innerHTML = `
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">🌱 Minimum Video Age Threshold</div>
+          <span class="badge bdg-pr" id="lblTmMinAge">${tm.minAge} days</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Videos younger than this are excluded from timing averages to prevent launch-spike distortion.</div>
+        <input type="range" min="1" max="7" step="1" value="${tm.minAge}"
+          style="width:100%;accent-color:var(--acc)" oninput="updateTimingPref('minAge', this.value, 'lblTmMinAge', ' days')">
+      </div>
+
+      <div style="padding-top:14px;border-top:1px solid var(--line-1)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">🌲 Maximum Video Age Window</div>
+          <span class="badge bdg-pr" id="lblTmMaxAge">${tm.maxAge} days</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Videos older than this are excluded because long-term SEO/evergreen ranking supersedes slot timing.</div>
+        <input type="range" min="30" max="365" step="15" value="${tm.maxAge}"
+          style="width:100%;accent-color:var(--acc)" oninput="updateTimingPref('maxAge', this.value, 'lblTmMaxAge', ' days')">
+      </div>
+
+      <div style="padding-top:14px;border-top:1px solid var(--line-1)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">📊 Tier 1 Threshold (Day Strip)</div>
+          <span class="badge bdg-pr" id="lblTmTier1">${tm.tier1} uploads</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Mature upload count needed to unlock the 7-day strip timing view.</div>
+        <input type="range" min="5" max="20" step="1" value="${tm.tier1}"
+          style="width:100%;accent-color:var(--acc)" oninput="updateTimingPref('tier1', this.value, 'lblTmTier1', ' uploads')">
+      </div>
+
+      <div style="padding-top:14px;border-top:1px solid var(--line-1)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">🔥 Tier 2 Threshold (7×12 Grid)</div>
+          <span class="badge bdg-pr" id="lblTmTier2">${tm.tier2} uploads</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Mature upload count needed to unlock the full 2-hour hourly heatmap grid.</div>
+        <input type="range" min="20" max="60" step="5" value="${tm.tier2}"
+          style="width:100%;accent-color:var(--acc)" oninput="updateTimingPref('tier2', this.value, 'lblTmTier2', ' uploads')">
+      </div>
+
+      <div style="padding-top:14px;border-top:1px solid var(--line-1)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">🛡️ Cell Confidence Floor (n)</div>
+          <span class="badge bdg-pr" id="lblTmMinN">${tm.minCellN} videos/cell</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Cells with fewer videos are rendered hatched and excluded from winning Best Slot.</div>
+        <input type="range" min="2" max="6" step="1" value="${tm.minCellN}"
+          style="width:100%;accent-color:var(--acc)" oninput="updateTimingPref('minCellN', this.value, 'lblTmMinN', ' videos/cell')">
       </div>`;
   } else if (settingsTab === 'data') {
     const storageKb = Math.round(JSON.stringify(localStorage).length / 1024);
@@ -504,6 +570,27 @@ function updateAlertPref(key, val, lblId, suffix, isFmt = false) {
   saveUserPrefs();
   const lbl = document.getElementById(lblId);
   if (lbl) lbl.textContent = (isFmt ? fmtN(num) : num) + suffix;
+}
+
+function updateTimingPref(key, val, lblId, suffix) {
+  const num = parseInt(val, 10);
+  userPrefs.timing = userPrefs.timing || { minAge: 3, maxAge: 180, tier1: 10, tier2: 30, minCellN: 3 };
+  userPrefs.timing[key] = num;
+  saveUserPrefs();
+  const lbl = document.getElementById(lblId);
+  if (lbl) lbl.textContent = num + suffix;
+  if (typeof clearTimingCache === 'function') clearTimingCache();
+
+  // Dynamically refresh live dashboard timing section if present
+  const sec = document.getElementById('sec-timing');
+  if (sec && typeof renderDashTiming === 'function') {
+    const temp = document.createElement('div');
+    temp.innerHTML = renderDashTiming();
+    if (temp.firstElementChild && sec.parentElement) {
+      sec.parentElement.replaceChild(temp.firstElementChild, sec);
+      attachTimingTooltips(document.getElementById('sec-timing') || document);
+    }
+  }
 }
 
 function purgeTopicCache() {

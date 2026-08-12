@@ -242,9 +242,13 @@ async function topicDeepScan(chId) {
     if (!Array.isArray(vids)) throw new Error('bad response');
     try { localStorage.setItem(DEEP_KEY, JSON.stringify({ ts: Date.now(), vids })); } catch { }
     _enrichCache[chId] = { ..._enrichCache[chId], vids, deepScanned: true };
+    if (typeof clearTimingCache === 'function') clearTimingCache();
     buildTopicCache();
     toast('Deep scan complete!', 's');
-    if (ddChannelId === chId) renderDDTopics(all.find(c => c.id === chId));
+    if (ddChannelId === chId) {
+      renderDDTopics(all.find(c => c.id === chId));
+      if (ddActiveTab === 'growth') renderDDGrowth(all.find(c => c.id === chId));
+    }
     renderTopicRadar();
   } catch {
     toast('Deep scan failed', 'e');

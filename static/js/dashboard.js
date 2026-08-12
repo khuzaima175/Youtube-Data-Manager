@@ -254,6 +254,9 @@ async function renderDash() {
       <div class="chart-box" id="dashVelocity"></div>
     </div>`;
 
+  // 5b. Timing Intelligence Card (Best-Time Heatmap & Slot Recommender)
+  const timingHtml = renderDashTiming();
+
   // 6. Recent Uploads Rail
   const recentHtml = `
     <div id="sec-recent" class="card rev in" style="margin-top:var(--s5);--i:5">
@@ -284,10 +287,11 @@ async function renderDash() {
       <div class="dash-spy-item" data-sec="sec-radar" onclick="scrollToSection('sec-radar')" title="Topic Radar"><span class="spy-dot"></span><span class="spy-label">Radar</span></div>
       <div class="dash-spy-item" data-sec="sec-lb" onclick="scrollToSection('sec-lb')" title="Leaderboard"><span class="spy-dot"></span><span class="spy-label">Board</span></div>
       <div class="dash-spy-item" data-sec="sec-vel" onclick="scrollToSection('sec-vel')" title="Velocity"><span class="spy-dot"></span><span class="spy-label">Velocity</span></div>
+      <div class="dash-spy-item" data-sec="sec-timing" onclick="scrollToSection('sec-timing')" title="Timing Intelligence"><span class="spy-dot"></span><span class="spy-label">Timing</span></div>
       <div class="dash-spy-item" data-sec="sec-recent" onclick="scrollToSection('sec-recent')" title="Recent Uploads"><span class="spy-dot"></span><span class="spy-label">Recent</span></div>
     </div>`;
 
-  el.innerHTML = stripHtml + yvfHtml + raceHtml + radarHtml + lbHtml + velHtml + recentHtml + spyRailHtml;
+  el.innerHTML = stripHtml + yvfHtml + raceHtml + radarHtml + lbHtml + velHtml + timingHtml + recentHtml + spyRailHtml;
 
   document.querySelectorAll('.count-val').forEach(valEl => {
     countUp(valEl, valEl.dataset.val);
@@ -301,6 +305,7 @@ async function renderDash() {
   renderRaceWindow();
   renderTopicRadar();
   loadVelocityWithFit(all);
+  attachTimingTooltips(el);
   loadDashboardRecentUploads(primary.id);
   setupScrollReveal();
   setupDashScrollSpy();

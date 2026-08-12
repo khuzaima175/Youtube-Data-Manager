@@ -89,6 +89,7 @@ async function processEnrichQueue() {
 
     _enrichCache[channelId] = data;
     try { localStorage.setItem('yt_enrich_' + channelId, JSON.stringify(data)); } catch { }
+    if (typeof clearTimingCache === 'function') clearTimingCache();
     // Rebuild topic intelligence from freshly cached videos
     setTimeout(() => {
       buildTopicCache();
@@ -138,6 +139,7 @@ async function refreshAll() {
         try { localStorage.removeItem('yt_enrich_' + ch.id); } catch { }
       } catch { }
     }
+    if (typeof clearTimingCache === 'function') clearTimingCache();
     await fetchAll();
     lastRefreshedTs = Date.now();
     const dashActive = document.getElementById('page-dash')?.classList.contains('on');
@@ -194,6 +196,7 @@ async function setPrimary(id) {
     const r = await fetch(`/api/channels/${id}/set-primary`, { method: 'POST' });
     if (!r.ok) { toast('Could not set primary', 'e'); return; }
     toast('Primary channel updated!', 's');
+    if (typeof clearTimingCache === 'function') clearTimingCache();
     await fetchAll();
     renderChannels();
     renderDash();
@@ -209,6 +212,7 @@ async function refreshOne(id) {
     const prevVids = _enrichCache[id]?.vids || [];
     delete _enrichCache[id];
     try { localStorage.removeItem('yt_enrich_' + id); } catch { }
+    if (typeof clearTimingCache === 'function') clearTimingCache();
     toast('Channel updated!', 's');
     await fetchAll();
     // Check for new videos and fire topic alerts
@@ -230,6 +234,7 @@ async function deleteChannel(id) {
     await fetch(`/api/channels/${id}`, { method: 'DELETE' });
     delete _enrichCache[id];
     try { localStorage.removeItem('yt_enrich_' + id); } catch { }
+    if (typeof clearTimingCache === 'function') clearTimingCache();
     compareSet = compareSet.filter(x => x !== id);
     localStorage.setItem('yt_compare_set', JSON.stringify(compareSet));
     toast('Channel removed', 'e');

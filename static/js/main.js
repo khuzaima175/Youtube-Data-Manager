@@ -246,7 +246,7 @@ let _isClickScrolling = false;
 let _clickScrollTimer = null;
 
 function setupDashScrollSpy() {
-  const sections = ['sec-hero', 'sec-yvf', 'sec-drops', 'sec-radar', 'sec-lb', 'sec-vel', 'sec-recent'];
+  const sections = ['sec-hero', 'sec-yvf', 'sec-drops', 'sec-radar', 'sec-lb', 'sec-vel', 'sec-timing', 'sec-recent'];
   const items = document.querySelectorAll('#dashSpyRail .dash-spy-item');
   if (!items.length) return;
 

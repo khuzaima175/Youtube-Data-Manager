@@ -528,6 +528,14 @@ function renderStudioPipelineHtml() {
 
 function renderPipelineCardHtml(card) {
   const isPublished = card.stage === 'published';
+  let slotChip = '';
+  if (card.stage === 'scheduled') {
+    const suggestedSlot = suggestSlotForCard(card);
+    if (suggestedSlot) {
+      slotChip = `<div class="chip chip-acc" style="font-size:10px;margin-bottom:6px;display:inline-flex;align-items:center;gap:4px">⏰ Suggested: ${esc(suggestedSlot)} (your best slot)</div>`;
+    }
+  }
+
   return `
     <div class="pipeline-card" draggable="true"
          ondragstart="pipelineDragStart(event, '${card.id}')"
@@ -540,6 +548,7 @@ function renderPipelineCardHtml(card) {
       <div style="font-size:12px;font-weight:600;color:var(--t1);line-height:1.35;margin-bottom:6px">${esc(card.title)}</div>
       ${card.notes ? `<div style="font-size:10px;color:var(--t3);margin-bottom:6px;line-height:1.3">${esc(card.notes)}</div>` : ''}
       ${card.targetDate ? `<div style="font-size:9.5px;color:var(--acc);margin-bottom:6px">📅 Target: ${card.targetDate}</div>` : ''}
+      ${slotChip}
       ${isPublished && card.actualViews ? `<div style="font-size:10px;color:var(--up);font-weight:700;margin-bottom:6px">👁 ${fmtN(card.actualViews)} views logged</div>` : ''}
 
       <!-- Shift and Delete Bar -->
