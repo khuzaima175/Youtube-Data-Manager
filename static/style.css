@@ -803,6 +803,7 @@ button {
   align-items: center;
   gap: 8px;
   margin-left: auto;
+  position: relative;
 }
 
 /* Compare Tray */
@@ -1092,6 +1093,20 @@ button {
 
 .page.on {
   display: block;
+}
+
+#dashMain {
+  padding-bottom: 50vh;
+}
+
+#sec-hero,
+#sec-yvf,
+#sec-drops,
+#sec-radar,
+#sec-lb,
+#sec-vel,
+#sec-recent {
+  scroll-margin-top: 80px;
 }
 
 .pg-head {
@@ -3159,13 +3174,14 @@ button {
 /* ── My Pulse Popover ── */
 .my-pulse-popover {
   position: absolute;
-  top: 56px;
-  right: 140px;
-  width: 300px;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 440px;
+  max-width: calc(100vw - 32px);
   background: var(--bg-2);
   border: 1px solid var(--line-2);
   border-radius: var(--r-l);
-  box-shadow: var(--sh-2);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
   z-index: 250;
   display: none;
   overflow: hidden;
@@ -3748,5 +3764,514 @@ button {
     white-space: nowrap;
     padding: 4px 8px;
     font-size: 11px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PHASE 12: OUTPUT, GAMIFICATION & SHARING STYLES
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Rank Movement Chips ────────────────────────────────────────────────── */
+.rank-delta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1.5px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.rank-delta-up {
+  color: var(--up);
+  background: rgba(61, 220, 151, 0.12);
+  border: 1px solid rgba(61, 220, 151, 0.28);
+}
+
+.rank-delta-down {
+  color: var(--down);
+  background: rgba(255, 77, 77, 0.12);
+  border: 1px solid rgba(255, 77, 77, 0.28);
+}
+
+.rank-delta-flat {
+  color: var(--t3);
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+}
+
+.rank-delta-new {
+  color: var(--acc);
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  font-size: 8.5px;
+}
+
+/* ── 2. Achievements Engine & Gamification UI ─────────────────────────────── */
+.xp-level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(245, 166, 35, 0.18), rgba(0, 229, 255, 0.18));
+  border: 1px solid rgba(245, 166, 35, 0.4);
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  font-family: var(--f-disp);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--me);
+}
+
+.xp-bar-track {
+  height: 6px;
+  background: var(--bg-3);
+  border-radius: var(--r-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.xp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--me), var(--acc));
+  border-radius: var(--r-full);
+  transition: width 0.8s var(--e-out);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+}
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.badge-card {
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-s);
+  padding: 8px 10px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  transition: all var(--d-1) var(--e-out);
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.badge-card.unlocked {
+  border-color: rgba(245, 166, 35, 0.35);
+  background: linear-gradient(145deg, var(--bg-3), rgba(245, 166, 35, 0.05));
+}
+
+.badge-card.unlocked:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  border-color: var(--me);
+}
+
+.badge-card.locked {
+  opacity: 0.55;
+  filter: grayscale(0.85);
+}
+
+.badge-card-icon {
+  font-size: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-s);
+  background: var(--bg-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--line-1);
+}
+
+.badge-card.unlocked .badge-card-icon {
+  border-color: rgba(245, 166, 35, 0.4);
+  box-shadow: 0 0 10px rgba(245, 166, 35, 0.25);
+}
+
+.badge-card-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.badge-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t1);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.badge-card-title span:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge-card-desc {
+  font-size: 10px;
+  color: var(--t3);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.badge-card-meta {
+  margin-top: 4px;
+  font-size: 9px;
+  font-family: var(--f-mono);
+  color: var(--t4);
+}
+
+/* Achievement Unlock Toast Notification */
+.achievement-toast {
+  position: fixed;
+  top: 68px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(13, 21, 32, 0.94);
+  border: 1.5px solid var(--me);
+  border-radius: var(--r-m);
+  padding: 12px 18px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), 0 0 20px rgba(245, 166, 35, 0.35);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transform: translateY(-40px) scale(0.95);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.achievement-toast.show {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── 3. Report Center Modal & Styles ──────────────────────────────────────── */
+#reportOvrl {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 500 !important;
+  background: rgba(4, 9, 15, 0.84) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  display: none;
+}
+
+#reportOvrl.open {
+  display: block !important;
+}
+
+.report-modal {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 90vw !important;
+  max-width: 1020px !important;
+  height: 86vh !important;
+  max-height: 86vh !important;
+  background: var(--bg-2) !important;
+  border: 1px solid var(--line-2) !important;
+  border-radius: var(--r-l) !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.88), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  z-index: 501 !important;
+  display: none;
+  flex-direction: column !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.report-modal.open {
+  display: flex !important;
+  animation: modalIn 0.22s var(--e-out) forwards;
+}
+
+.report-modal-hdr {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line-1);
+  background: var(--bg-2);
+  flex-wrap: wrap;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.report-controls-bar {
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--line-1);
+  background: var(--bg-3);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.report-ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-ctrl-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.report-preview-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 28px;
+  background: var(--bg-1);
+}
+
+/* Printable Report Paper Layout */
+.rep-paper {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-m);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rep-cover {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--line-2);
+  padding-bottom: 16px;
+}
+
+.rep-title {
+  font-family: var(--f-disp);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--t1);
+  letter-spacing: -0.02em;
+}
+
+.rep-sub {
+  font-size: 11.5px;
+  color: var(--t3);
+  margin-top: 4px;
+}
+
+.rep-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.rep-kpi-card {
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-s);
+  padding: 10px 14px;
+}
+
+.rep-kpi-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--t3);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.rep-kpi-val {
+  font-family: var(--f-mono);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--t1);
+}
+
+.rep-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--r-s);
+  border: 1px solid var(--line-1);
+}
+
+.rep-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.rep-table th {
+  background: var(--bg-3);
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--t3);
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.rep-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line-1);
+  color: var(--t2);
+}
+
+.rep-table tr:last-child td {
+  border-bottom: none;
+}
+
+.rep-insights-box {
+  background: rgba(0, 229, 255, 0.04);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: var(--r-s);
+  padding: 14px 18px;
+}
+
+.rep-insights-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--acc);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rep-insights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--t2);
+  line-height: 1.45;
+  padding-left: 16px;
+}
+
+/* ── 4. Print Stylesheet (@media print) ────────────────────────────────────── */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  .topnav,
+  .staleness-banner,
+  .main,
+  #page-channel,
+  .cmd-pal,
+  .cmd-ovrl,
+  #scModal,
+  #settingsModal,
+  #spotlightOverlay,
+  #spotlightCard,
+  .report-modal-hdr,
+  .report-controls-bar,
+  .dash-spy-rail,
+  #toast,
+  .achievement-toast {
+    display: none !important;
+  }
+
+  #reportModal,
+  .report-modal {
+    position: static !important;
+    display: block !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+  }
+
+  .report-preview-wrap {
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  .rep-paper {
+    background: #ffffff !important;
+    border: none !important;
+    padding: 0 !important;
+    color: #0f172a !important;
+  }
+
+  .rep-title,
+  .badge-card-title,
+  .rep-kpi-val {
+    color: #0f172a !important;
+  }
+
+  .rep-sub,
+  .rep-kpi-lbl,
+  .badge-card-desc {
+    color: #475569 !important;
+  }
+
+  .rep-kpi-card,
+  .rep-table-wrap,
+  .badge-card {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+  }
+
+  .rep-table th {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  .rep-table td {
+    color: #1e293b !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+
+  .rep-insights-box {
+    background: #f0fdfa !important;
+    border: 1px solid #99f6e4 !important;
+    color: #0f766e !important;
+  }
+
+  .rep-insights-list {
+    color: #134e4a !important;
+  }
+
+  .rep-insights-title {
+    color: #0f766e !important;
+  }
+
+  .rep-paper > * {
+    page-break-inside: avoid;
   }
 }

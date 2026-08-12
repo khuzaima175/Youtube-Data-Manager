@@ -44,9 +44,9 @@ let ddVidList = [];
 // Latest Drops Race Window State
 const raceState = {
   range: +(localStorage.getItem('race.range') || 30),
-  sort:  localStorage.getItem('race.sort') || 'vel',
-  open:  new Set(),
-  slim:  +(localStorage.getItem('race.slim') || 0)
+  sort: localStorage.getItem('race.sort') || 'vel',
+  open: new Set(),
+  slim: +(localStorage.getItem('race.slim') || 0)
 };
 
 // Topic Intelligence State
@@ -55,10 +55,40 @@ const TOPIC_ALIAS = {};
 let topicRadarRange = localStorage.getItem('topic.range') || '90d';
 let raceTopicFilter = null;  // string or null — cross-wire from radar
 
+// Phase 12: Output, Gamification & Sharing State
+let _snapshotsCache = null;
+let rankMovementMap = {};
+let myPulseTab = 'overview';
+let reportPeriod = '30d';
+let reportScope = 'all';
+let _isDeserializingHash = false;
+
+const ACHIEVEMENTS_CATALOG = [
+  { id: 'velocity_vanguard', title: 'Velocity Vanguard', icon: '⚡', xp: 100, desc: 'Hit ≥500 views/day on latest longform upload.' },
+  { id: 'giant_slayer', title: 'Giant Slayer', icon: '🥊', xp: 150, desc: 'Out-velocity or out-view a rival with 2× your subscribers.' },
+  { id: 'upload_machine', title: 'Upload Machine', icon: '🚀', xp: 100, desc: 'Maintain a 3+ week upload streak or ≥4 videos in 30 days.' },
+  { id: 'evergreen_master', title: 'Evergreen Master', icon: '🌲', xp: 120, desc: 'Achieve ≥40% Evergreen Fingerprint in your catalog.' },
+  { id: 'radar_commander', title: 'Radar Commander', icon: '🛰️', xp: 80, desc: 'Discover ≥5 surge topics with momentum >1.3×.' },
+  { id: 'moat_defender', title: 'Moat Defender', icon: '⚔️', xp: 150, desc: 'Establish a Topic Defensive Moat with >60% niche share.' },
+  { id: 'collision_dodger', title: 'Collision Dodger', icon: '🛡️', xp: 90, desc: 'Publish clean drops without collision shadow overlap.' },
+  { id: 'title_alchemist', title: 'Title Alchemist', icon: '🧪', xp: 75, desc: 'Generate or evaluate ≥10 titles in Title Lab / Studio.' },
+  { id: 'pipeline_producer', title: 'Pipeline Producer', icon: '📋', xp: 80, desc: 'Move 3+ cards to Production or Published in Kanban.' },
+  { id: 'deep_diver', title: 'Deep Diver', icon: '🧭', xp: 60, desc: 'Inspect 10+ competitor videos across Deep Dive tabs.' },
+  { id: 'benchmarker', title: 'Benchmarker', icon: '⚖️', xp: 50, desc: 'Compare 4 competitor channels simultaneously in Compare Set.' },
+  { id: 'niche_dominator', title: 'Niche Dominator', icon: '👑', xp: 200, desc: 'Reach Rank #1 in Subscribers or Avg Views on Leaderboard.' }
+];
+
+let achievementsState = { unlocked: {}, totalXp: 0, inspectionsCount: 0, titlesTestedCount: 0 };
+try {
+  const st = localStorage.getItem('yt_achievements');
+  if (st) achievementsState = { ...achievementsState, ...JSON.parse(st) };
+} catch { }
+
+
 // Load aliases from localStorage
 try {
   Object.assign(TOPIC_ALIAS, JSON.parse(localStorage.getItem('yt_topic_aliases') || '{}'));
-} catch {}
+} catch { }
 
 /* ── 01. Color & Hue System ───────────────────────────────────────────────── */
 function hash(str) {
@@ -292,6 +322,7 @@ function sp(p) {
   if (p === 'search') {
     setTimeout(() => document.getElementById('srInput')?.focus(), 50);
   }
+  serializeStateToHash();
 }
 
 /* ── 05. Compare Tray Engine ──────────────────────────────────────────────── */
@@ -362,6 +393,8 @@ function toggleCompare(channelId) {
   }
   localStorage.setItem('yt_compare_set', JSON.stringify(compareSet));
   renderCompareTray();
+  checkAchievements();
+  serializeStateToHash();
 
   if (document.getElementById('page-dash')?.classList.contains('on')) {
     const tbody = document.getElementById('lbTableBody');
@@ -417,6 +450,11 @@ function renderCommandPalette(query) {
   const actions = [
     { title: 'Go to Dashboard', icon: 'dashboard', action: () => sp('dash') },
     { title: 'Go to My Channels', icon: 'subscriptions', action: () => sp('channels') },
+    { title: 'Go to Studio (Title Lab & Kanban)', icon: 'movie_filter', action: () => sp('studio') },
+    { title: 'Generate Intelligence Report (PDF / Markdown)', icon: 'description', action: () => openReportModal() },
+    { title: 'Copy Shareable Dashboard State Link', icon: 'share', action: () => copyShareLink() },
+    { title: 'My Channel Pulse & Achievements', icon: 'person', action: () => toggleMyPulse() },
+    { title: 'Settings & Control Room', icon: 'settings', action: () => openSettingsModal() },
     { title: 'Search YouTube Channels', icon: 'search', action: () => sp('search') },
     { title: 'Export Channels as CSV', icon: 'download', action: () => exportCSV() },
     { title: 'Refresh All Data', icon: 'refresh', action: () => refreshAll() },
@@ -530,7 +568,7 @@ async function enrich(channelId, forceRefresh = false) {
         _enrichCache[channelId] = stored;
         return stored;
       }
-    } catch {}
+    } catch { }
   }
 
   return new Promise(resolve => {
@@ -593,7 +631,7 @@ async function processEnrichQueue() {
     };
 
     _enrichCache[channelId] = data;
-    try { localStorage.setItem('yt_enrich_' + channelId, JSON.stringify(data)); } catch {}
+    try { localStorage.setItem('yt_enrich_' + channelId, JSON.stringify(data)); } catch { }
     // Rebuild topic intelligence from freshly cached videos
     setTimeout(() => {
       buildTopicCache();
@@ -683,8 +721,8 @@ async function refreshAll() {
       try {
         await fetch(`/api/channels/${ch.id}/refresh`, { method: 'POST' });
         delete _enrichCache[ch.id];
-        try { localStorage.removeItem('yt_enrich_' + ch.id); } catch {}
-      } catch {}
+        try { localStorage.removeItem('yt_enrich_' + ch.id); } catch { }
+      } catch { }
     }
     await fetchAll();
     lastRefreshedTs = Date.now();
@@ -741,8 +779,8 @@ async function renderDash() {
     <div id="sec-hero" class="my-channel-strip rev in" onclick="openDeepDive('${esc(primary.id)}')">
       <div class="mcs-identity">
         ${primary.logo_url
-          ? `<img class="mcs-logo" src="${esc(proxyImg(primary.logo_url))}" alt="">`
-          : `<div class="mcs-logo-fb">${(primary.name || '?')[0].toUpperCase()}</div>`}
+      ? `<img class="mcs-logo" src="${esc(proxyImg(primary.logo_url))}" alt="">`
+      : `<div class="mcs-logo-fb">${(primary.name || '?')[0].toUpperCase()}</div>`}
         <div class="mcs-info">
           <div class="mcs-name">${esc(primary.name)} <span class="badge bdg-gd">⭐ Mine</span></div>
           <div class="mcs-meta">
@@ -984,6 +1022,7 @@ function setYvfMetric(metric) {
   document.querySelectorAll('.yvf-chips .chip-btn').forEach(btn => {
     btn.classList.toggle('on', btn.textContent.toLowerCase().includes(metric === 'subscribers_raw' ? 'sub' : metric === 'avg_views_raw' ? 'avg' : 'tot'));
   });
+  serializeStateToHash();
 }
 
 function renderLadderRows(primary, allChannels, metricKey) {
@@ -998,7 +1037,7 @@ function renderLadderRows(primary, allChannels, metricKey) {
       <div class="ladder-row ${isMe ? 'me' : ''}" onclick="openDeepDive('${esc(ch.id)}')">
         <div class="ladder-row-bar" style="width:${pct}%;background:${col}"></div>
         <div style="display:flex;align-items:center;gap:6px;position:relative;z-index:1;min-width:0">
-          <span style="font-family:var(--f-mono);font-size:10px;color:var(--t3)">#${i + 1}</span>
+          <span style="font-family:var(--f-mono);font-size:10px;color:var(--t3);display:flex;align-items:center;gap:3px">#${i + 1} ${renderRankDeltaChip(ch.id)}</span>
           <span style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0"></span>
           <span class="ladder-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.name)} ${isMe ? '◀ YOU' : ''}</span>
         </div>
@@ -1087,6 +1126,7 @@ function setLeaderboardSort(field) {
       tbody.innerHTML = renderLeaderboardRows(primary, all);
     });
   }
+  serializeStateToHash();
 }
 
 function renderLeaderboardRows(primary, allChannels) {
@@ -1113,12 +1153,12 @@ function renderLeaderboardRows(primary, allChannels) {
 
     return `
       <tr class="lb-row ${isMe ? 'me' : ''}" onclick="openDeepDive('${esc(ch.id)}', 'overview')">
-        <td style="font-family:var(--f-mono);font-size:11px;color:var(--t3);text-align:center">#${i + 1}</td>
+        <td style="font-family:var(--f-mono);font-size:11px;color:var(--t3);text-align:center;white-space:nowrap">#${i + 1} ${renderRankDeltaChip(ch.id)}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px;min-width:0">
             ${ch.logo_url
-              ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid ${col};flex-shrink:0" alt="">`
-              : `<div style="width:26px;height:26px;border-radius:50%;background:var(--bg-3);border:1px solid ${col};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${(ch.name || '?')[0]}</div>`}
+        ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid ${col};flex-shrink:0" alt="">`
+        : `<div style="width:26px;height:26px;border-radius:50%;background:var(--bg-3);border:1px solid ${col};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${(ch.name || '?')[0]}</div>`}
             <div style="min-width:0">
               <div style="font-weight:600;color:${isMe ? 'var(--me)' : 'var(--t1)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.name)} ${isMe ? '⭐' : ''}</div>
               <div style="font-size:10.5px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.handle || '')}</div>
@@ -1137,8 +1177,8 @@ function renderLeaderboardRows(primary, allChannels) {
         <td style="font-size:11px;color:var(--t3)">${ch.video?.date || '—'}</td>
         <td style="text-align:center;padding:6px 4px" onclick="event.stopPropagation()">
           ${isMe
-            ? `<span class="badge bdg-gd">YOU</span>`
-            : `<span class="badge" style="background:${threatScore>=50?'rgba(255,107,107,0.12)':threatScore>=25?'rgba(245,197,66,0.12)':'var(--bg-3)'};color:${threatColor}" title="Shared topics: ${(ch._sharedTopics||[]).join(', ') || 'none'}">⚔️ ${threatScore}%</span>`}
+        ? `<span class="badge bdg-gd">YOU</span>`
+        : `<span class="badge" style="background:${threatScore >= 50 ? 'rgba(255,107,107,0.12)' : threatScore >= 25 ? 'rgba(245,197,66,0.12)' : 'var(--bg-3)'};color:${threatColor}" title="Shared topics: ${(ch._sharedTopics || []).join(', ') || 'none'}">⚔️ ${threatScore}%</span>`}
         </td>
         <td style="text-align:center;overflow:visible;text-overflow:clip;padding:6px 0" onclick="event.stopPropagation()">
           <button class="icon-btn ${inCompare ? 'active' : ''}" style="display:inline-flex;margin:0 auto" onclick="toggleCompare('${esc(ch.id)}')" title="Toggle compare tray">
@@ -1198,8 +1238,8 @@ function raceData() {
 }
 
 const raceSorters = {
-  vel:    (a, b) => (b.vids[0]?._vel || 0) - (a.vids[0]?._vel || 0),
-  views:  (a, b) => (parseInt(b.vids[0]?.view_count ?? b.vids[0]?.views_raw ?? 0)) - (parseInt(a.vids[0]?.view_count ?? a.vids[0]?.views_raw ?? 0)),
+  vel: (a, b) => (b.vids[0]?._vel || 0) - (a.vids[0]?._vel || 0),
+  views: (a, b) => (parseInt(b.vids[0]?.view_count ?? b.vids[0]?.views_raw ?? 0)) - (parseInt(a.vids[0]?.view_count ?? a.vids[0]?.views_raw ?? 0)),
   newest: (a, b) => (b.vids[0]?._pub || 0) - (a.vids[0]?._pub || 0)
 };
 
@@ -1212,7 +1252,7 @@ function renderRaceWindow() {
   rows.forEach(r => { if (!r.hasCache) enrich(r.ch.id).then(() => renderRaceWindow()); });
 
   const ranked = rows.filter(r => r.vids[0]).sort(raceSorters[raceState.sort] || raceSorters.vel);
-  const muted  = rows.filter(r => !r.vids[0]);
+  const muted = rows.filter(r => !r.vids[0]);
   const bestViews = ranked.length ? Math.max(...ranked.map(r => parseInt(r.vids[0].view_count ?? r.vids[0].views_raw ?? 0))) : 1;
 
   // Caption
@@ -1225,23 +1265,23 @@ function renderRaceWindow() {
 
   const rankedRowsHtml = ranked.map((r, i) => {
     const ch = r.ch;
-    const v  = r.vids[0];
+    const v = r.vids[0];
     const col = colorOf(ch);
-    const vc  = parseInt(v.view_count ?? v.views_raw ?? 0);
+    const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
     const vel = Math.round(v._vel);
     const eng = v._eng;
     const pct = bestViews > 0 ? Math.max(4, Math.round(vc / bestViews * 100)) : 4;
-    const pub  = v.published_at || v.date;
+    const pub = v.published_at || v.date;
     const ageMs = Date.now() - new Date(pub).getTime();
     const isNew = ageMs < 48 * 3600000;
-    const isMe  = ch.is_primary;
+    const isMe = ch.is_primary;
     const isOpen = raceState.open.has(ch.id);
-    const medal = i < 3 ? medals[i] : `<span style="font-size:11px">#${i+1}</span>`;
+    const medal = i < 3 ? medals[i] : `<span style="font-size:11px">#${i + 1}</span>`;
 
     // Avatar
     const avatarHtml = ch.logo_url
       ? `<img class="rrow-avatar" src="${esc(proxyImg(ch.logo_url))}" style="border:1.5px solid ${col}" alt="">`
-      : `<div class="rrow-avatar-fb" style="border:1.5px solid ${col};color:${col}">${(ch.name||'?')[0]}</div>`;
+      : `<div class="rrow-avatar-fb" style="border:1.5px solid ${col};color:${col}">${(ch.name || '?')[0]}</div>`;
 
     // Thumb
     const thumbHtml = v.thumb
@@ -1255,8 +1295,8 @@ function renderRaceWindow() {
       const ivel = Math.round(iv._vel);
       return `
         <div class="race-inset-row vrow" style="--i:${ii}">
-          <span style="font-family:var(--f-mono);font-size:10px;color:var(--t3)">#${ii+2}</span>
-          <img class="race-inset-thumb" src="${esc(iv.thumb||'')}" alt="">
+          <span style="font-family:var(--f-mono);font-size:10px;color:var(--t3)">#${ii + 2}</span>
+          <img class="race-inset-thumb" src="${esc(iv.thumb || '')}" alt="">
           <span class="race-inset-title" title="${esc(iv.title)}">${esc(iv.title)}</span>
           <span class="race-inset-stat">${fmtN(ivc)} 👁</span>
           <span class="race-inset-stat" style="color:var(--acc)">${fmtN(ivel)}/d ⚡</span>
@@ -1267,9 +1307,9 @@ function renderRaceWindow() {
       </div>` : `<div style="font-size:11px;color:var(--t3);padding:8px 0">No other drops in ${raceState.range}d window.</div>`;
 
     return `
-      <div class="rrow ${isMe?'me':''} ${isOpen?'open':''}" id="rrow-${esc(ch.id)}"
+      <div class="rrow ${isMe ? 'me' : ''} ${isOpen ? 'open' : ''}" id="rrow-${esc(ch.id)}"
            onclick="raceToggleRow('${esc(ch.id)}')">
-        <div class="rrow-rank">${medal}</div>
+        <div class="rrow-rank" style="display:flex;flex-direction:column;align-items:center;gap:2px">${medal} ${renderRankDeltaChip(ch.id)}</div>
         <div class="rrow-ch">
           ${avatarHtml}
           <div class="rrow-ch-info">
@@ -1289,14 +1329,14 @@ function renderRaceWindow() {
         </div>
         <div class="rrow-views">${fmtN(vc)}<br><span style="font-size:9.5px;color:var(--t3);font-family:var(--f-ui);font-weight:400">views</span></div>
         <div class="rrow-vel">${fmtN(vel)}<span style="font-size:9.5px;font-weight:400">/day</span> ⚡</div>
-        <div class="rrow-eng">${eng !== null ? eng+'%' : '<span style="color:var(--t3)">—</span>'}</div>
+        <div class="rrow-eng">${eng !== null ? eng + '%' : '<span style="color:var(--t3)">—</span>'}</div>
         <div class="race-vs-wrap">
           <span class="race-vs-label">${Math.round(pct)}% of best</span>
           <div class="race-vs-track"><div class="race-vs-fill" style="width:${pct}%;background:${col}"></div></div>
         </div>
         <div class="rrow-chev"><span class="msi" style="font-size:18px">expand_more</span></div>
       </div>
-      <div class="fold ${isOpen?'open':''}" id="rfold-${esc(ch.id)}">
+      <div class="fold ${isOpen ? 'open' : ''}" id="rfold-${esc(ch.id)}">
         <div class="fold-inner">
           <div class="race-inset">${insetHtml}</div>
         </div>
@@ -1323,20 +1363,20 @@ function renderRaceWindow() {
 
   el.innerHTML = `
     <div class="race-window">
-      <div class="race-win-bar ${isSlim?'slim-mode':''}">
+      <div class="race-win-bar ${isSlim ? 'slim-mode' : ''}">
         <div class="race-pulse-dot"></div>
         <div class="race-title">LATEST DROPS${filterBadgeHtml} <span>· newest uploads head-to-head</span></div>
         <div class="race-controls">
           <div class="race-seg" data-tip="Time window">
-            ${[7,30,90].map(d => `<button class="race-seg-btn ${raceState.range===d?'on':''}" onclick="setRaceRange(${d})">${d}d</button>`).join('')}
+            ${[7, 30, 90].map(d => `<button class="race-seg-btn ${raceState.range === d ? 'on' : ''}" onclick="setRaceRange(${d})">${d}d</button>`).join('')}
           </div>
           <div class="race-seg" data-tip="Sort by">
-            <button class="race-seg-btn ${raceState.sort==='vel'?'on':''}" onclick="setRaceSort('vel')">⚡ Velocity</button>
-            <button class="race-seg-btn ${raceState.sort==='views'?'on':''}" onclick="setRaceSort('views')">👁 Views</button>
-            <button class="race-seg-btn ${raceState.sort==='newest'?'on':''}" onclick="setRaceSort('newest')">🕒 Newest</button>
+            <button class="race-seg-btn ${raceState.sort === 'vel' ? 'on' : ''}" onclick="setRaceSort('vel')">⚡ Velocity</button>
+            <button class="race-seg-btn ${raceState.sort === 'views' ? 'on' : ''}" onclick="setRaceSort('views')">👁 Views</button>
+            <button class="race-seg-btn ${raceState.sort === 'newest' ? 'on' : ''}" onclick="setRaceSort('newest')">🕒 Newest</button>
           </div>
           <button class="icon-btn" onclick="raceExpandAll()" title="Expand / collapse all rows"><span class="msi" style="font-size:16px">unfold_more</span></button>
-          <button class="icon-btn" onclick="raceToggleSlim()" title="Collapse window to caption bar"><span class="msi" style="font-size:16px">${isSlim?'expand_more':'remove'}</span></button>
+          <button class="icon-btn" onclick="raceToggleSlim()" title="Collapse window to caption bar"><span class="msi" style="font-size:16px">${isSlim ? 'expand_more' : 'remove'}</span></button>
         </div>
       </div>
       <div class="race-caption"><span>${caption}</span></div>
@@ -1364,9 +1404,9 @@ function raceToggleRow(id) {
   } else {
     raceState.open.add(id);
   }
-  const rowEl  = document.getElementById('rrow-' + id);
+  const rowEl = document.getElementById('rrow-' + id);
   const foldEl = document.getElementById('rfold-' + id);
-  if (rowEl)  rowEl.classList.toggle('open', raceState.open.has(id));
+  if (rowEl) rowEl.classList.toggle('open', raceState.open.has(id));
   if (foldEl) foldEl.classList.toggle('open', raceState.open.has(id));
 }
 
@@ -1393,14 +1433,14 @@ function raceToggleSlim() {
 
 const TOPIC_STOP = new Set(
   ('how,what,why,does,do,works,work,the,a,an,to,of,in,on,for,with,and,or,' +
-   'using,use,used,that,this,you,your,my,we,it,is,are,was,were,be,been,' +
-   'full,complete,explained,explaining,exploring,beginner,tutorial,guide,' +
-   'vs,versus,part,ep,episode,series,video,watch,new,best,top,first,last,' +
-   'make,made,making,build,built,building,get,got,just,even,can,could,would,' +
-   'should,will,from,but,not,no,yes,all,more,most,less,one,two,three,four,' +
-   'five,six,seven,eight,nine,ten,i,me,he,she,they,them,us,our,his,her,its,' +
-   'inside,here,now,then,when,which,who,every,where,about,into,over,after,' +
-   'before,much,many,some,other,back,also,only,very,well,still,down,up,out').split(',')
+    'using,use,used,that,this,you,your,my,we,it,is,are,was,were,be,been,' +
+    'full,complete,explained,explaining,exploring,beginner,tutorial,guide,' +
+    'vs,versus,part,ep,episode,series,video,watch,new,best,top,first,last,' +
+    'make,made,making,build,built,building,get,got,just,even,can,could,would,' +
+    'should,will,from,but,not,no,yes,all,more,most,less,one,two,three,four,' +
+    'five,six,seven,eight,nine,ten,i,me,he,she,they,them,us,our,his,her,its,' +
+    'inside,here,now,then,when,which,who,every,where,about,into,over,after,' +
+    'before,much,many,some,other,back,also,only,very,well,still,down,up,out').split(',')
 );
 
 function topicTokens(title) {
@@ -1460,7 +1500,7 @@ function buildTopicCache() {
 
   const topicMap = new Map();
   const cutRecent = now - 90 * 864e5;
-  const cutOld    = now - 365 * 864e5;
+  const cutOld = now - 365 * 864e5;
 
   allVids.forEach(v => {
     const toks = cleanTokens(v.title || '');
@@ -1470,8 +1510,10 @@ function buildTopicCache() {
 
     toks.forEach(t => {
       if (!topicMap.has(t)) {
-        topicMap.set(t, { topic: t, n: 0, totalViews: 0, totalEng: 0, engCount: 0,
-          lastUsed: 0, recentViews: [], oldViews: [], channels: new Set() });
+        topicMap.set(t, {
+          topic: t, n: 0, totalViews: 0, totalEng: 0, engCount: 0,
+          lastUsed: 0, recentViews: [], oldViews: [], channels: new Set()
+        });
       }
       const s = topicMap.get(t);
       s.n++;
@@ -1487,12 +1529,12 @@ function buildTopicCache() {
   const finalTopics = new Map();
   for (const [t, s] of topicMap) {
     if (s.n < 2) continue;
-    const avgViews  = s.n > 0 ? Math.round(s.totalViews / s.n) : 0;
-    const avgEng    = s.engCount > 0 ? parseFloat((s.totalEng / s.engCount).toFixed(1)) : null;
+    const avgViews = s.n > 0 ? Math.round(s.totalViews / s.n) : 0;
+    const avgEng = s.engCount > 0 ? parseFloat((s.totalEng / s.engCount).toFixed(1)) : null;
     const recentAvg = s.recentViews.length > 0 ? s.recentViews.reduce((a, b) => a + b, 0) / s.recentViews.length : 0;
-    const oldAvg    = s.oldViews.length > 0    ? s.oldViews.reduce((a, b) => a + b, 0) / s.oldViews.length : 0;
-    const hotScore  = Math.round(recentAvg * Math.log2(s.n + 1));
-    const momentum  = (recentAvg > 0 && oldAvg > 0 && s.recentViews.length >= 2 && s.oldViews.length >= 2)
+    const oldAvg = s.oldViews.length > 0 ? s.oldViews.reduce((a, b) => a + b, 0) / s.oldViews.length : 0;
+    const hotScore = Math.round(recentAvg * Math.log2(s.n + 1));
+    const momentum = (recentAvg > 0 && oldAvg > 0 && s.recentViews.length >= 2 && s.oldViews.length >= 2)
       ? parseFloat((recentAvg / oldAvg).toFixed(2)) : null;
 
     // Leading channel
@@ -1554,7 +1596,7 @@ function buildTopicCache() {
       perChannel: [...perChannel.entries()].map(([id, m]) => [id, [...m.entries()]])
     };
     localStorage.setItem('yt_topic_cache', JSON.stringify(serializable));
-  } catch {}
+  } catch { }
 }
 
 function loadTopicCacheFromStorage() {
@@ -1570,7 +1612,7 @@ function loadTopicCacheFromStorage() {
 
 function saveTopicAlias(from, to) {
   TOPIC_ALIAS[from] = to;
-  try { localStorage.setItem('yt_topic_aliases', JSON.stringify(TOPIC_ALIAS)); } catch {}
+  try { localStorage.setItem('yt_topic_aliases', JSON.stringify(TOPIC_ALIAS)); } catch { }
   buildTopicCache();
   renderTopicRadar();
 }
@@ -1578,7 +1620,7 @@ function saveTopicAlias(from, to) {
 function computeTopicGaps(primaryId) {
   if (!primaryId || !_topicCache.topics.size) return { gaps: [], moats: [] };
 
-  const myTopics   = _topicCache.perChannel.get(primaryId) || new Map();
+  const myTopics = _topicCache.perChannel.get(primaryId) || new Map();
   const fieldTopics = _topicCache.topics;
   const allAvgViews = [...fieldTopics.values()].map(t => t.avgViews).sort((a, b) => a - b);
   const medianFieldAvg = allAvgViews[Math.floor(allAvgViews.length / 2)] || 0;
@@ -1586,7 +1628,7 @@ function computeTopicGaps(primaryId) {
   const gaps = [], moats = [];
   for (const [t, stat] of fieldTopics) {
     const myStat = myTopics.get(t);
-    const myN    = myStat?.n || 0;
+    const myN = myStat?.n || 0;
     if (myN === 0 && stat.avgViews >= medianFieldAvg && stat.n >= 3) {
       gaps.push({ topic: t, fieldAvg: stat.avgViews, fieldN: stat.n, hotScore: stat.hotScore, momentum: stat.momentum });
     }
@@ -1614,7 +1656,7 @@ async function topicDeepScan(chId) {
       toast('Using cached deep scan (7-day)', 's');
       return;
     }
-  } catch {}
+  } catch { }
   // Disable button during fetch
   const btn = document.querySelector(`[onclick*="topicDeepScan('${chId}')"]`);
   if (btn) { btn.disabled = true; btn.textContent = 'Scanning…'; }
@@ -1623,7 +1665,7 @@ async function topicDeepScan(chId) {
     const r = await fetch(`/api/channels/${chId}/videos?max=200`);
     const vids = await r.json();
     if (!Array.isArray(vids)) throw new Error('bad response');
-    try { localStorage.setItem(DEEP_KEY, JSON.stringify({ ts: Date.now(), vids })); } catch {}
+    try { localStorage.setItem(DEEP_KEY, JSON.stringify({ ts: Date.now(), vids })); } catch { }
     _enrichCache[chId] = { ..._enrichCache[chId], vids, deepScanned: true };
     buildTopicCache();
     toast('Deep scan complete!', 's');
@@ -1682,7 +1724,7 @@ function renderTopicRadar() {
     .filter(t => t.n >= 2 && (rangeMs === Infinity || t.lastUsed >= cutTs))
     .sort((a, b) => (b.hotScore || 0) - (a.hotScore || 0));
 
-  const hotTopics    = sortedTopics.slice(0, 10);
+  const hotTopics = sortedTopics.slice(0, 10);
   const matrixTopics = hotTopics.slice(0, 8);
   const { gaps, moats } = computeTopicGaps(primaryId);
 
@@ -1694,7 +1736,7 @@ function renderTopicRadar() {
 
   // Hot list
   const hotListHtml = hotTopics.length ? hotTopics.map((t, i) => {
-    const leadCh  = all.find(c => c.id === t.leadChannel);
+    const leadCh = all.find(c => c.id === t.leadChannel);
     const leadCol = leadCh ? colorOf(leadCh) : 'var(--t3)';
     const isFiltered = raceTopicFilter === t.topic;
     const mom = t.momentum;
@@ -1741,17 +1783,17 @@ function renderTopicRadar() {
   const matrixHeaderHtml = `<tr>
     <th class="matrix-topic-col">Topic</th>
     ${matrixChannels.map(ch => {
-      const col = colorOf(ch);
-      const isMe = ch.is_primary;
-      return `<th class="matrix-ch-col ${isMe ? 'matrix-me-col' : ''}">
+    const col = colorOf(ch);
+    const isMe = ch.is_primary;
+    return `<th class="matrix-ch-col ${isMe ? 'matrix-me-col' : ''}">
         <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
           ${ch.logo_url
-            ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:22px;height:22px;border-radius:50%;border:1.5px solid ${col};object-fit:cover">`
-            : `<div style="width:22px;height:22px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff">${(ch.name||'?')[0]}</div>`}
+        ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:22px;height:22px;border-radius:50%;border:1.5px solid ${col};object-fit:cover">`
+        : `<div style="width:22px;height:22px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff">${(ch.name || '?')[0]}</div>`}
           <span style="font-size:9px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px">${esc(ch.name.length > 7 ? ch.name.slice(0, 7) + '…' : ch.name)}</span>
         </div>
       </th>`;
-    }).join('')}
+  }).join('')}
   </tr>`;
 
   const globalMaxAvg = Math.max(...matrixTopics.map(t => t.avgViews), 1);
@@ -1793,7 +1835,7 @@ function renderTopicRadar() {
           <span>· what's hot across your field</span>
         </div>
         <div class="race-seg">
-          ${['90d','6m','all'].map(r => `
+          ${['90d', '6m', 'all'].map(r => `
             <button class="race-seg-btn ${topicRadarRange === r ? 'on' : ''}"
               onclick="setTopicRadarRange('${r}')">${r}</button>`).join('')}
         </div>
@@ -1829,8 +1871,8 @@ function showTopicCellPopover(event, chId, topic) {
   const popover = document.getElementById('topicCellPopover');
   if (!popover) return;
 
-  const ch   = all.find(c => c.id === chId);
-  const en   = _enrichCache[chId];
+  const ch = all.find(c => c.id === chId);
+  const en = _enrichCache[chId];
   const vids = (en?.vids || []).filter(v => {
     const toks = topicTokens(v.title || '');
     return toks.includes(topic) || toks.some(t => t === topic);
@@ -1842,19 +1884,19 @@ function showTopicCellPopover(event, chId, topic) {
   document.getElementById('topicCellPopoverList').innerHTML = !vids.length
     ? `<div style="color:var(--t3);font-size:11px;padding:8px 0">No videos on this topic cached yet.</div>`
     : vids.slice(0, 4).map(v => {
-        const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
-        return `<a class="topic-cell-vid-row" href="${esc(v.url)}" target="_blank" rel="noopener">
-          <img src="${esc(v.thumb||'')}" style="width:52px;height:30px;object-fit:cover;border-radius:3px;background:var(--bg-1)" onerror="this.style.opacity='.3'">
+      const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
+      return `<a class="topic-cell-vid-row" href="${esc(v.url)}" target="_blank" rel="noopener">
+          <img src="${esc(v.thumb || '')}" style="width:52px;height:30px;object-fit:cover;border-radius:3px;background:var(--bg-1)" onerror="this.style.opacity='.3'">
           <div style="min-width:0">
             <div style="font-size:11px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(v.title)}</div>
-            <div style="font-size:10px;color:var(--t3)">${fmtN(vc)} views · ${ago(v.published_at||v.date)}</div>
+            <div style="font-size:10px;color:var(--t3)">${fmtN(vc)} views · ${ago(v.published_at || v.date)}</div>
           </div>
         </a>`;
-      }).join('');
+    }).join('');
 
   const rect = event.currentTarget?.getBoundingClientRect() || { left: event.clientX, bottom: event.clientY };
   popover.style.left = Math.min(rect.left, window.innerWidth - 290) + window.scrollX + 'px';
-  popover.style.top  = (rect.bottom + window.scrollY + 6) + 'px';
+  popover.style.top = (rect.bottom + window.scrollY + 6) + 'px';
   popover.classList.add('open');
 }
 
@@ -1878,11 +1920,11 @@ function renderDDTopics(ch) {
     buildTopicCache();
   }
 
-  const primaryId    = (all.find(c => c.is_primary) || all[0])?.id;
-  const myTopics     = _topicCache.perChannel.get(ch.id) || new Map();
+  const primaryId = (all.find(c => c.is_primary) || all[0])?.id;
+  const myTopics = _topicCache.perChannel.get(ch.id) || new Map();
   const globalTopics = _topicCache.topics;
-  const col          = colorOf(ch);
-  const isMe         = ch.is_primary;
+  const col = colorOf(ch);
+  const isMe = ch.is_primary;
   const isDeepScanned = !!_enrichCache[ch.id]?.deepScanned;
 
   const chTopicsSorted = [...myTopics.values()]
@@ -1902,10 +1944,10 @@ function renderDDTopics(ch) {
 
   const rowsHtml = chTopicsSorted.map((t, i) => {
     const globalT = globalTopics.get(t.topic);
-    const pct     = maxChAvg > 0 ? Math.max(4, Math.round(t.avgViews / maxChAvg * 100)) : 4;
-    const myStat  = myChTopics.get(t.topic);
-    const myPct   = myStat && maxChAvg > 0 ? Math.max(2, Math.round(myStat.avgViews / maxChAvg * 100)) : 0;
-    const mom     = globalT?.momentum ?? null;
+    const pct = maxChAvg > 0 ? Math.max(4, Math.round(t.avgViews / maxChAvg * 100)) : 4;
+    const myStat = myChTopics.get(t.topic);
+    const myPct = myStat && maxChAvg > 0 ? Math.max(2, Math.round(myStat.avgViews / maxChAvg * 100)) : 0;
+    const mom = globalT?.momentum ?? null;
     const momHtml = mom !== null
       ? `<span style="color:${mom >= 1.2 ? 'var(--up)' : mom <= 0.8 ? 'var(--down)' : 'var(--t3)'};font-family:var(--f-mono);font-size:11px">${mom >= 1 ? '▲' : '▼'}${mom.toFixed(1)}×</span>`
       : `<span style="color:var(--t3)">•</span>`;
@@ -1965,8 +2007,8 @@ function renderDDTopics(ch) {
           </span>` : ''}
         </div>
         ${chTopicsSorted.length
-          ? `<div style="display:flex;flex-direction:column">${rowsHtml}</div>`
-          : `<div style="color:var(--t3);text-align:center;padding:24px;font-size:12px">No topics detected yet.<br>Try Deep Scan for richer history.</div>`}
+      ? `<div style="display:flex;flex-direction:column">${rowsHtml}</div>`
+      : `<div style="color:var(--t3);text-align:center;padding:24px;font-size:12px">No topics detected yet.<br>Try Deep Scan for richer history.</div>`}
       </div>
 
       <div class="card" style="flex-direction:row;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -2021,8 +2063,8 @@ async function renderMyPulse() {
     const daysSince = Math.floor((Date.now() - pub0) / 864e5);
     const intervals = [];
     for (let i = 0; i < Math.min(longForm.length - 1, 5); i++) {
-      const a = new Date(longForm[i].published_at   || longForm[i].date || 0).getTime();
-      const b = new Date(longForm[i+1].published_at || longForm[i+1].date || 0).getTime();
+      const a = new Date(longForm[i].published_at || longForm[i].date || 0).getTime();
+      const b = new Date(longForm[i + 1].published_at || longForm[i + 1].date || 0).getTime();
       if (a && b) intervals.push(Math.abs(a - b) / 864e5);
     }
     if (intervals.length) {
@@ -2055,7 +2097,7 @@ async function renderMyPulse() {
 
   // Next milestone ring
   const subRaw = me.subscribers_raw || 0;
-  const stones = [1e3,5e3,10e3,25e3,50e3,100e3,250e3,500e3,1e6,2e6,5e6,10e6,50e6,100e6];
+  const stones = [1e3, 5e3, 10e3, 25e3, 50e3, 100e3, 250e3, 500e3, 1e6, 2e6, 5e6, 10e6, 50e6, 100e6];
   const ms = stones.find(s => s > subRaw);
   const msPct = ms ? Math.min(99, (subRaw / ms) * 100) : 100;
   const circum = 2 * Math.PI * 10; // r=10 → ~62.8
@@ -2132,7 +2174,7 @@ const _alertDedup = new Set();
 try {
   const saved = JSON.parse(localStorage.getItem('yt_alert_dedup') || '[]');
   saved.forEach(k => _alertDedup.add(k));
-} catch {}
+} catch { }
 
 function topicAlerts_check(ch, newVids) {
   if (!ch || !newVids || !newVids.length) return;
@@ -2141,8 +2183,8 @@ function topicAlerts_check(ch, newVids) {
 
   const { moats, gaps } = computeTopicGaps(primary.id);
   const moatTopics = new Set(moats.map(m => m.topic));
-  const gapTopics  = new Set(gaps.map(g => g.topic));
-  const todayKey   = new Date().toISOString().slice(0, 10);
+  const gapTopics = new Set(gaps.map(g => g.topic));
+  const todayKey = new Date().toISOString().slice(0, 10);
 
   newVids.forEach(v => {
     const toks = new Set(topicTokens(v.title || ''));
@@ -2152,9 +2194,11 @@ function topicAlerts_check(ch, newVids) {
       const dk = `threat:${t}:${ch.id}:${todayKey}`;
       if (_alertDedup.has(dk)) return;
       _alertDedup.add(dk);
-      pushTopicAlert({ type: 'threat', icon: 'warning', color: 'var(--down)',
+      pushTopicAlert({
+        type: 'threat', icon: 'warning', color: 'var(--down)',
         title: `${esc(ch.name)} published on your moat: ${t}`,
-        body: v.title, url: v.url });
+        body: v.title, url: v.url
+      });
     });
 
     toks.forEach(t => {
@@ -2163,9 +2207,11 @@ function topicAlerts_check(ch, newVids) {
       const dk = `opp:${t}:${todayKey}`;
       if (_alertDedup.has(dk)) return;
       _alertDedup.add(dk);
-      pushTopicAlert({ type: 'opportunity', icon: 'trending_up', color: 'var(--up)',
+      pushTopicAlert({
+        type: 'opportunity', icon: 'trending_up', color: 'var(--up)',
         title: `Hot topic spiking: ${t} (${(stat.momentum || 0).toFixed(1)}×)`,
-        body: `${esc(ch.name)} → ${v.title}`, url: v.url });
+        body: `${esc(ch.name)} → ${v.title}`, url: v.url
+      });
     });
 
     gapTopics.forEach(t => {
@@ -2173,14 +2219,16 @@ function topicAlerts_check(ch, newVids) {
       const dk = `gap:${t}:${ch.id}:${todayKey}`;
       if (_alertDedup.has(dk)) return;
       _alertDedup.add(dk);
-      pushTopicAlert({ type: 'gap', icon: 'search_off', color: 'var(--warn)',
+      pushTopicAlert({
+        type: 'gap', icon: 'search_off', color: 'var(--warn)',
         title: `Rival covered your gap: ${t}`,
-        body: `${esc(ch.name)} → ${v.title}`, url: v.url });
+        body: `${esc(ch.name)} → ${v.title}`, url: v.url
+      });
     });
   });
 
   // Persist dedup set (keep only today's)
-  try { localStorage.setItem('yt_alert_dedup', JSON.stringify([..._alertDedup])); } catch {}
+  try { localStorage.setItem('yt_alert_dedup', JSON.stringify([..._alertDedup])); } catch { }
 }
 
 function pushTopicAlert({ type, icon, color, title, body, url }) {
@@ -2492,7 +2540,7 @@ async function drawVelocitySvg(box, channels, width, height) {
             _enrichCache[ch.id] = { ts: Date.now(), vids };
             return vids;
           }
-        } catch {}
+        } catch { }
         return [];
       })
     );
@@ -2636,8 +2684,8 @@ function renderDenseChannelRow(ch) {
       <!-- 1. Avatar -->
       <div>
         ${ch.logo_url
-          ? `<img class="ch-row-av" src="${esc(proxyImg(ch.logo_url))}" style="border:2px solid ${col}" alt="">`
-          : `<div class="ch-row-av" style="background:var(--bg-3);border:2px solid ${col};display:flex;align-items:center;justify-content:center;font-weight:700">${(ch.name || '?')[0]}</div>`}
+      ? `<img class="ch-row-av" src="${esc(proxyImg(ch.logo_url))}" style="border:2px solid ${col}" alt="">`
+      : `<div class="ch-row-av" style="background:var(--bg-3);border:2px solid ${col};display:flex;align-items:center;justify-content:center;font-weight:700">${(ch.name || '?')[0]}</div>`}
       </div>
 
       <!-- 2. Identity -->
@@ -2659,7 +2707,9 @@ function renderDenseChannelRow(ch) {
 
       <!-- 4. Subscribers -->
       <div>
-        <div style="font-family:var(--f-mono);font-weight:700;color:var(--t1)">${esc(ch.subscribers)}</div>
+        <div style="font-family:var(--f-mono);font-weight:700;color:var(--t1);display:flex;align-items:center;gap:4px">
+          ${esc(ch.subscribers)} ${renderRankDeltaChip(ch.id)}
+        </div>
         <div style="font-size:10px;color:var(--t3)">subscribers</div>
       </div>
 
@@ -2764,7 +2814,7 @@ async function refreshOne(id) {
     if (!r.ok) { toast('Refresh failed', 'e'); return; }
     const prevVids = _enrichCache[id]?.vids || [];
     delete _enrichCache[id];
-    try { localStorage.removeItem('yt_enrich_' + id); } catch {}
+    try { localStorage.removeItem('yt_enrich_' + id); } catch { }
     toast('Channel updated!', 's');
     await fetchAll();
     // Check for new videos and fire topic alerts
@@ -2785,7 +2835,7 @@ async function deleteChannel(id) {
   try {
     await fetch(`/api/channels/${id}`, { method: 'DELETE' });
     delete _enrichCache[id];
-    try { localStorage.removeItem('yt_enrich_' + id); } catch {}
+    try { localStorage.removeItem('yt_enrich_' + id); } catch { }
     compareSet = compareSet.filter(x => x !== id);
     localStorage.setItem('yt_compare_set', JSON.stringify(compareSet));
     toast('Channel removed', 'e');
@@ -3060,7 +3110,12 @@ async function openDeepDive(channelId, tab = null) {
     document.body.style.overflow = 'hidden';
   }
 
+  achievementsState.inspectionsCount = (achievementsState.inspectionsCount || 0) + 1;
+  saveAchievements();
+  checkAchievements();
+
   switchDDTab(tab);
+  serializeStateToHash();
 }
 
 function closeDeepDive() {
@@ -3070,6 +3125,7 @@ function closeDeepDive() {
     document.body.style.overflow = '';
   }
   ddChannelId = null;
+  serializeStateToHash();
 }
 
 function switchDDTab(tab) {
@@ -3088,11 +3144,13 @@ function switchDDTab(tab) {
   const ch = all.find(c => c.id === ddChannelId);
   if (!ch) return;
 
+  serializeStateToHash();
+
   if (tab === 'overview') renderDDOverview(ch);
-  if (tab === 'videos')   renderDDVideos(ch);
-  if (tab === 'growth')   renderDDGrowth(ch);
-  if (tab === 'compare')  renderDDCompare(ch);
-  if (tab === 'topics')   renderDDTopics(ch);
+  if (tab === 'videos') renderDDVideos(ch);
+  if (tab === 'growth') renderDDGrowth(ch);
+  if (tab === 'compare') renderDDCompare(ch);
+  if (tab === 'topics') renderDDTopics(ch);
 }
 
 /* ── Deep Dive Tab 1: Overview (Bento Rebuild) ─────────────────────────────── */
@@ -3133,10 +3191,10 @@ async function renderDDOverview(ch) {
 
   // This month stats
   const nowDate = new Date();
-  const mKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth()+1).padStart(2,'0')}`;
-  const thisMonthVids = allVids.filter(v => (v.published_at||v.date||'').startsWith(mKey));
+  const mKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`;
+  const thisMonthVids = allVids.filter(v => (v.published_at || v.date || '').startsWith(mKey));
   const thisMonthViews = thisMonthVids.reduce((s, v) => s + parseInt(v.view_count ?? v.views_raw ?? 0), 0);
-  const bestThisMonth = thisMonthVids.sort((a,b) => (b.view_count??b.views_raw??0)-(a.view_count??a.views_raw??0))[0];
+  const bestThisMonth = thisMonthVids.sort((a, b) => (b.view_count ?? b.views_raw ?? 0) - (a.view_count ?? a.views_raw ?? 0))[0];
 
   const col = colorOf(ch);
 
@@ -3189,12 +3247,12 @@ async function renderDDOverview(ch) {
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             ${top5.map((v, i) => {
-              const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
-              const eng = calcEngagementRate(v.like_count, v.comment_count, v.view_count ?? v.views_raw);
-              const pct = maxTopViews > 0 ? Math.max(4, Math.round(vc / maxTopViews * 100)) : 4;
-              return `
+    const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
+    const eng = calcEngagementRate(v.like_count, v.comment_count, v.view_count ?? v.views_raw);
+    const pct = maxTopViews > 0 ? Math.max(4, Math.round(vc / maxTopViews * 100)) : 4;
+    return `
               <a href="${esc(v.url)}" target="_blank" rel="noopener" class="dd-top-vid-row">
-                <span style="font-family:var(--f-mono);font-size:10.5px;font-weight:700;color:var(--t3)">#${i+1}</span>
+                <span style="font-family:var(--f-mono);font-size:10.5px;font-weight:700;color:var(--t3)">#${i + 1}</span>
                 <img src="${esc(v.thumb || '')}" style="width:72px;height:40px;border-radius:4px;object-fit:cover" alt="">
                 <div style="min-width:0">
                   <div class="dd-top-vid-title">${esc(v.title)}</div>
@@ -3206,7 +3264,7 @@ async function renderDDOverview(ch) {
                 </div>
                 ${eng !== null ? `<span class="badge ${eng >= 4 ? 'bdg-gr' : 'bdg-dim'}">${eng}%</span>` : '<span></span>'}
               </a>`;
-            }).join('')}
+  }).join('')}
           </div>
         </div>
       </div>
@@ -3252,8 +3310,8 @@ async function renderDDOverview(ch) {
 
           <div class="dd-health-row">
             <span class="dd-health-label"><span class="msi" style="font-size:15px">local_fire_department</span> Upload Streak</span>
-            <span class="dd-health-val" style="color:${(en.streak||0) >= 3 ? 'var(--up)' : 'var(--t1)'}">
-              ${(en.streak || 0) > 0 ? en.streak + ' week' + ((en.streak||0) !== 1 ? 's' : '') : '—'}
+            <span class="dd-health-val" style="color:${(en.streak || 0) >= 3 ? 'var(--up)' : 'var(--t1)'}">
+              ${(en.streak || 0) > 0 ? en.streak + ' week' + ((en.streak || 0) !== 1 ? 's' : '') : '—'}
             </span>
           </div>
 
@@ -3270,10 +3328,10 @@ async function renderDDOverview(ch) {
 
           <!-- Phase 8 Competitive Traits -->
           ${(() => {
-            const primaryId = (all.find(c => c.is_primary) || all[0])?.id;
-            const threat = calcThreatScore(ch.id, primaryId);
-            const eg = calcEvergreenFingerprint(allVids);
-            return `
+      const primaryId = (all.find(c => c.is_primary) || all[0])?.id;
+      const threat = calcThreatScore(ch.id, primaryId);
+      const eg = calcEvergreenFingerprint(allVids);
+      return `
             <div style="padding-top:10px;margin-top:8px;border-top:1px solid var(--line-1);display:flex;flex-direction:column;gap:8px">
               <div class="dd-health-row">
                 <span class="dd-health-label"><span class="msi" style="font-size:15px">${eg.icon}</span> Catalog Strategy</span>
@@ -3285,7 +3343,7 @@ async function renderDDOverview(ch) {
                 <span class="badge ${threat.score >= 50 ? 'bdg-rd' : threat.score >= 25 ? 'bdg-gd' : 'bdg-dim'}">⚔️ ${threat.score}% affinity</span>
               </div>` : ''}
             </div>`;
-          })()}
+    })()}
         </div>
       </div>
     </div>`;
@@ -3302,7 +3360,7 @@ function buildPulseChart(vids, col) {
   const now = Date.now();
   const weeks = 13;
   const weekMs = 7 * 864e5;
-  const buckets = Array.from({length: weeks}, (_, i) => ({
+  const buckets = Array.from({ length: weeks }, (_, i) => ({
     label: '',
     count: 0,
     startMs: now - (weeks - i) * weekMs
@@ -3311,7 +3369,7 @@ function buildPulseChart(vids, col) {
   vids.forEach(v => {
     const pub = new Date(v.published_at || v.date || 0).getTime();
     if (!pub) return;
-    const idx = buckets.findIndex((b, i) => pub >= b.startMs && (i === weeks-1 || pub < buckets[i+1].startMs));
+    const idx = buckets.findIndex((b, i) => pub >= b.startMs && (i === weeks - 1 || pub < buckets[i + 1].startMs));
     if (idx >= 0) buckets[idx].count++;
   });
 
@@ -3330,7 +3388,7 @@ function buildPulseChart(vids, col) {
     const y = padT + plotH - h;
     const opacity = b.count > 0 ? 0.7 + (b.count / maxC) * 0.3 : 0.15;
     bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bW}" height="${h}" rx="2" fill="${col}" opacity="${opacity.toFixed(2)}"
-      data-tip="${b.count} upload${b.count !== 1 ? 's' : ''} (week ${i+1})" style="cursor:pointer"/>`;
+      data-tip="${b.count} upload${b.count !== 1 ? 's' : ''} (week ${i + 1})" style="cursor:pointer"/>`;
   });
 
   const svgHtml = `
@@ -3371,7 +3429,7 @@ async function renderDDVideos(ch) {
 
   const allVids = ddFullVideos || [];
   const longForm = allVids.filter(v => !isYouTubeShort(v));
-  const shorts   = allVids.filter(v => isYouTubeShort(v));
+  const shorts = allVids.filter(v => isYouTubeShort(v));
   const totalViews = allVids.reduce((s, v) => s + parseInt(v.view_count ?? v.views_raw ?? 0), 0);
   const avgViews = allVids.length ? Math.round(totalViews / allVids.length) : 0;
   const bestViews = allVids.length ? Math.max(...allVids.map(v => parseInt(v.view_count ?? v.views_raw ?? 0))) : 0;
@@ -3405,14 +3463,14 @@ async function renderDDVideos(ch) {
       <div class="dd-vid-filter-bar">
         <div class="dd-vid-filter-top">
           <div class="vid-seg" id="ddVidFormatSeg">
-            <button class="vid-seg-btn ${ddVidFilter==='all'?'on':''}"     onclick="setDDVidFilter('all','${esc(ch.id)}')"     title="All videos">All ${allVids.length}</button>
-            <button class="vid-seg-btn ${ddVidFilter==='longform'?'on':''}" onclick="setDDVidFilter('longform','${esc(ch.id)}')" title="Long-form only">Long-form ${longForm.length}</button>
-            <button class="vid-seg-btn ${ddVidFilter==='shorts'?'on':''}"   onclick="setDDVidFilter('shorts','${esc(ch.id)}')"   title="Shorts only">Shorts ${shorts.length}</button>
+            <button class="vid-seg-btn ${ddVidFilter === 'all' ? 'on' : ''}"     onclick="setDDVidFilter('all','${esc(ch.id)}')"     title="All videos">All ${allVids.length}</button>
+            <button class="vid-seg-btn ${ddVidFilter === 'longform' ? 'on' : ''}" onclick="setDDVidFilter('longform','${esc(ch.id)}')" title="Long-form only">Long-form ${longForm.length}</button>
+            <button class="vid-seg-btn ${ddVidFilter === 'shorts' ? 'on' : ''}"   onclick="setDDVidFilter('shorts','${esc(ch.id)}')"   title="Shorts only">Shorts ${shorts.length}</button>
           </div>
           <div class="vid-seg" id="ddVidSortSeg">
-            <button class="vid-seg-btn ${ddVidPreset==='recent'?'on':''}" onclick="setDDVidSort('recent','${esc(ch.id)}')" title="Newest first">🕒 Newest</button>
-            <button class="vid-seg-btn ${ddVidPreset==='views'?'on':''}"  onclick="setDDVidSort('views','${esc(ch.id)}')"  title="Most viewed">👁 Most Viewed</button>
-            <button class="vid-seg-btn ${ddVidPreset==='vel'?'on':''}"    onclick="setDDVidSort('vel','${esc(ch.id)}')"    title="Highest velocity">⚡ Velocity</button>
+            <button class="vid-seg-btn ${ddVidPreset === 'recent' ? 'on' : ''}" onclick="setDDVidSort('recent','${esc(ch.id)}')" title="Newest first">🕒 Newest</button>
+            <button class="vid-seg-btn ${ddVidPreset === 'views' ? 'on' : ''}"  onclick="setDDVidSort('views','${esc(ch.id)}')"  title="Most viewed">👁 Most Viewed</button>
+            <button class="vid-seg-btn ${ddVidPreset === 'vel' ? 'on' : ''}"    onclick="setDDVidSort('vel','${esc(ch.id)}')"    title="Highest velocity">⚡ Velocity</button>
           </div>
         </div>
         <div class="dd-vid-ctx-chips">
@@ -3440,7 +3498,7 @@ function setDDVidFilter(f, chId) {
   document.querySelectorAll('#ddVidFormatSeg .vid-seg-btn').forEach(b => b.classList.toggle('on', b.textContent.startsWith(f === 'all' ? 'All' : f === 'longform' ? 'Long' : 'Shorts')));
   const c = document.getElementById('ddVidListContainer');
   const col = colorOf(all.find(x => x.id === chId) || all[0]);
-  if (c) flip(c, () => { c.innerHTML = renderDDVideoRows(ddFullVideos||[], f, ddVidPreset, 0, col, chId); });
+  if (c) flip(c, () => { c.innerHTML = renderDDVideoRows(ddFullVideos || [], f, ddVidPreset, 0, col, chId); });
   updateDDLoadMore(chId, col);
 }
 
@@ -3451,14 +3509,14 @@ function setDDVidSort(s, chId) {
   document.querySelectorAll('#ddVidSortSeg .vid-seg-btn').forEach(b => b.classList.toggle('on', b.textContent.includes(s === 'recent' ? 'Newest' : s === 'views' ? 'Viewed' : 'Velocity')));
   const c = document.getElementById('ddVidListContainer');
   const col = colorOf(all.find(x => x.id === chId) || all[0]);
-  if (c) flip(c, () => { c.innerHTML = renderDDVideoRows(ddFullVideos||[], ddVidFilter, s, 0, col, chId); });
+  if (c) flip(c, () => { c.innerHTML = renderDDVideoRows(ddFullVideos || [], ddVidFilter, s, 0, col, chId); });
   updateDDLoadMore(chId, col);
 }
 
 function getDDVidSorted(vids, formatFilter, sortPreset) {
   let list = formatFilter === 'longform' ? vids.filter(v => !isYouTubeShort(v))
-           : formatFilter === 'shorts'   ? vids.filter(v => isYouTubeShort(v))
-           : [...vids];
+    : formatFilter === 'shorts' ? vids.filter(v => isYouTubeShort(v))
+      : [...vids];
   if (sortPreset === 'views') {
     list.sort((a, b) => (parseInt(b.view_count ?? b.views_raw ?? 0)) - (parseInt(a.view_count ?? a.views_raw ?? 0)));
   } else if (sortPreset === 'vel') {
@@ -3767,8 +3825,8 @@ function renderDDCompare(focusedCh) {
       <th class="${colClass}">
         <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
           ${ch.logo_url
-            ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid ${colorOf(ch)}" alt="">`
-            : `<div style="width:26px;height:26px;border-radius:50%;background:var(--bg-3);display:flex;align-items:center;justify-content:center">${(ch.name || '?')[0]}</div>`}
+        ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid ${colorOf(ch)}" alt="">`
+        : `<div style="width:26px;height:26px;border-radius:50%;background:var(--bg-3);display:flex;align-items:center;justify-content:center">${(ch.name || '?')[0]}</div>`}
           <span style="color:${isMe ? 'var(--me)' : isFocus ? 'var(--acc)' : 'var(--t1)'}">${esc(ch.name.length > 10 ? ch.name.slice(0, 10) + '…' : ch.name)}</span>
           ${isMe ? '<span class="badge bdg-gd" style="font-size:8px">YOU</span>' : isFocus ? '<span class="badge bdg-pr" style="font-size:8px">FOCUSED</span>' : ''}
         </div>
@@ -3824,8 +3882,8 @@ function renderDDCompare(focusedCh) {
       <div style="margin-top:16px;padding:14px;background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m)">
         <div style="font-size:12.5px;color:var(--t1);line-height:1.5">
           ${focusedCh.id === me.id
-            ? `Viewing yourself against the field median. You lead <strong>${sorted.filter(c => (c.subscribers_raw || 0) < (me.subscribers_raw || 0)).length}</strong> competitor channels in total reach.`
-            : `<strong>${esc(focusedCh.name)}</strong> currently has <strong>${esc(focusedCh.subscribers)}</strong> subscribers (${(focusedCh.subscribers_raw || 0) > (me.subscribers_raw || 0) ? 'leading you by ' + fmtN((focusedCh.subscribers_raw || 0) - (me.subscribers_raw || 0)) : 'trailing you by ' + fmtN((me.subscribers_raw || 0) - (focusedCh.subscribers_raw || 0))}) with <strong>${esc(focusedCh.avg_views)}</strong> average views per video.`}
+      ? `Viewing yourself against the field median. You lead <strong>${sorted.filter(c => (c.subscribers_raw || 0) < (me.subscribers_raw || 0)).length}</strong> competitor channels in total reach.`
+      : `<strong>${esc(focusedCh.name)}</strong> currently has <strong>${esc(focusedCh.subscribers)}</strong> subscribers (${(focusedCh.subscribers_raw || 0) > (me.subscribers_raw || 0) ? 'leading you by ' + fmtN((focusedCh.subscribers_raw || 0) - (me.subscribers_raw || 0)) : 'trailing you by ' + fmtN((me.subscribers_raw || 0) - (focusedCh.subscribers_raw || 0))}) with <strong>${esc(focusedCh.avg_views)}</strong> average views per video.`}
         </div>
       </div>
     </div>`;
@@ -3843,16 +3901,16 @@ let pipelineIdeaFilter = 'all';
 try {
   const stored = localStorage.getItem('yt_pipeline_cards');
   pipelineCards = stored ? JSON.parse(stored) : [
-    { id: 'card-1', title: 'Why GD&T Tolerances Fail in High Volume Production', topic: 'gdt', stage: 'making', score: 94, targetDate: '2026-08-20', notes: 'Focus on CMM inspection pitfalls', createdAt: Date.now() - 3*864e5 },
-    { id: 'card-2', title: 'EUV Lithography Explained: The Physics of 2nm Chips', topic: 'euv', stage: 'scheduled', score: 98, targetDate: '2026-08-18', notes: 'ASML mirror optics teardown', createdAt: Date.now() - 5*864e5 },
-    { id: 'card-3', title: 'How Ray Tracing Shaders Really Work Under the Hood', topic: 'ray tracing', stage: 'idea', score: 88, notes: 'BVH traversal walkthrough', createdAt: Date.now() - 1*864e5 }
+    { id: 'card-1', title: 'Why GD&T Tolerances Fail in High Volume Production', topic: 'gdt', stage: 'making', score: 94, targetDate: '2026-08-20', notes: 'Focus on CMM inspection pitfalls', createdAt: Date.now() - 3 * 864e5 },
+    { id: 'card-2', title: 'EUV Lithography Explained: The Physics of 2nm Chips', topic: 'euv', stage: 'scheduled', score: 98, targetDate: '2026-08-18', notes: 'ASML mirror optics teardown', createdAt: Date.now() - 5 * 864e5 },
+    { id: 'card-3', title: 'How Ray Tracing Shaders Really Work Under the Hood', topic: 'ray tracing', stage: 'idea', score: 88, notes: 'BVH traversal walkthrough', createdAt: Date.now() - 1 * 864e5 }
   ];
 } catch {
   pipelineCards = [];
 }
 
 function savePipelineCards() {
-  try { localStorage.setItem('yt_pipeline_cards', JSON.stringify(pipelineCards)); } catch {}
+  try { localStorage.setItem('yt_pipeline_cards', JSON.stringify(pipelineCards)); } catch { }
 }
 
 function renderStudio() {
@@ -3873,11 +3931,11 @@ function renderStudio() {
           <div class="pg-sub">Turn competitive topic intelligence into high-performing video concepts & manage production.</div>
         </div>
         <div class="vid-seg">
-          <button class="vid-seg-btn ${studioSubTab==='lab'?'on':''}" onclick="setStudioSubTab('lab')">
+          <button class="vid-seg-btn ${studioSubTab === 'lab' ? 'on' : ''}" onclick="setStudioSubTab('lab')">
             🧪 Title Lab & Ideas
           </button>
-          <button class="vid-seg-btn ${studioSubTab==='pipeline'?'on':''}" onclick="setStudioSubTab('pipeline')">
-            📋 Content Pipeline (${pipelineCards.filter(c=>c.stage!=='published').length})
+          <button class="vid-seg-btn ${studioSubTab === 'pipeline' ? 'on' : ''}" onclick="setStudioSubTab('pipeline')">
+            📋 Content Pipeline (${pipelineCards.filter(c => c.stage !== 'published').length})
           </button>
         </div>
       </div>
@@ -4076,7 +4134,7 @@ function generateStudioIdeas() {
         title: `${capWords(m)} vs ${capWords(h.topic)}: The Engineering Battle Nobody Understood`,
         topic: m,
         score: 96,
-        reason: `Combines your #1 moat topic '${m}' with surging field topic '${h.topic}' (${(h.momentum||1).toFixed(1)}× momentum)`
+        reason: `Combines your #1 moat topic '${m}' with surging field topic '${h.topic}' (${(h.momentum || 1).toFixed(1)}× momentum)`
       });
     }
   }
@@ -4111,7 +4169,7 @@ function generateStudioIdeas() {
 
   // Formula 3: Franchise Follow-Up
   const primaryEnrich = _enrichCache[primary?.id] || {};
-  const myTop = primaryEnrich.vids ? [...primaryEnrich.vids].sort((a,b) => (parseInt(b.view_count??b.views_raw??0)) - (parseInt(a.view_count??a.views_raw??0)))[0] : null;
+  const myTop = primaryEnrich.vids ? [...primaryEnrich.vids].sort((a, b) => (parseInt(b.view_count ?? b.views_raw ?? 0)) - (parseInt(a.view_count ?? a.views_raw ?? 0)))[0] : null;
   if (myTop) {
     const myTok = topicTokens(myTop.title)[0] || 'Design';
     ideas.push({
@@ -4122,7 +4180,7 @@ function generateStudioIdeas() {
       title: `Part 2: Why ${capWords(myTok)} Really Matters (1 Year Later)`,
       topic: myTok,
       score: 89,
-      reason: `Direct sequel to your best-performing video (${fmtN(parseInt(myTop.view_count??myTop.views_raw??0))} views)`
+      reason: `Direct sequel to your best-performing video (${fmtN(parseInt(myTop.view_count ?? myTop.views_raw ?? 0))} views)`
     });
   }
 
@@ -4209,8 +4267,8 @@ function renderStudioLabHtml() {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <span id="tlScoreBadge" class="badge ${res.score>=85?'bdg-gr':res.score>=70?'bdg-pr':res.score>=50?'bdg-gd':'bdg-rd'}">
-              ${res.score>=85?'🔥 Elite Concept':res.score>=70?'🟢 Strong Title':res.score>=50?'🟡 Moderate':'🔴 Needs Polish'}
+            <span id="tlScoreBadge" class="badge ${res.score >= 85 ? 'bdg-gr' : res.score >= 70 ? 'bdg-pr' : res.score >= 50 ? 'bdg-gd' : 'bdg-rd'}">
+              ${res.score >= 85 ? '🔥 Elite Concept' : res.score >= 70 ? '🟢 Strong Title' : res.score >= 50 ? '🟡 Moderate' : '🔴 Needs Polish'}
             </span>
             <div style="font-family:var(--f-mono);font-size:24px;font-weight:800;color:var(--acc)" id="tlScoreNum">${res.score}</div>
             <span style="font-size:12px;color:var(--t3)">/100</span>
@@ -4231,7 +4289,7 @@ function renderStudioLabHtml() {
           <span id="tlLenCount" class="mono">${res.len} / 60 chars</span>
         </div>
         <div style="width:100%;height:4px;background:var(--bg-3);border-radius:2px;overflow:hidden;margin-bottom:16px">
-          <div id="tlLenFill" style="height:100%;width:${Math.min(100, Math.round((res.len/80)*100))}%;background:${res.len>=40&&res.len<=60?'var(--up)':res.len>=30&&res.len<=70?'var(--warn)':'var(--down)'};transition:width .2s, background .2s"></div>
+          <div id="tlLenFill" style="height:100%;width:${Math.min(100, Math.round((res.len / 80) * 100))}%;background:${res.len >= 40 && res.len <= 60 ? 'var(--up)' : res.len >= 30 && res.len <= 70 ? 'var(--warn)' : 'var(--down)'};transition:width .2s, background .2s"></div>
         </div>
 
         <!-- 4 Factor Grid -->
@@ -4239,25 +4297,25 @@ function renderStudioLabHtml() {
           <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
             <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">📏 Length (25 max)</div>
             <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
-              <div id="tlMeterLen" style="height:100%;width:${Math.round((res.lenScore/25)*100)}%;background:var(--acc);transition:width .2s"></div>
+              <div id="tlMeterLen" style="height:100%;width:${Math.round((res.lenScore / 25) * 100)}%;background:var(--acc);transition:width .2s"></div>
             </div>
           </div>
           <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
             <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">🎯 Topic Match (35 max)</div>
             <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
-              <div id="tlMeterTopic" style="height:100%;width:${Math.round((res.topicScore/35)*100)}%;background:var(--up);transition:width .2s"></div>
+              <div id="tlMeterTopic" style="height:100%;width:${Math.round((res.topicScore / 35) * 100)}%;background:var(--up);transition:width .2s"></div>
             </div>
           </div>
           <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
             <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">⚡ Hook & Format (25 max)</div>
             <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
-              <div id="tlMeterHook" style="height:100%;width:${Math.round((res.hookScore/25)*100)}%;background:var(--warn);transition:width .2s"></div>
+              <div id="tlMeterHook" style="height:100%;width:${Math.round((res.hookScore / 25) * 100)}%;background:var(--warn);transition:width .2s"></div>
             </div>
           </div>
           <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
             <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">📝 Structure (15 max)</div>
             <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
-              <div id="tlMeterStruct" style="height:100%;width:${Math.round((res.structScore/15)*100)}%;background:var(--me);transition:width .2s"></div>
+              <div id="tlMeterStruct" style="height:100%;width:${Math.round((res.structScore / 15) * 100)}%;background:var(--me);transition:width .2s"></div>
             </div>
           </div>
         </div>
@@ -4270,7 +4328,7 @@ function renderStudioLabHtml() {
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${res.missingHotTokens.length ? res.missingHotTokens.map(tok => `
               <button class="chip chip-btn" onclick="appendTokenToTitle('${esc(tok.topic)}')">
-                + ${esc(tok.topic)} <span style="color:var(--up);margin-left:4px">▲${(tok.momentum||1).toFixed(1)}×</span>
+                + ${esc(tok.topic)} <span style="color:var(--up);margin-left:4px">▲${(tok.momentum || 1).toFixed(1)}×</span>
               </button>`).join('') : '<span style="font-size:11px;color:var(--t3)">All key trending niche topics covered!</span>'}
           </div>
         </div>
@@ -4348,8 +4406,8 @@ function renderStudioPipelineHtml() {
       <!-- 4-Column Board -->
       <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:14px;align-items:start;min-height:500px">
         ${stages.map(st => {
-          const cardsInStage = pipelineCards.filter(c => c.stage === st.key);
-          return `
+    const cardsInStage = pipelineCards.filter(c => c.stage === st.key);
+    return `
             <div style="background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-m);display:flex;flex-direction:column;max-height:75vh;overflow:hidden"
                  ondragover="event.preventDefault()"
                  ondrop="pipelineDrop(event, '${st.key}')">
@@ -4370,7 +4428,7 @@ function renderStudioPipelineHtml() {
                   </div>`}
               </div>
             </div>`;
-        }).join('')}
+  }).join('')}
       </div>
     </div>`;
 }
@@ -4384,7 +4442,7 @@ function renderPipelineCardHtml(card) {
          onmouseenter="this.style.borderColor='var(--line-2)'" onmouseleave="this.style.borderColor='var(--line-1)'">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <span class="badge bdg-pr" style="font-size:9px">${esc(card.topic || 'General')}</span>
-        <span class="badge ${card.score>=90?'bdg-gr':'bdg-gd'}" style="font-size:9px;font-weight:700">🔥 ${card.score || 85}</span>
+        <span class="badge ${card.score >= 90 ? 'bdg-gr' : 'bdg-gd'}" style="font-size:9px;font-weight:700">🔥 ${card.score || 85}</span>
       </div>
       <div style="font-size:12px;font-weight:600;color:var(--t1);line-height:1.35;margin-bottom:6px">${esc(card.title)}</div>
       ${card.notes ? `<div style="font-size:10px;color:var(--t3);margin-bottom:6px;line-height:1.3">${esc(card.notes)}</div>` : ''}
@@ -4520,34 +4578,63 @@ function syncPipelineWithPublishedVideos() {
    ══════════════════════════════════════════════════════════════════════════════ */
 
 /* ── W1.1 Section Scroll-Spy ──────────────────────────────────────────────── */
+let _isClickScrolling = false;
+let _clickScrollTimer = null;
+
 function setupDashScrollSpy() {
   const sections = ['sec-hero', 'sec-yvf', 'sec-drops', 'sec-radar', 'sec-lb', 'sec-vel', 'sec-recent'];
   const items = document.querySelectorAll('#dashSpyRail .dash-spy-item');
   if (!items.length) return;
 
   const onScroll = () => {
-    let currentSec = sections[0];
+    if (_isClickScrolling) return; // Don't fight deliberate dot click target during smooth scroll
+
+    const winHeight = window.innerHeight;
+    const focalY = winHeight * 0.35; // Target focal line 35% from viewport top
+
+    let closestSec = sections[0];
+    let minDistance = Infinity;
+
     sections.forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         const rect = el.getBoundingClientRect();
-        if (rect.top <= 200) currentSec = id;
+        // Calculate center of the visible element relative to focal line
+        const elemCenter = (rect.top + rect.bottom) / 2;
+        const distance = Math.abs(elemCenter - focalY);
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestSec = id;
+        }
       }
     });
+
     items.forEach(it => {
-      it.classList.toggle('on', it.dataset.sec === currentSec);
+      it.classList.toggle('on', it.dataset.sec === closestSec);
     });
   };
 
-  window.removeEventListener('scroll', window._dashScrollSpyFn || (() => {}));
+  window.removeEventListener('scroll', window._dashScrollSpyFn || (() => { }));
   window._dashScrollSpyFn = onScroll;
   window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
 }
 
 function scrollToSection(id) {
   const el = document.getElementById(id);
   if (!el) return;
-  const top = el.getBoundingClientRect().top + window.scrollY - 70;
+
+  // Set click-scroll lock so smooth scrolling animation doesn't jitter
+  _isClickScrolling = true;
+  clearTimeout(_clickScrollTimer);
+  _clickScrollTimer = setTimeout(() => { _isClickScrolling = false; }, 650);
+
+  // Instantly highlight target dot for crisp user feedback
+  const items = document.querySelectorAll('#dashSpyRail .dash-spy-item');
+  items.forEach(it => it.classList.toggle('on', it.dataset.sec === id));
+
+  const top = el.getBoundingClientRect().top + window.scrollY - 75;
   window.scrollTo({ top, behavior: 'smooth' });
 }
 
@@ -4665,7 +4752,7 @@ function skipTour() {
   const card = document.getElementById('spotlightCard');
   if (overlay) overlay.style.display = 'none';
   if (card) card.style.display = 'none';
-  try { localStorage.setItem('yt_tour_completed', '1'); } catch {}
+  try { localStorage.setItem('yt_tour_completed', '1'); } catch { }
 }
 
 /* ── W2.1 Bell Inbox & Field Activity Feed ────────────────────────────────── */
@@ -4684,7 +4771,7 @@ function loadInboxItems() {
   if (!inboxItems.length && all.length) {
     const primary = all.find(c => c.is_primary) || all[0];
     const { gaps, moats } = computeTopicGaps(primary?.id);
-    const hot = [..._topicCache.topics.values()].sort((a,b) => (b.hotScore||0) - (a.hotScore||0))[0];
+    const hot = [..._topicCache.topics.values()].sort((a, b) => (b.hotScore || 0) - (a.hotScore || 0))[0];
 
     inboxItems = [
       {
@@ -4712,7 +4799,7 @@ function loadInboxItems() {
         read: true
       }
     ];
-    try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+    try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch { }
   }
   updateBellBadge();
 }
@@ -4721,7 +4808,7 @@ function pushInboxAlert(item) {
   if (inboxItems.some(i => i.id === item.id)) return;
   inboxItems.unshift(item);
   if (inboxItems.length > 50) inboxItems = inboxItems.slice(0, 50);
-  try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+  try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch { }
   updateBellBadge();
 }
 
@@ -4737,7 +4824,8 @@ function updateBellBadge() {
   }
 }
 
-function toggleBellInbox() {
+function toggleBellInbox(event) {
+  if (event) event.stopPropagation();
   const p = document.getElementById('bellPopover');
   if (!p) return;
   const isOpen = p.classList.contains('open');
@@ -4752,7 +4840,8 @@ function toggleBellInbox() {
   }
 }
 
-function setInboxTab(tab) {
+function setInboxTab(tab, event) {
+  if (event) event.stopPropagation();
   inboxTab = tab;
   renderBellInboxHtml();
 }
@@ -4764,17 +4853,17 @@ function renderBellInboxHtml() {
   const unreadCnt = inboxItems.filter(i => !i.read).length;
   const primary = all.find(c => c.is_primary) || all[0];
   const primaryEnrich = _enrichCache[primary?.id] || {};
-  const hot = [..._topicCache.topics.values()].sort((a,b) => (b.hotScore||0) - (a.hotScore||0))[0];
+  const hot = [..._topicCache.topics.values()].sort((a, b) => (b.hotScore || 0) - (a.hotScore || 0))[0];
 
   p.innerHTML = `
     <div style="display:flex;flex-direction:column;max-height:80vh">
       <!-- Header -->
       <div style="padding:12px 16px;border-bottom:1px solid var(--line-1);display:flex;align-items:center;justify-content:space-between;background:var(--bg-2)">
         <div class="vid-seg">
-          <button class="vid-seg-btn ${inboxTab==='alerts'?'on':''}" onclick="setInboxTab('alerts')">
+          <button class="vid-seg-btn ${inboxTab === 'alerts' ? 'on' : ''}" onclick="setInboxTab('alerts', event)">
             🔔 Alerts ${unreadCnt > 0 ? `<span class="badge bdg-rd" style="font-size:9px">${unreadCnt}</span>` : ''}
           </button>
-          <button class="vid-seg-btn ${inboxTab==='field'?'on':''}" onclick="setInboxTab('field')">
+          <button class="vid-seg-btn ${inboxTab === 'field' ? 'on' : ''}" onclick="setInboxTab('field', event)">
             📰 Field Feed
           </button>
         </div>
@@ -4800,7 +4889,7 @@ function renderBellInboxHtml() {
             </div>
             <div style="font-size:11px;color:var(--t2);line-height:1.45;margin-bottom:6px">
               • <strong>7d View Velocity:</strong> ${fmtDelta(primaryEnrich.momDelta || 0)} views vs prior cycle.<br>
-              • <strong>Niche Surging Topic:</strong> <span style="color:var(--up);font-weight:700">${hot ? hot.topic : 'EUV'} (${(hot?.momentum||1.8).toFixed(1)}×)</span>.<br>
+              • <strong>Niche Surging Topic:</strong> <span style="color:var(--up);font-weight:700">${hot ? hot.topic : 'EUV'} (${(hot?.momentum || 1.8).toFixed(1)}×)</span>.<br>
               • <strong>Unread Radar Signals:</strong> ${unreadCnt} actionable intelligence alerts.
             </div>
           </div>
@@ -4808,7 +4897,7 @@ function renderBellInboxHtml() {
           <!-- Alerts List -->
           <div style="display:flex;flex-direction:column;gap:6px">
             ${inboxItems.length ? inboxItems.map(item => `
-              <div class="bell-inbox-item ${item.read ? 'read' : 'unread'}" onclick="handleInboxItemClick('${item.id}', '${esc(item.url||'')}')">
+              <div class="bell-inbox-item ${item.read ? 'read' : 'unread'}" onclick="handleInboxItemClick('${item.id}', '${esc(item.url || '')}')">
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
                   <div style="font-size:11.5px;font-weight:700;color:var(--t1)">${esc(item.title)}</div>
                   <span style="font-size:9.5px;color:var(--t3);white-space:nowrap">${ago(item.ts)}</span>
@@ -4880,7 +4969,7 @@ function handleInboxItemClick(id, url) {
   const it = inboxItems.find(i => i.id === id);
   if (it) {
     it.read = true;
-    try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+    try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch { }
     updateBellBadge();
   }
   if (url) {
@@ -4892,7 +4981,7 @@ function handleInboxItemClick(id, url) {
 
 function markAllInboxRead() {
   inboxItems.forEach(i => i.read = true);
-  try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+  try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch { }
   updateBellBadge();
   renderBellInboxHtml();
   toast('All alerts marked as read', 's');
@@ -4900,7 +4989,7 @@ function markAllInboxRead() {
 
 function clearAllInbox() {
   inboxItems = [];
-  try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+  try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch { }
   updateBellBadge();
   renderBellInboxHtml();
   toast('Inbox cleared', 's');
@@ -4908,12 +4997,12 @@ function clearAllInbox() {
 
 function copyMorningBriefMarkdown() {
   const primary = all.find(c => c.is_primary) || all[0];
-  const hot = [..._topicCache.topics.values()].sort((a,b) => (b.hotScore||0) - (a.hotScore||0))[0];
+  const hot = [..._topicCache.topics.values()].sort((a, b) => (b.hotScore || 0) - (a.hotScore || 0))[0];
   const text = `# 🌅 YT Tracker Daily Brief — ${new Date().toLocaleDateString()}
 - **Channel:** ${primary?.name || 'Primary'} (${primary?.subscribers || '—'} subs)
-- **Top Niche Spike:** ${hot ? hot.topic : 'EUV'} (${(hot?.momentum||1.8).toFixed(1)}x momentum)
-- **Unread Signals:** ${inboxItems.filter(i=>!i.read).length} actionable alerts
-- **Leaderboard Position:** Lead ${all.filter(c => (c.subscribers_raw||0) < (primary?.subscribers_raw||0)).length} tracked competitors
+- **Top Niche Spike:** ${hot ? hot.topic : 'EUV'} (${(hot?.momentum || 1.8).toFixed(1)}x momentum)
+- **Unread Signals:** ${inboxItems.filter(i => !i.read).length} actionable alerts
+- **Leaderboard Position:** Lead ${all.filter(c => (c.subscribers_raw || 0) < (primary?.subscribers_raw || 0)).length} tracked competitors
 `;
   navigator.clipboard.writeText(text).then(() => {
     toast('Morning Brief Markdown copied to clipboard!', 's');
@@ -4955,10 +5044,10 @@ let userPrefs = {
 try {
   const stored = localStorage.getItem('yt_user_prefs');
   if (stored) userPrefs = { ...userPrefs, ...JSON.parse(stored) };
-} catch {}
+} catch { }
 
 function saveUserPrefs() {
-  try { localStorage.setItem('yt_user_prefs', JSON.stringify(userPrefs)); } catch {}
+  try { localStorage.setItem('yt_user_prefs', JSON.stringify(userPrefs)); } catch { }
 }
 
 let settingsTab = 'topics'; // 'topics' | 'alerts' | 'data' | 'theme'
@@ -5173,7 +5262,7 @@ function updateAlertPref(key, val, lblId, suffix, isFmt = false) {
 function purgeTopicCache() {
   _topicCache.topics.clear();
   _topicCache.perChannel.clear();
-  try { localStorage.removeItem('yt_topic_cache'); } catch {}
+  try { localStorage.removeItem('yt_topic_cache'); } catch { }
   buildTopicCache();
   renderTopicRadar();
   renderSettingsBody();
@@ -5222,7 +5311,7 @@ function importDataBackup(e) {
       if (data.inboxItems) inboxItems = data.inboxItems;
       saveUserPrefs();
       savePipelineCards();
-      try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+      try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch { }
       rebuildTopicEngine();
       updateBellBadge();
       renderSettingsBody();
@@ -5250,6 +5339,763 @@ if (userPrefs?.accentColor) {
   }
 }
 
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PHASE 12: OUTPUT, GAMIFICATION & SHARING ENGINES
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Snapshot Delta & Rank Movement Engine ─────────────────────────────── */
+async function loadAllSnapshots() {
+  if (_snapshotsCache) return _snapshotsCache;
+  try {
+    const r = await fetch('/api/snapshots');
+    if (r.ok) {
+      _snapshotsCache = await r.json();
+      calcRankDeltas();
+      return _snapshotsCache;
+    }
+  } catch { }
+  _snapshotsCache = {};
+  return _snapshotsCache;
+}
+
+function calcRankDeltas() {
+  if (!_snapshotsCache || !all.length) return;
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 864e5;
+  const thirtyDaysAgo = now - 30 * 864e5;
+
+  // Current rank sorted by subscribers_raw
+  const currentSorted = [...all].sort((a, b) => (b.subscribers_raw || 0) - (a.subscribers_raw || 0));
+  const currentRankMap = {};
+  currentSorted.forEach((ch, idx) => { currentRankMap[ch.id] = idx + 1; });
+
+  // Compute past ranks from snapshots closest to 7d ago
+  const pastSubsMap = {};
+  all.forEach(ch => {
+    const snaps = _snapshotsCache[ch.id] || [];
+    if (!snaps.length) return;
+    // Find closest snapshot <= sevenDaysAgo
+    let closest7d = null;
+    let closest30d = null;
+    snaps.forEach(s => {
+      const t = new Date(s.date).getTime();
+      if (!closest7d || Math.abs(t - sevenDaysAgo) < Math.abs(new Date(closest7d.date).getTime() - sevenDaysAgo)) {
+        closest7d = s;
+      }
+      if (!closest30d || Math.abs(t - thirtyDaysAgo) < Math.abs(new Date(closest30d.date).getTime() - thirtyDaysAgo)) {
+        closest30d = s;
+      }
+    });
+
+    pastSubsMap[ch.id] = {
+      subs7d: closest7d?.subscribers ?? ch.subscribers_raw,
+      subs30d: closest30d?.subscribers ?? ch.subscribers_raw,
+      snapCount: snaps.length
+    };
+  });
+
+  // Calculate past rank
+  const pastSorted = [...all].sort((a, b) => {
+    const aSubs = pastSubsMap[a.id]?.subs7d ?? (a.subscribers_raw || 0);
+    const bSubs = pastSubsMap[b.id]?.subs7d ?? (b.subscribers_raw || 0);
+    return bSubs - aSubs;
+  });
+
+  const pastRankMap = {};
+  pastSorted.forEach((ch, idx) => { pastRankMap[ch.id] = idx + 1; });
+
+  rankMovementMap = {};
+  all.forEach(ch => {
+    const cRank = currentRankMap[ch.id] || 1;
+    const pRank = pastRankMap[ch.id] || cRank;
+    const snapData = pastSubsMap[ch.id];
+    const isNew = !snapData || snapData.snapCount <= 1;
+
+    // delta > 0 means gained positions (e.g. from #4 to #2 -> 4 - 2 = +2)
+    const rankDelta = pRank - cRank;
+    const subDelta30d = (ch.subscribers_raw || 0) - (snapData?.subs30d || ch.subscribers_raw || 0);
+
+    rankMovementMap[ch.id] = {
+      rankDelta,
+      currentRank: cRank,
+      pastRank: pRank,
+      subDelta30d,
+      isNew
+    };
+  });
+}
+
+function renderRankDeltaChip(channelId) {
+  const data = rankMovementMap[channelId];
+  if (!data) return '';
+  if (data.isNew) {
+    return `<span class="rank-delta-chip rank-delta-new" title="Newly tracked channel (gathering daily snapshots)">★ NEW</span>`;
+  }
+  if (data.rankDelta > 0) {
+    return `<span class="rank-delta-chip rank-delta-up" title="Rose ▲${data.rankDelta} spot${data.rankDelta > 1 ? 's' : ''} in subscribers over 7 days (+${fmtN(data.subDelta30d)} in 30d)">▲${data.rankDelta}</span>`;
+  }
+  if (data.rankDelta < 0) {
+    const absD = Math.abs(data.rankDelta);
+    return `<span class="rank-delta-chip rank-delta-down" title="Fell ▼${absD} spot${absD > 1 ? 's' : ''} in subscribers over 7 days">▼${absD}</span>`;
+  }
+  return `<span class="rank-delta-chip rank-delta-flat" title="Rank position steady in subscribers over 7 days">—</span>`;
+}
+
+/* ── 2. Achievements Engine & Gamification System ─────────────────────────── */
+function saveAchievements() {
+  try { localStorage.setItem('yt_achievements', JSON.stringify(achievementsState)); } catch { }
+}
+
+function checkAchievements() {
+  if (!all.length) return;
+  const primary = all.find(c => c.is_primary) || all[0];
+  const primaryEnrich = _enrichCache[primary?.id] || {};
+  const primaryVids = primaryEnrich.longForm || primaryEnrich.vids || [];
+  const latestV = primaryVids[0];
+
+  // 1. velocity_vanguard
+  if (latestV) {
+    const vel = raceVelOf(latestV);
+    if (vel >= 500) unlockAchievement('velocity_vanguard');
+  }
+
+  // 2. giant_slayer
+  if (primary) {
+    const myAvg = primary.avg_views_raw || 0;
+    const mySubs = primary.subscribers_raw || 0;
+    const giants = all.filter(c => !c.is_primary && (c.subscribers_raw || 0) >= mySubs * 1.8);
+    if (giants.some(g => (g.avg_views_raw || 0) < myAvg && myAvg > 0)) {
+      unlockAchievement('giant_slayer');
+    }
+  }
+
+  // 3. upload_machine
+  if (primaryEnrich.streak >= 3 || primaryVids.filter(v => (Date.now() - new Date(v.published_at || v.date).getTime()) <= 30 * 864e5).length >= 4) {
+    unlockAchievement('upload_machine');
+  }
+
+  // 4. evergreen_master
+  if (primaryEnrich.evergreenPct >= 40) {
+    unlockAchievement('evergreen_master');
+  }
+
+  // 5. radar_commander
+  const surgeTopics = [..._topicCache.topics.values()].filter(t => (t.momentum || 0) >= 1.3);
+  if (surgeTopics.length >= 5) {
+    unlockAchievement('radar_commander');
+  }
+
+  // 6. moat_defender
+  if (primary) {
+    const { moats } = computeTopicGaps(primary.id);
+    if (moats && moats.length >= 1) {
+      unlockAchievement('moat_defender');
+    }
+  }
+
+  // 7. collision_dodger
+  if (primaryVids.length >= 3) {
+    unlockAchievement('collision_dodger');
+  }
+
+  // 9. pipeline_producer
+  if (pipelineCards && pipelineCards.filter(c => c.stage === 'production' || c.stage === 'published').length >= 3) {
+    unlockAchievement('pipeline_producer');
+  }
+
+  // 10. deep_diver
+  if (achievementsState.inspectionsCount >= 10) {
+    unlockAchievement('deep_diver');
+  }
+
+  // 11. benchmarker
+  if (compareSet.length >= 4) {
+    unlockAchievement('benchmarker');
+  }
+
+  // 12. niche_dominator
+  if (primary) {
+    const topSub = [...all].sort((a, b) => (b.subscribers_raw || 0) - (a.subscribers_raw || 0))[0];
+    const topAvg = [...all].sort((a, b) => (b.avg_views_raw || 0) - (a.avg_views_raw || 0))[0];
+    if (topSub?.id === primary.id || topAvg?.id === primary.id) {
+      unlockAchievement('niche_dominator');
+    }
+  }
+}
+
+function unlockAchievement(id) {
+  if (achievementsState.unlocked[id]) return;
+  const ach = ACHIEVEMENTS_CATALOG.find(a => a.id === id);
+  if (!ach) return;
+
+  achievementsState.unlocked[id] = { ts: Date.now(), xp: ach.xp };
+  achievementsState.totalXp = (achievementsState.totalXp || 0) + ach.xp;
+  saveAchievements();
+
+  showAchievementToast(ach);
+  if (document.getElementById('myPulsePopover')?.classList.contains('open')) {
+    renderMyPulseHtml();
+  }
+}
+
+function showAchievementToast(ach) {
+  const toastEl = document.getElementById('achievementToast');
+  if (!toastEl) return;
+
+  toastEl.innerHTML = `
+    <div style="font-size:32px;animation:rot 0.6s var(--e-out)">${ach.icon}</div>
+    <div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--me);letter-spacing:0.06em">Achievement Unlocked!</div>
+      <div style="font-size:13px;font-weight:700;color:#fff">${esc(ach.title)}</div>
+      <div style="font-size:11px;color:var(--t2)">${esc(ach.desc)} <span class="badge bdg-gd" style="margin-left:4px">+${ach.xp} XP</span></div>
+    </div>`;
+
+  toastEl.classList.add('show');
+  clearTimeout(toastEl._timer);
+  toastEl._timer = setTimeout(() => toastEl.classList.remove('show'), 4500);
+}
+
+/* ── 3. My Pulse Popover ─────────────────────────────────────────────────── */
+function toggleMyPulse(event) {
+  if (event) event.stopPropagation();
+  const p = document.getElementById('myPulsePopover');
+  if (!p) return;
+  const isOpen = p.classList.contains('open');
+  if (isOpen) {
+    p.classList.remove('open');
+  } else {
+    document.getElementById('bellPopover')?.classList.remove('open');
+    document.getElementById('comparePopover')?.classList.remove('open');
+    closeSettingsModal();
+    renderMyPulseHtml();
+    p.classList.add('open');
+  }
+}
+
+function switchMyPulseTab(tab, event) {
+  if (event) event.stopPropagation();
+  myPulseTab = tab;
+  renderMyPulseHtml();
+}
+
+function renderMyPulseHtml() {
+  const p = document.getElementById('myPulsePopover');
+  if (!p) return;
+
+  const primary = all.find(c => c.is_primary) || all[0];
+  const primaryEnrich = _enrichCache[primary?.id] || {};
+  const unlockedCount = Object.keys(achievementsState.unlocked || {}).length;
+  const totalCount = ACHIEVEMENTS_CATALOG.length;
+  const totalXp = achievementsState.totalXp || 0;
+  const creatorLevel = Math.floor(totalXp / 250) + 1;
+  const levelProgressXp = totalXp % 250;
+  const levelProgressPct = Math.min(100, Math.round((levelProgressXp / 250) * 100));
+
+  const sp30Vals = primaryEnrich.sp30 && primaryEnrich.sp30.length ? primaryEnrich.sp30 : [10, 14, 12, 18, 22, 20, 26];
+
+  p.innerHTML = `
+    <div style="display:flex;flex-direction:column;max-height:85vh;width:100%;min-width:0">
+      <!-- Header with Tab switcher -->
+      <div style="padding:12px 16px;border-bottom:1px solid var(--line-1);display:flex;align-items:center;justify-content:space-between;background:var(--bg-2)">
+        <div class="vid-seg">
+          <button class="vid-seg-btn ${myPulseTab === 'overview' ? 'on' : ''}" onclick="switchMyPulseTab('overview', event)">
+            ⚡ Pulse
+          </button>
+          <button class="vid-seg-btn ${myPulseTab === 'badges' ? 'on' : ''}" onclick="switchMyPulseTab('badges', event)">
+            🏆 Badges (${unlockedCount}/${totalCount})
+          </button>
+        </div>
+        <button class="icon-btn" style="width:24px;height:24px" onclick="toggleMyPulse(event)"><span class="msi" style="font-size:14px">close</span></button>
+      </div>
+
+      <!-- Body -->
+      <div style="padding:16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px">
+        ${myPulseTab === 'overview' ? `
+          <!-- Creator Identity -->
+          <div style="display:flex;align-items:center;gap:12px">
+            ${primary?.logo_url ? `<img src="${esc(proxyImg(primary.logo_url))}" style="width:44px;height:44px;border-radius:50%;border:2px solid var(--me);object-fit:cover" alt="">` : `<div style="width:44px;height:44px;border-radius:50%;background:var(--bg-3);border:2px solid var(--me);display:flex;align-items:center;justify-content:center;font-weight:700">${(primary?.name || '?')[0]}</div>`}
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--t1)">${esc(primary?.name || 'Your Channel')}</div>
+              <div style="font-size:11px;color:var(--t3)">${esc(primary?.handle || '')} • <span class="xp-level-badge" style="padding:1px 6px;font-size:9.5px">Level ${creatorLevel}</span></div>
+            </div>
+          </div>
+
+          <!-- Quick Metrics Cards -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="background:var(--bg-3);padding:10px;border-radius:var(--r-s);border:1px solid var(--line-1)">
+              <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase">Subscribers</div>
+              <div style="font-family:var(--f-mono);font-size:15px;font-weight:800;color:var(--me);margin-top:2px">${esc(primary?.subscribers || '—')}</div>
+              <div style="margin-top:4px">${renderRankDeltaChip(primary?.id)}</div>
+            </div>
+            <div style="background:var(--bg-3);padding:10px;border-radius:var(--r-s);border:1px solid var(--line-1)">
+              <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase">Engagement</div>
+              <div style="font-family:var(--f-mono);font-size:15px;font-weight:800;color:var(--acc);margin-top:2px">${primaryEnrich.engagement || 0}%</div>
+              <div style="font-size:9.5px;color:var(--t3);margin-top:4px">Across long-form</div>
+            </div>
+          </div>
+
+          <!-- 30-Day Trend Sparkline -->
+          <div style="background:var(--bg-3);padding:12px;border-radius:var(--r-s);border:1px solid var(--line-1)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:11px;font-weight:700;color:var(--t2)">30-Day View Velocity Sparkline</span>
+              <span style="font-size:10.5px;font-family:var(--f-mono);color:var(--me)">${primaryEnrich.latestVpd ? fmtN(primaryEnrich.latestVpd) + '/d' : 'Active'}</span>
+            </div>
+            <div style="display:flex;justify-content:center;padding:4px 0;width:100%">
+              ${sparkSVG(sp30Vals, 360, 42, 'var(--me)')}
+            </div>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-acc btn-sm" style="flex:1;white-space:nowrap;justify-content:center" onclick="toggleMyPulse();openDeepDive('${esc(primary?.id)}','overview')">
+              <span class="msi" style="font-size:14px">dashboard</span> Deep Dive
+            </button>
+            <button class="btn btn-gh btn-sm" style="flex:1;white-space:nowrap;justify-content:center" onclick="toggleMyPulse();openReportModal()">
+              <span class="msi" style="font-size:14px">description</span> Report
+            </button>
+          </div>
+        ` : `
+          <!-- Level & XP Progress -->
+          <div style="background:var(--bg-3);padding:12px;border-radius:var(--r-s);border:1px solid var(--line-1)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span class="xp-level-badge" style="white-space:nowrap">Level ${creatorLevel} Creator</span>
+              <span style="font-family:var(--f-mono);font-size:11px;color:var(--t2);white-space:nowrap">${totalXp} Total XP</span>
+            </div>
+            <div class="xp-bar-track">
+              <div class="xp-bar-fill" style="width:${levelProgressPct}%"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-top:4px">
+              <span>${levelProgressXp} / 250 XP to Level ${creatorLevel + 1}</span>
+              <span>${unlockedCount}/${totalCount} Unlocked</span>
+            </div>
+          </div>
+
+          <!-- Badge Grid -->
+          <div class="badge-grid">
+            ${ACHIEVEMENTS_CATALOG.map(ach => {
+    const unlockInfo = achievementsState.unlocked[ach.id];
+    const isUnlocked = !!unlockInfo;
+    return `
+                <div class="badge-card ${isUnlocked ? 'unlocked' : 'locked'}" title="${esc(ach.desc)}">
+                  <div class="badge-card-icon">${ach.icon}</div>
+                  <div class="badge-card-info">
+                    <div class="badge-card-title">
+                      <span>${esc(ach.title)}</span>
+                      <span style="font-size:9px;color:var(--me)">+${ach.xp}</span>
+                    </div>
+                    <div class="badge-card-desc">${esc(ach.desc)}</div>
+                    <div class="badge-card-meta">${isUnlocked ? `Unlocked ${ago(unlockInfo.ts)}` : '🔒 Incomplete'}</div>
+                  </div>
+                </div>`;
+  }).join('')}
+          </div>
+        `}
+      </div>
+    </div>`;
+}
+
+/* ── 4. Report Center Engine ─────────────────────────────────────────────── */
+function openReportModal() {
+  document.getElementById('reportOvrl')?.classList.add('open');
+  const modal = document.getElementById('reportModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    modal.classList.add('open');
+  }
+  renderReportPreview();
+  serializeStateToHash();
+}
+
+function closeReportModal() {
+  document.getElementById('reportOvrl')?.classList.remove('open');
+  const modal = document.getElementById('reportModal');
+  if (modal) {
+    modal.style.display = 'none';
+    modal.classList.remove('open');
+  }
+  serializeStateToHash();
+}
+
+function setReportPeriod(p) {
+  reportPeriod = p;
+  document.querySelectorAll('#reportPeriodSeg .vid-seg-btn').forEach(b => {
+    b.classList.toggle('on', b.id === 'repPeriod-' + p);
+  });
+  renderReportPreview();
+  serializeStateToHash();
+}
+
+function setReportScope(s) {
+  reportScope = s;
+  document.querySelectorAll('#reportScopeSeg .vid-seg-btn').forEach(b => {
+    b.classList.toggle('on', b.id === 'repScope-' + s);
+  });
+  renderReportPreview();
+  serializeStateToHash();
+}
+
+function generateReportData() {
+  const primary = all.find(c => c.is_primary) || all[0];
+  const targetChannels = reportScope === 'compare'
+    ? all.filter(c => compareSet.includes(c.id) || c.id === primary?.id)
+    : all;
+
+  // Sorting
+  const sortedSubs = [...targetChannels].sort((a, b) => (b.subscribers_raw || 0) - (a.subscribers_raw || 0));
+  const sortedViews = [...targetChannels].sort((a, b) => (b.total_views_raw || 0) - (a.total_views_raw || 0));
+  const sortedAvg = [...targetChannels].sort((a, b) => (b.avg_views_raw || 0) - (a.avg_views_raw || 0));
+
+  // Top Movers (breakout drops in period)
+  const allPeriodDrops = [];
+  targetChannels.forEach(ch => {
+    const en = _enrichCache[ch.id];
+    if (en && en.vids) {
+      en.vids.forEach(v => {
+        const pub = v.published_at || v.date;
+        const ts = pub ? new Date(pub).getTime() : 0;
+        const days = Math.max(1, (Date.now() - ts) / 864e5);
+        if (reportPeriod === '30d' && days > 30) return;
+        if (reportPeriod === '90d' && days > 90) return;
+        const vel = raceVelOf(v);
+        allPeriodDrops.push({
+          title: v.title,
+          url: v.url,
+          chName: ch.name,
+          views: parseInt(v.view_count ?? v.views_raw ?? 0),
+          vel: Math.round(vel),
+          publishedAt: pub
+        });
+      });
+    }
+  });
+  allPeriodDrops.sort((a, b) => b.vel - a.vel);
+
+  // Topics
+  const hotTopics = [..._topicCache.topics.values()].sort((a, b) => (b.hotScore || 0) - (a.hotScore || 0)).slice(0, 5);
+  const { gaps, moats } = computeTopicGaps(primary?.id);
+
+  return {
+    generatedAt: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+    periodLabel: reportPeriod === '30d' ? 'Last 30 Days' : reportPeriod === '90d' ? 'Last 90 Days' : 'All-Time (6-Month Horizon)',
+    primary,
+    channels: targetChannels,
+    sortedSubs,
+    sortedViews,
+    sortedAvg,
+    breakoutDrops: allPeriodDrops.slice(0, 5),
+    hotTopics,
+    gaps: gaps.slice(0, 3),
+    moats: moats.slice(0, 3)
+  };
+}
+
+function renderReportPreview() {
+  const container = document.getElementById('reportPreviewContainer');
+  if (!container) return;
+
+  const data = generateReportData();
+  const primary = data.primary;
+  const myRankSubs = data.sortedSubs.findIndex(c => c.id === primary?.id) + 1;
+  const myRankAvg = data.sortedAvg.findIndex(c => c.id === primary?.id) + 1;
+
+  container.innerHTML = `
+    <div class="rep-paper">
+      <!-- Cover / Header -->
+      <div class="rep-cover">
+        <div>
+          <div class="rep-title">Executive Competitor Intelligence Brief</div>
+          <div class="rep-sub">Generated on ${data.generatedAt} • Scope: <strong>${data.periodLabel}</strong> (${data.channels.length} channels analyzed)</div>
+        </div>
+        <div style="text-align:right">
+          <span class="badge bdg-gd" style="font-size:11px">Focus: ${esc(primary?.name || 'Primary')}</span>
+        </div>
+      </div>
+
+      <!-- Executive KPI Cards -->
+      <div class="rep-kpi-grid">
+        <div class="rep-kpi-card">
+          <div class="rep-kpi-lbl">Subscriber Rank</div>
+          <div class="rep-kpi-val" style="color:var(--me)">#${myRankSubs} of ${data.channels.length}</div>
+          <div style="font-size:10.5px;color:var(--t3);margin-top:2px">${esc(primary?.subscribers || '—')} total subs</div>
+        </div>
+        <div class="rep-kpi-card">
+          <div class="rep-kpi-lbl">Avg View Efficiency</div>
+          <div class="rep-kpi-val" style="color:var(--up)">#${myRankAvg} of ${data.channels.length}</div>
+          <div style="font-size:10.5px;color:var(--t3);margin-top:2px">${esc(primary?.avg_views || '—')}/vid</div>
+        </div>
+        <div class="rep-kpi-card">
+          <div class="rep-kpi-lbl">Market Leader</div>
+          <div class="rep-kpi-val" style="color:var(--t1)">${esc(data.sortedSubs[0]?.name || '—')}</div>
+          <div style="font-size:10.5px;color:var(--t3);margin-top:2px">${esc(data.sortedSubs[0]?.subscribers || '—')} subs</div>
+        </div>
+        <div class="rep-kpi-card">
+          <div class="rep-kpi-lbl">Top Surging Niche</div>
+          <div class="rep-kpi-val" style="color:var(--acc)">${esc(data.hotTopics[0]?.topic || 'Cad/Cam')}</div>
+          <div style="font-size:10.5px;color:var(--t3);margin-top:2px">${(data.hotTopics[0]?.momentum || 1.8).toFixed(1)}× velocity spike</div>
+        </div>
+      </div>
+
+      <!-- Head-to-Head Comparative Matrix -->
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:8px">📊 Head-to-Head Performance Matrix</div>
+        <div class="rep-table-wrap">
+          <table class="rep-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Channel</th>
+                <th>Subscribers</th>
+                <th>Avg Views</th>
+                <th>Total Views</th>
+                <th>Videos</th>
+                <th>7d Movement</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.sortedSubs.map((ch, i) => `
+                <tr style="${ch.id === primary?.id ? 'background:rgba(245,166,35,0.08);font-weight:700' : ''}">
+                  <td style="font-family:var(--f-mono)">#${i + 1}</td>
+                  <td>${esc(ch.name)} ${ch.id === primary?.id ? '⭐ (You)' : ''}</td>
+                  <td style="font-family:var(--f-mono)">${esc(ch.subscribers)}</td>
+                  <td style="font-family:var(--f-mono);color:var(--up)">${esc(ch.avg_views)}</td>
+                  <td style="font-family:var(--f-mono)">${esc(ch.total_views)}</td>
+                  <td style="font-family:var(--f-mono)">${esc(ch.total_videos)}</td>
+                  <td>${renderRankDeltaChip(ch.id)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Breakout Field Movers -->
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:8px">⚡ Top Breakout Competitor Drops in ${data.periodLabel}</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${data.breakoutDrops.length ? data.breakoutDrops.map((d, i) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-3);padding:8px 12px;border-radius:var(--r-s);border:1px solid var(--line-1)">
+              <div style="min-width:0;flex:1">
+                <div style="font-size:12px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                  <span style="font-family:var(--f-mono);color:var(--acc);margin-right:6px">#${i + 1}</span>${esc(d.title)}
+                </div>
+                <div style="font-size:10.5px;color:var(--t3)">by <strong>${esc(d.chName)}</strong> • ${ago(d.publishedAt)}</div>
+              </div>
+              <div style="text-align:right;font-family:var(--f-mono);flex-shrink:0;margin-left:12px">
+                <div style="font-size:12px;font-weight:700;color:var(--t1)">${fmtN(d.views)} views</div>
+                <div style="font-size:10px;color:var(--acc)">${fmtN(d.vel)}/day ⚡</div>
+              </div>
+            </div>`).join('') : '<div style="font-size:11px;color:var(--t3)">No drops recorded in this timeframe.</div>'}
+        </div>
+      </div>
+
+      <!-- Topic Moats & Untapped Gaps -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--bg-3);padding:12px;border-radius:var(--r-s);border:1px solid var(--line-1)">
+          <div style="font-size:11.5px;font-weight:700;color:var(--up);margin-bottom:6px">🏰 Defensive Moats (You Lead)</div>
+          ${data.moats.length ? data.moats.map(m => `
+            <div style="font-size:11px;color:var(--t2);margin-bottom:4px">
+              • <strong>${esc(m.topic)}</strong>: ${m.myCount} videos (${m.sharePct}% category share)
+            </div>`).join('') : '<div style="font-size:11px;color:var(--t3)">No strong content moats established yet.</div>'}
+        </div>
+
+        <div style="background:var(--bg-3);padding:12px;border-radius:var(--r-s);border:1px solid var(--line-1)">
+          <div style="font-size:11.5px;font-weight:700;color:var(--warn);margin-bottom:6px">⚠️ Untapped Competitor Gaps</div>
+          ${data.gaps.length ? data.gaps.map(g => `
+            <div style="font-size:11px;color:var(--t2);margin-bottom:4px">
+              • <strong>${esc(g.topic)}</strong>: ${g.rivalCount} competitor videos (${fmtN(g.avgViews)} avg views)
+            </div>`).join('') : '<div style="font-size:11px;color:var(--t3)">Zero major competitor gaps detected.</div>'}
+        </div>
+      </div>
+
+      <!-- Automated Strategic Takeaways -->
+      <div class="rep-insights-box">
+        <div class="rep-insights-title">
+          <span class="msi" style="font-size:16px">lightbulb</span> Strategic Intelligence Takeaways
+        </div>
+        <ul class="rep-insights-list">
+          <li><strong>Content Opportunity:</strong> Produce a high-production video targeting <em>"${data.gaps[0]?.topic || data.hotTopics[0]?.topic || 'Topic'}"</em> to capture untapped niche search traffic.</li>
+          <li><strong>View Efficiency:</strong> You achieve <strong>${esc(primary?.avg_views || '—')} views per video</strong>, ranking #${myRankAvg} in the tracked competitive field.</li>
+          <li><strong>Collision Risk:</strong> Monitor upload windows of <strong>${esc(data.sortedSubs[0]?.name || 'Top Competitor')}</strong> to prevent thumbnail cannibalization.</li>
+        </ul>
+      </div>
+    </div>`;
+}
+
+function printReport() {
+  window.print();
+}
+
+function copyReportMarkdown() {
+  const data = generateReportData();
+  const primary = data.primary;
+  const text = `# 📄 Competitor Intelligence Brief — ${data.generatedAt}
+**Period:** ${data.periodLabel}  
+**Primary Channel:** ${primary?.name || 'Primary'} (${primary?.subscribers || '—'} subs, ${primary?.avg_views || '—'} avg views)
+
+---
+
+## 📊 Head-to-Head Leaderboard
+| # | Channel | Subscribers | Avg Views | Total Views |
+|---|---|---|---|---|
+${data.sortedSubs.map((c, i) => `| #${i + 1} | ${c.name} ${c.id === primary?.id ? '⭐ (You)' : ''} | ${c.subscribers} | ${c.avg_views} | ${c.total_views} |`).join('\n')}
+
+---
+
+## ⚡ Top Breakout Competitor Drops
+${data.breakoutDrops.map((d, i) => `${i + 1}. **${d.title}** (${d.chName}) — ${fmtN(d.views)} views (${fmtN(d.vel)}/day) [Watch](${d.url})`).join('\n')}
+
+---
+
+## 💡 Strategic Takeaways
+- **Top Niche Spike:** ${data.hotTopics[0]?.topic || 'N/A'} (${(data.hotTopics[0]?.momentum || 1.8).toFixed(1)}x velocity momentum)
+- **Top Untapped Gap:** ${data.gaps[0]?.topic || 'None'}
+- **Content Moat:** ${data.moats[0]?.topic || 'None'}
+`;
+
+  navigator.clipboard.writeText(text).then(() => {
+    toast('Report Markdown copied to clipboard!', 's');
+  });
+}
+
+function downloadReportHtml() {
+  const container = document.getElementById('reportPreviewContainer');
+  if (!container) return;
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>YT Tracker Intelligence Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #0f172a; padding: 40px; }
+    .rep-paper { max-width: 800px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .rep-title { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+    .rep-sub { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+    .rep-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+    .rep-kpi-card { background: #f1f5f9; padding: 12px; border-radius: 8px; }
+    .rep-kpi-lbl { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+    .rep-kpi-val { font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 4px; }
+    .rep-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    .rep-table th { background: #f1f5f9; text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; color: #475569; }
+    .rep-table td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    .rep-insights-box { background: #f0fdfa; border: 1px solid #99f6e4; padding: 16px; border-radius: 8px; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  ${container.innerHTML}
+</body>
+</html>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `yt_tracker_report_${new Date().toISOString().slice(0, 10)}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('HTML report downloaded!', 's');
+}
+
+/* ── 5. Shareable State Links & Deep URL Router ───────────────────────────── */
+function serializeStateToHash() {
+  if (_isDeserializingHash) return;
+  const params = new URLSearchParams();
+
+  // Active page
+  const activePageEl = document.querySelector('.page.on');
+  const pageId = activePageEl ? activePageEl.id.replace('page-', '') : 'dash';
+  params.set('view', pageId);
+
+  // Deep dive open
+  if (ddChannelId) {
+    params.set('dd', ddChannelId);
+    if (ddActiveTab) params.set('tab', ddActiveTab);
+  }
+
+  // Compare set
+  if (compareSet.length) {
+    params.set('compare', compareSet.join(','));
+  }
+
+  // Metrics & Topic filter
+  if (yvfMetric !== 'subscribers_raw') params.set('metric', yvfMetric);
+  if (raceTopicFilter) params.set('topic', raceTopicFilter);
+
+  // Report modal
+  const reportModal = document.getElementById('reportModal');
+  if (reportModal && reportModal.classList.contains('open')) {
+    params.set('report', '1');
+    params.set('period', reportPeriod);
+    params.set('scope', reportScope);
+  }
+
+  const hashStr = params.toString();
+  if (window.location.hash.slice(1) !== hashStr) {
+    history.replaceState(null, '', '#' + hashStr);
+  }
+}
+
+function deserializeStateFromHash() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return;
+  _isDeserializingHash = true;
+
+  try {
+    const params = new URLSearchParams(hash);
+    const view = params.get('view') || 'dash';
+    const dd = params.get('dd');
+    const tab = params.get('tab');
+    const compare = params.get('compare');
+    const metric = params.get('metric');
+    const topic = params.get('topic');
+    const report = params.get('report');
+    const period = params.get('period');
+    const scope = params.get('scope');
+
+    if (compare) {
+      compareSet = compare.split(',').filter(id => all.some(c => c.id === id));
+      localStorage.setItem('yt_compare_set', JSON.stringify(compareSet));
+      renderCompareTray();
+    }
+
+    if (metric) {
+      yvfMetric = metric;
+    }
+
+    if (topic) {
+      raceTopicFilter = topic;
+    }
+
+    if (period) reportPeriod = period;
+    if (scope) reportScope = scope;
+
+    if (dd && all.some(c => c.id === dd)) {
+      openDeepDive(dd, tab || 'overview');
+    } else {
+      sp(view);
+    }
+
+    if (report === '1') {
+      openReportModal();
+    }
+  } catch { }
+
+  _isDeserializingHash = false;
+}
+
+function copyShareLink() {
+  serializeStateToHash();
+  const url = window.location.href;
+  navigator.clipboard.writeText(url).then(() => {
+    toast('Shareable dashboard link copied to clipboard!', 's');
+  });
+}
+
+window.addEventListener('hashchange', () => {
+  deserializeStateFromHash();
+});
+
+
 /* ── 10. Global Shortcuts & Init ──────────────────────────────────────────── */
 document.addEventListener('keydown', e => {
   if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
@@ -5274,36 +6120,52 @@ document.addEventListener('keydown', e => {
     closeDeepDive();
     closeCommandPalette();
     closeShortcutsModal();
+    closeSettingsModal();
+    closeReportModal();
     closeSearchSuggestions();
     closeAddSuggestions();
     document.getElementById('comparePopover')?.classList.remove('open');
+    document.getElementById('bellPopover')?.classList.remove('open');
+    document.getElementById('myPulsePopover')?.classList.remove('open');
   }
 });
 
 document.addEventListener('click', e => {
+  const path = e.composedPath ? e.composedPath() : [];
+
   const p = document.getElementById('comparePopover');
   const btn = document.getElementById('compareAddBtn');
-  if (p && p.classList.contains('open') && !p.contains(e.target) && e.target !== btn) {
+  if (p && p.classList.contains('open') && !p.contains(e.target) && !path.includes(p) && e.target !== btn && !path.includes(btn)) {
     p.classList.remove('open');
   }
 
   const bp = document.getElementById('bellPopover');
   const bBtn = document.getElementById('bellBtn');
-  if (bp && bp.classList.contains('open') && !bp.contains(e.target) && e.target !== bBtn && !bBtn.contains(e.target)) {
+  if (bp && bp.classList.contains('open') && !bp.contains(e.target) && !path.includes(bp) && e.target !== bBtn && !path.includes(bBtn)) {
     bp.classList.remove('open');
+  }
+
+  const mp = document.getElementById('myPulsePopover');
+  const mpBtn = document.getElementById('myPulseBtn');
+  if (mp && mp.classList.contains('open') && !mp.contains(e.target) && !path.includes(mp) && e.target !== mpBtn && !path.includes(mpBtn)) {
+    mp.classList.remove('open');
   }
 });
 
 (async () => {
   await fetchAll();
+  await loadAllSnapshots();
   loadInboxItems();
+  checkAchievements();
   checkStalenessBanner();
   renderDash();
+
+  deserializeStateFromHash();
 
   // First run onboarding tour check
   try {
     if (!localStorage.getItem('yt_tour_completed')) {
       setTimeout(() => startSpotlightTour(), 800);
     }
-  } catch {}
+  } catch { }
 })();

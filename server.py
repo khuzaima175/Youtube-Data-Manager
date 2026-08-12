@@ -693,6 +693,12 @@ def channel_videos_full(channel_id):
         return api_error("Failed to fetch full video list", 500)
 
 
+@app.route("/api/snapshots")
+def get_all_snapshots():
+    """Return growth snapshot history for all channels."""
+    return jsonify(load_snapshots())
+
+
 @app.route("/api/snapshots/<channel_id>")
 def get_snapshots(channel_id):
     """Return growth snapshot history for a channel."""

@@ -74,13 +74,23 @@
           </span>
         </div>
 
+        <!-- Share State Link Button -->
+        <button class="icon-btn" id="shareStateBtn" onclick="copyShareLink()" title="Copy Shareable State Link">
+          <span class="msi" style="font-size:16px">share</span>
+        </button>
+
+        <!-- Report Center Button -->
+        <button class="icon-btn" id="reportBtn" onclick="openReportModal()" title="Intelligence Report Center">
+          <span class="msi" style="font-size:16px">description</span>
+        </button>
+
         <!-- My Pulse Button -->
-        <button class="icon-btn" id="myPulseBtn" onclick="toggleMyPulse()" title="My Channel Pulse">
+        <button class="icon-btn" id="myPulseBtn" onclick="toggleMyPulse(event)" title="My Channel Pulse & Achievements">
           <span class="msi" style="font-size:16px">person</span>
         </button>
 
         <!-- Bell Inbox Button -->
-        <button class="icon-btn" id="bellBtn" style="position:relative;margin-left:4px" onclick="toggleBellInbox()" title="Alert Inbox & Field Feed">
+        <button class="icon-btn" id="bellBtn" style="position:relative;margin-left:4px" onclick="toggleBellInbox(event)" title="Alert Inbox & Field Feed">
           <span class="msi" style="font-size:16px">notifications</span>
           <span id="bellBadge" class="nav-cnt" style="position:absolute;top:-4px;right:-4px;background:var(--down);color:#fff;display:none">0</span>
         </button>
@@ -387,6 +397,59 @@
     </div>
     <div id="settingsPanelBody" style="max-height:65vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px"></div>
   </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       REPORT CENTER MODAL (Monthly / Custom Intelligence Brief)
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="cmd-ovrl" id="reportOvrl" onclick="closeReportModal()"></div>
+  <div class="report-modal" id="reportModal">
+    <!-- Header -->
+    <div class="report-modal-hdr">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="ic-tile cyan"><span class="msi" style="font-size:18px">description</span></span>
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--t1);font-family:var(--f-disp)">Competitor Intelligence Report Center</div>
+          <div style="font-size:11px;color:var(--t3)">Generate executive briefs, export printable PDF dossiers & shareable markdown.</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-gh btn-sm" onclick="copyReportMarkdown()"><span class="msi">content_copy</span> Copy MD</button>
+        <button class="btn btn-gh btn-sm" onclick="downloadReportHtml()"><span class="msi">download</span> Save HTML</button>
+        <button class="btn btn-acc btn-sm" onclick="printReport()"><span class="msi">print</span> Print / Save PDF</button>
+        <button class="icon-btn" onclick="closeReportModal()"><span class="msi">close</span></button>
+      </div>
+    </div>
+
+    <!-- Generator Control Toolbar -->
+    <div class="report-controls-bar">
+      <div class="report-ctrl-group">
+        <span class="report-ctrl-lbl">Period:</span>
+        <div class="vid-seg" id="reportPeriodSeg">
+          <button class="vid-seg-btn on" id="repPeriod-30d" onclick="setReportPeriod('30d')">Last 30 Days</button>
+          <button class="vid-seg-btn" id="repPeriod-90d" onclick="setReportPeriod('90d')">Last 90 Days</button>
+          <button class="vid-seg-btn" id="repPeriod-all" onclick="setReportPeriod('all')">All-Time (6M)</button>
+        </div>
+      </div>
+
+      <div class="report-ctrl-group">
+        <span class="report-ctrl-lbl">Scope:</span>
+        <div class="vid-seg" id="reportScopeSeg">
+          <button class="vid-seg-btn on" id="repScope-all" onclick="setReportScope('all')">All Tracked</button>
+          <button class="vid-seg-btn" id="repScope-compare" onclick="setReportScope('compare')">Compare Set</button>
+        </div>
+      </div>
+
+      <div class="report-ctrl-group" style="margin-left:auto">
+        <button class="btn btn-gh btn-sm" onclick="copyShareLink()"><span class="msi">share</span> Copy Share Link</button>
+      </div>
+    </div>
+
+    <!-- Scrollable Printable Report Container -->
+    <div class="report-preview-wrap" id="reportPreviewContainer"></div>
+  </div>
+
+  <!-- Achievement Celebration Pop-up Banner -->
+  <div id="achievementToast" class="achievement-toast"></div>
 
   <script src="static/app.js" defer></script>
 </body>
