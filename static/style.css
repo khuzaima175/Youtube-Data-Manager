@@ -3246,3 +3246,20 @@ button {
 @media (max-width: 768px) {
   .my-pulse-popover { right: 16px; width: calc(100vw - 32px); }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PHASE 8: COMPETITIVE INTELLIGENCE STYLES
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.dd-series-strip {
+  animation: fadeUp .3s var(--e-out);
+}
+
+.dd-series-card {
+  transition: border-color var(--d-1), transform var(--d-1);
+}
+
+.dd-series-card:hover {
+  border-color: var(--line-2);
+  transform: translateY(-1px);
+}

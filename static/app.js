@@ -868,6 +868,7 @@ async function renderDash() {
             <col style="width:13%">
             <col style="width:9%">
             <col style="width:11%">
+            <col style="width:75px">
             <col style="width:68px">
           </colgroup>
           <thead>
@@ -879,6 +880,7 @@ async function renderDash() {
               <th onclick="setLeaderboardSort('total_views_raw')">Total Views ▾</th>
               <th onclick="setLeaderboardSort('total_videos_raw')">Videos ▾</th>
               <th>Last Upload</th>
+              <th onclick="setLeaderboardSort('threat_score')" style="text-align:center" title="Topic Overlap Threat vs Your Channel">Threat ▾</th>
               <th style="text-align:center">Compare</th>
             </tr>
           </thead>
@@ -1070,16 +1072,29 @@ function setLeaderboardSort(field) {
 }
 
 function renderLeaderboardRows(primary, allChannels) {
-  const sorted = [...allChannels].sort((a, b) => (b[sort] || 0) - (a[sort] || 0));
-  const maxVal = Math.max(...sorted.map(c => c[sort] || 0), 1);
+  // Precompute threat scores for all channels
+  const withThreat = allChannels.map(ch => {
+    const threat = calcThreatScore(ch.id, primary?.id);
+    return { ...ch, _threatScore: threat.score, _sharedTopics: threat.sharedTopics };
+  });
+
+  const sorted = [...withThreat].sort((a, b) => {
+    if (sort === 'threat_score') return (b._threatScore || 0) - (a._threatScore || 0);
+    return (b[sort] || 0) - (a[sort] || 0);
+  });
+  const maxVal = Math.max(...sorted.map(c => sort === 'threat_score' ? (c._threatScore || 0) : (c[sort] || 0)), 1);
 
   return sorted.map((ch, i) => {
-    const isMe = ch.id === primary.id;
-    const pct = Math.max(4, Math.round(((ch[sort] || 0) / maxVal) * 100));
+    const isMe = ch.id === primary?.id;
+    const curVal = sort === 'threat_score' ? (ch._threatScore || 0) : (ch[sort] || 0);
+    const pct = Math.max(4, Math.round((curVal / maxVal) * 100));
     const col = colorOf(ch);
     const inCompare = compareSet.includes(ch.id) || isMe;
+    const threatScore = ch._threatScore || 0;
+    const threatColor = threatScore >= 50 ? 'var(--down)' : threatScore >= 25 ? 'var(--warn)' : 'var(--t3)';
+
     return `
-      <tr class="lb-row ${isMe ? 'me' : ''}" onclick="openDeepDive('${esc(ch.id)}', 'compare')">
+      <tr class="lb-row ${isMe ? 'me' : ''}" onclick="openDeepDive('${esc(ch.id)}', 'overview')">
         <td style="font-family:var(--f-mono);font-size:11px;color:var(--t3);text-align:center">#${i + 1}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px;min-width:0">
@@ -1102,6 +1117,11 @@ function renderLeaderboardRows(primary, allChannels) {
         <td style="font-family:var(--f-mono);color:var(--t2)">${esc(ch.total_views)}</td>
         <td style="font-family:var(--f-mono);color:var(--t3)">${esc(ch.total_videos)}</td>
         <td style="font-size:11px;color:var(--t3)">${ch.video?.date || '—'}</td>
+        <td style="text-align:center;padding:6px 4px" onclick="event.stopPropagation()">
+          ${isMe
+            ? `<span class="badge bdg-gd">YOU</span>`
+            : `<span class="badge" style="background:${threatScore>=50?'rgba(255,107,107,0.12)':threatScore>=25?'rgba(245,197,66,0.12)':'var(--bg-3)'};color:${threatColor}" title="Shared topics: ${(ch._sharedTopics||[]).join(', ') || 'none'}">⚔️ ${threatScore}%</span>`}
+        </td>
         <td style="text-align:center;overflow:visible;text-overflow:clip;padding:6px 0" onclick="event.stopPropagation()">
           <button class="icon-btn ${inCompare ? 'active' : ''}" style="display:inline-flex;margin:0 auto" onclick="toggleCompare('${esc(ch.id)}')" title="Toggle compare tray">
             <span class="msi" style="font-size:14px">${inCompare ? 'check' : 'add'}</span>
@@ -2149,6 +2169,183 @@ function pushTopicAlert({ type, icon, color, title, body, url }) {
   toast(`${title}`, type === 'threat' ? 'e' : type === 'opportunity' ? 's' : '');
 }
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   PHASE 8: COMPETITIVE INTELLIGENCE ENGINE (⚔️ COMPETE)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+// C1: Closest-Threat Jaccard Topic Overlap Score
+function calcThreatScore(chId, primaryId) {
+  if (!primaryId || chId === primaryId || !_topicCache.topics.size) {
+    return { score: 0, sharedTopics: [] };
+  }
+  const myTopics = _topicCache.perChannel.get(primaryId);
+  const rivalTopics = _topicCache.perChannel.get(chId);
+  if (!myTopics || !rivalTopics || !myTopics.size || !rivalTopics.size) {
+    return { score: 0, sharedTopics: [] };
+  }
+
+  const myTop = new Set([...myTopics.values()].sort((a, b) => b.n - a.n).slice(0, 20).map(t => t.topic));
+  const rivalTop = new Set([...rivalTopics.values()].sort((a, b) => b.n - a.n).slice(0, 20).map(t => t.topic));
+
+  const shared = [];
+  myTop.forEach(t => {
+    if (rivalTop.has(t)) shared.push(t);
+  });
+
+  const union = new Set([...myTop, ...rivalTop]).size;
+  const score = union > 0 ? Math.round((shared.length / union) * 100) : 0;
+  return { score, sharedTopics: shared };
+}
+
+// C2: Copycat Detector (token overlap >= 60%)
+function detectCopycatsForVideo(v, myTopVids) {
+  if (!myTopVids || !myTopVids.length) return null;
+  const vToks = new Set(topicTokens(v.title || ''));
+  if (vToks.size < 2) return null;
+
+  for (const myV of myTopVids) {
+    const myToks = new Set(topicTokens(myV.title || ''));
+    if (myToks.size < 2) continue;
+
+    let matchCount = 0;
+    vToks.forEach(t => { if (myToks.has(t)) matchCount++; });
+    const minSize = Math.min(vToks.size, myToks.size);
+    const overlap = minSize > 0 ? (matchCount / minSize) : 0;
+
+    const pubV = new Date(v.published_at || v.date || 0).getTime();
+    const pubMy = new Date(myV.published_at || myV.date || 0).getTime();
+
+    if (overlap >= 0.60 && pubV >= pubMy - 864e5) {
+      return {
+        myTitle: myV.title,
+        overlapPct: Math.round(overlap * 100),
+        myViews: parseInt(myV.view_count ?? myV.views_raw ?? 0)
+      };
+    }
+  }
+  return null;
+}
+
+// C3: Collision Insight Detector (Traffic Shadow)
+function detectCollisionForVideo(myVid, allChannels, primaryId) {
+  const pub = new Date(myVid.published_at || myVid.date || 0).getTime();
+  if (!pub) return null;
+
+  const myToks = new Set(topicTokens(myVid.title || ''));
+  const myCh = allChannels.find(c => c.id === primaryId) || allChannels[0];
+  const mySubs = myCh?.subscribers_raw || 0;
+
+  for (const ch of allChannels) {
+    if (ch.id === primaryId) continue;
+    const rivalSubs = ch.subscribers_raw || 0;
+    if (rivalSubs < mySubs * 1.8) continue;
+
+    const en = _enrichCache[ch.id];
+    if (!en || !en.vids) continue;
+
+    for (const rv of en.vids) {
+      const rPub = new Date(rv.published_at || rv.date || 0).getTime();
+      const diffHours = Math.abs(pub - rPub) / 3600000;
+
+      if (diffHours <= 24) {
+        const rToks = new Set(topicTokens(rv.title || ''));
+        let sharedTopic = null;
+        for (const t of myToks) {
+          if (rToks.has(t)) { sharedTopic = t; break; }
+        }
+        if (sharedTopic) {
+          return {
+            rivalCh: ch.name,
+            rivalVidTitle: rv.title,
+            hoursDiff: Math.round(diffHours),
+            sharedTopic,
+            isEarlier: rPub <= pub
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// C4: Evergreen vs. Hype Fingerprint
+function calcEvergreenFingerprint(vids) {
+  if (!vids || !vids.length) return { ratio: 50, label: 'Balanced', type: 'balanced', icon: 'balance' };
+  const sortedByViews = [...vids].sort((a, b) => (parseInt(b.view_count ?? b.views_raw ?? 0)) - (parseInt(a.view_count ?? a.views_raw ?? 0)));
+  const top10 = sortedByViews.slice(0, 10);
+  if (!top10.length) return { ratio: 50, label: 'Balanced', type: 'balanced', icon: 'balance' };
+
+  const now = Date.now();
+  const ONE_YEAR = 365 * 864e5;
+  const oldies = top10.filter(v => {
+    const pub = new Date(v.published_at || v.date || 0).getTime();
+    return pub > 0 && (now - pub) >= ONE_YEAR;
+  });
+
+  const ratio = Math.round((oldies.length / top10.length) * 100);
+  if (ratio >= 60) {
+    return { ratio, label: `Evergreen (${ratio}%)`, type: 'evergreen', icon: 'park' };
+  } else if (ratio <= 25) {
+    return { ratio: 100 - ratio, label: `Hype-Driven (${100 - ratio}%)`, type: 'hype', icon: 'bolt' };
+  }
+  return { ratio, label: `Balanced (${ratio}%)`, type: 'balanced', icon: 'balance' };
+}
+
+// C5: Series Detector
+function detectSeries(vids) {
+  if (!vids || vids.length < 3) return [];
+  const seriesMap = new Map();
+  const seriesRegex = /\b(part|ep|episode|#|vol|volume|chapter)\s*(\d+)\b/i;
+
+  const totalV = vids.reduce((s, v) => s + (parseInt(v.view_count ?? v.views_raw ?? 0) || 0), 0);
+  const chAvg = totalV / vids.length;
+
+  vids.forEach(v => {
+    const title = v.title || '';
+    const m = title.match(seriesRegex);
+    let seriesName = null;
+    let epNum = 0;
+
+    if (m) {
+      epNum = parseInt(m[2]) || 1;
+      seriesName = title.slice(0, m.index).replace(/[-:–|]$/, '').trim();
+    } else {
+      const parts = title.split(/[-:|–]/);
+      if (parts.length >= 2 && parts[0].trim().length >= 4) {
+        seriesName = parts[0].trim();
+      }
+    }
+
+    if (seriesName && seriesName.length >= 3) {
+      if (!seriesMap.has(seriesName)) {
+        seriesMap.set(seriesName, { name: seriesName, vids: [] });
+      }
+      seriesMap.get(seriesName).vids.push({ ...v, _ep: epNum });
+    }
+  });
+
+  const detected = [];
+  for (const [name, entry] of seriesMap) {
+    if (entry.vids.length >= 2) {
+      const sVids = entry.vids;
+      const sTotal = sVids.reduce((s, v) => s + (parseInt(v.view_count ?? v.views_raw ?? 0) || 0), 0);
+      const sAvg = Math.round(sTotal / sVids.length);
+      const ratio = chAvg > 0 ? (sAvg / chAvg) : 1;
+      const status = ratio >= 1.25 ? 'double_down' : ratio <= 0.7 ? 'diminishing' : 'neutral';
+      detected.push({
+        name,
+        count: sVids.length,
+        avgViews: sAvg,
+        ratio: parseFloat(ratio.toFixed(2)),
+        status,
+        latestVid: sVids.sort((a, b) => new Date(b.published_at || b.date) - new Date(a.published_at || a.date))[0]
+      });
+    }
+  }
+
+  return detected.sort((a, b) => b.avgViews - a.avgViews).slice(0, 6);
+}
+
 function scrollRecentRail(offset) {
 
   const rail = document.getElementById('dashRecentUploads');
@@ -2180,7 +2377,13 @@ async function loadDashboardRecentUploads(primaryId) {
       if (ratio >= 1.3) {
         healthChip = `<span class="ru-health-chip up" title="Overperformer (▲${ratio.toFixed(1)}× your avg) → make Part 2">▲${ratio.toFixed(1)}×</span>`;
       } else if (ratio <= 0.7) {
-        healthChip = `<span class="ru-health-chip down" title="Underperformer (▼${ratio.toFixed(1)}× your avg) → test new thumbnail">▼${ratio.toFixed(1)}×</span>`;
+        // Check for collision with larger rival
+        const collision = detectCollisionForVideo(v, all, primaryId);
+        if (collision) {
+          healthChip = `<span class="ru-health-chip down" style="background:rgba(239,68,68,0.2);color:#ef4444" title="Collision: ${esc(collision.rivalCh)} dropped on '${esc(collision.sharedTopic)}' ${collision.hoursDiff}h ${collision.isEarlier ? 'earlier' : 'later'}">⚡ Collision</span>`;
+        } else {
+          healthChip = `<span class="ru-health-chip down" title="Underperformer (▼${ratio.toFixed(1)}× your avg) → test new thumbnail">▼${ratio.toFixed(1)}×</span>`;
+        }
       }
 
       return `
@@ -3034,6 +3237,25 @@ async function renderDDOverview(ch) {
             <span class="dd-health-label"><span class="msi" style="font-size:15px">video_library</span> Total Videos</span>
             <span class="dd-health-val">${esc(ch.total_videos || '—')}</span>
           </div>
+
+          <!-- Phase 8 Competitive Traits -->
+          ${(() => {
+            const primaryId = (all.find(c => c.is_primary) || all[0])?.id;
+            const threat = calcThreatScore(ch.id, primaryId);
+            const eg = calcEvergreenFingerprint(allVids);
+            return `
+            <div style="padding-top:10px;margin-top:8px;border-top:1px solid var(--line-1);display:flex;flex-direction:column;gap:8px">
+              <div class="dd-health-row">
+                <span class="dd-health-label"><span class="msi" style="font-size:15px">${eg.icon}</span> Catalog Strategy</span>
+                <span class="badge ${eg.type === 'evergreen' ? 'bdg-gr' : eg.type === 'hype' ? 'bdg-rd' : 'bdg-dim'}">${eg.label}</span>
+              </div>
+              ${ch.id !== primaryId ? `
+              <div class="dd-health-row">
+                <span class="dd-health-label"><span class="msi" style="font-size:15px">swords</span> Threat Overlap</span>
+                <span class="badge ${threat.score >= 50 ? 'bdg-rd' : threat.score >= 25 ? 'bdg-gd' : 'bdg-dim'}">⚔️ ${threat.score}% affinity</span>
+              </div>` : ''}
+            </div>`;
+          })()}
         </div>
       </div>
     </div>`;
@@ -3125,6 +3347,29 @@ async function renderDDVideos(ch) {
   const bestViews = allVids.length ? Math.max(...allVids.map(v => parseInt(v.view_count ?? v.views_raw ?? 0))) : 0;
   const col = colorOf(ch);
 
+  const detectedSeries = detectSeries(allVids);
+  const seriesStripHtml = detectedSeries.length ? `
+    <div class="dd-series-strip" style="margin-bottom:14px;padding:12px 16px;background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--t2);display:flex;align-items:center;gap:6px">
+          <span class="msi" style="font-size:16px;color:var(--acc)">auto_stories</span> Series Detector
+        </div>
+        <span style="font-size:10.5px;color:var(--t3)">${detectedSeries.length} active franchise${detectedSeries.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:8px">
+        ${detectedSeries.map(s => `
+          <div class="dd-series-card" style="background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-s);padding:8px 10px">
+            <div style="font-size:12px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+              <span style="font-size:10.5px;color:var(--t3)">${s.count} episodes</span>
+              <span class="badge ${s.status === 'double_down' ? 'bdg-gr' : s.status === 'diminishing' ? 'bdg-rd' : 'bdg-dim'}" style="font-size:9.5px">
+                ${s.status === 'double_down' ? '▲ Double Down' : s.status === 'diminishing' ? '▼ Fading' : '• Steady'} (${s.ratio}×)
+              </span>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
+
   panel.innerHTML = `
     <div class="card rev in">
       <div class="dd-vid-filter-bar">
@@ -3147,8 +3392,10 @@ async function renderDDVideos(ch) {
         </div>
       </div>
 
+      ${seriesStripHtml}
+
       <div id="ddVidListContainer" style="display:flex;flex-direction:column;gap:6px">
-        ${renderDDVideoRows(allVids, ddVidFilter, ddVidPreset, 0, col)}
+        ${renderDDVideoRows(allVids, ddVidFilter, ddVidPreset, 0, col, ch.id)}
       </div>
       <div id="ddVidLoadMore"></div>
     </div>`;
@@ -3163,7 +3410,7 @@ function setDDVidFilter(f, chId) {
   document.querySelectorAll('#ddVidFormatSeg .vid-seg-btn').forEach(b => b.classList.toggle('on', b.textContent.startsWith(f === 'all' ? 'All' : f === 'longform' ? 'Long' : 'Shorts')));
   const c = document.getElementById('ddVidListContainer');
   const col = colorOf(all.find(x => x.id === chId) || all[0]);
-  if (c) flip(c, () => { c.innerHTML = renderDDVideoRows(ddFullVideos||[], f, ddVidPreset, 0, col); });
+  if (c) flip(c, () => { c.innerHTML = renderDDVideoRows(ddFullVideos||[], f, ddVidPreset, 0, col, chId); });
   updateDDLoadMore(chId, col);
 }
 
@@ -3174,7 +3421,7 @@ function setDDVidSort(s, chId) {
   document.querySelectorAll('#ddVidSortSeg .vid-seg-btn').forEach(b => b.classList.toggle('on', b.textContent.includes(s === 'recent' ? 'Newest' : s === 'views' ? 'Viewed' : 'Velocity')));
   const c = document.getElementById('ddVidListContainer');
   const col = colorOf(all.find(x => x.id === chId) || all[0]);
-  if (c) flip(c, () => { c.innerHTML = renderDDVideoRows(ddFullVideos||[], ddVidFilter, s, 0, col); });
+  if (c) flip(c, () => { c.innerHTML = renderDDVideoRows(ddFullVideos||[], ddVidFilter, s, 0, col, chId); });
   updateDDLoadMore(chId, col);
 }
 
@@ -3192,7 +3439,7 @@ function getDDVidSorted(vids, formatFilter, sortPreset) {
   return list;
 }
 
-function renderDDVideoRows(vids, formatFilter, sortPreset, page, col) {
+function renderDDVideoRows(vids, formatFilter, sortPreset, page, col, chId) {
   const list = getDDVidSorted(vids, formatFilter, sortPreset);
   ddVidList = list;
   const maxVc = list.length ? Math.max(...list.map(v => parseInt(v.view_count ?? v.views_raw ?? 0))) : 1;
@@ -3200,6 +3447,11 @@ function renderDDVideoRows(vids, formatFilter, sortPreset, page, col) {
   const slice = list.slice(0, (page + 1) * PAGE);
 
   if (!slice.length) return '<div style="color:var(--t3);padding:24px;text-align:center">No videos matching filters.</div>';
+
+  const primary = all.find(c => c.is_primary) || all[0];
+  const primaryId = primary?.id;
+  const isRival = chId && chId !== primaryId;
+  const myTopVids = (isRival && _enrichCache[primaryId]?.vids) ? _enrichCache[primaryId].vids.slice(0, 20) : [];
 
   return slice.map((v, i) => {
     const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
@@ -3214,6 +3466,9 @@ function renderDDVideoRows(vids, formatFilter, sortPreset, page, col) {
     const dur = v.duration || '';
     const engColor = eng !== null ? (eng >= 4 ? 'var(--up)' : eng >= 2 ? 'var(--warn)' : 'var(--t3)') : 'var(--t3)';
 
+    // Copycat detection on rival videos
+    const copycat = isRival ? detectCopycatsForVideo(v, myTopVids) : null;
+
     return `
       <div class="dd-vrow rev in" style="--i:${i % 10}" onclick="window.open('${esc(v.url)}','_blank')">
         <span class="dd-vrow-rank">#${i + 1}</span>
@@ -3227,6 +3482,7 @@ function renderDDVideoRows(vids, formatFilter, sortPreset, page, col) {
           <div class="dd-vrow-meta">
             <span title="${esc(pub)}">${ago(pub)}</span>
             ${likeStr ? `<span>${likeStr}</span>` : ''}
+            ${copycat ? `<span class="badge bdg-rd" style="font-size:9.5px" title="High token similarity with your video: '${esc(copycat.myTitle)}'">🕵️ ${copycat.overlapPct}% match with yours</span>` : ''}
           </div>
         </div>
         <div class="dd-vrow-views-wrap">
@@ -3267,6 +3523,11 @@ function ddLoadMore(chId, col) {
   const container = document.getElementById('ddVidListContainer');
   if (!container) return;
 
+  const primary = all.find(c => c.is_primary) || all[0];
+  const primaryId = primary?.id;
+  const isRival = chId && chId !== primaryId;
+  const myTopVids = (isRival && _enrichCache[primaryId]?.vids) ? _enrichCache[primaryId].vids.slice(0, 20) : [];
+
   const offset = ddVidPage * PAGE;
   const newHtml = slice.map((v, ii) => {
     const i = offset + ii;
@@ -3282,6 +3543,9 @@ function ddLoadMore(chId, col) {
     const dur = v.duration || '';
     const engColor = eng !== null ? (eng >= 4 ? 'var(--up)' : eng >= 2 ? 'var(--warn)' : 'var(--t3)') : 'var(--t3)';
 
+    // Copycat detection on rival videos
+    const copycat = isRival ? detectCopycatsForVideo(v, myTopVids) : null;
+
     return `
       <div class="dd-vrow rev in" style="--i:${ii}" onclick="window.open('${esc(v.url)}','_blank')">
         <span class="dd-vrow-rank">#${i + 1}</span>
@@ -3295,6 +3559,7 @@ function ddLoadMore(chId, col) {
           <div class="dd-vrow-meta">
             <span title="${esc(pub)}">${ago(pub)}</span>
             ${likeStr ? `<span>${likeStr}</span>` : ''}
+            ${copycat ? `<span class="badge bdg-rd" style="font-size:9.5px" title="High token similarity with your video: '${esc(copycat.myTitle)}'">🕵️ ${copycat.overlapPct}% match with yours</span>` : ''}
           </div>
         </div>
         <div class="dd-vrow-views-wrap">
