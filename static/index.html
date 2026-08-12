@@ -91,6 +91,9 @@
         <button class="icon-btn" onclick="openShortcutsModal()" title="Help & Metric Glossary (?)">
           <span class="msi" style="font-size:16px">help</span>
         </button>
+        <button class="icon-btn" id="settingsBtn" onclick="openSettingsModal()" title="Settings & Control Room">
+          <span class="msi" style="font-size:16px">settings</span>
+        </button>
 
         <!-- Popovers -->
         <div class="my-pulse-popover" id="myPulsePopover"></div>
@@ -366,6 +369,23 @@
         <button class="btn btn-acc btn-sm" id="tourNextBtn" onclick="nextTourStep()">Next →</button>
       </div>
     </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       SETTINGS & CONTROL ROOM MODAL
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="cmd-ovrl" id="settingsOvrl" onclick="closeSettingsModal()"></div>
+  <div class="sc-modal" id="settingsModal" style="max-width:580px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="vid-seg" id="settingsModalSeg">
+        <button class="vid-seg-btn on" id="setTabTopics" onclick="switchSettingsTab('topics')">🏷️ Topics</button>
+        <button class="vid-seg-btn" id="setTabAlerts" onclick="switchSettingsTab('alerts')">🔔 Alerts</button>
+        <button class="vid-seg-btn" id="setTabData" onclick="switchSettingsTab('data')">💾 Data & Backup</button>
+        <button class="vid-seg-btn" id="setTabTheme" onclick="switchSettingsTab('theme')">🎨 Appearance</button>
+      </div>
+      <button class="icon-btn" onclick="closeSettingsModal()"><span class="msi">close</span></button>
+    </div>
+    <div id="settingsPanelBody" style="max-height:65vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px"></div>
   </div>
 
   <script src="static/app.js" defer></script>

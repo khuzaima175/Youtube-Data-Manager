@@ -1405,11 +1405,12 @@ const TOPIC_STOP = new Set(
 
 function topicTokens(title) {
   if (!title) return [];
+  const customStops = new Set(userPrefs?.customStopwords || []);
   const words = title.toLowerCase()
     .replace(/[^\p{L}\p{N}\s+#]/gu, ' ')
     .split(/\s+/)
-    .filter(w => w.length > 2 && !TOPIC_STOP.has(w))
-    .map(w => TOPIC_ALIAS[w] || w);
+    .filter(w => w.length > 2 && !TOPIC_STOP.has(w) && !customStops.has(w))
+    .map(w => (userPrefs?.topicAliases && userPrefs.topicAliases[w]) || TOPIC_ALIAS[w] || w);
   const tokens = [...words];
   for (let i = 0; i < words.length - 1; i++) {
     tokens.push(words[i] + ' ' + words[i + 1]);
@@ -2266,7 +2267,8 @@ function detectCollisionForVideo(myVid, allChannels, primaryId) {
   for (const ch of allChannels) {
     if (ch.id === primaryId) continue;
     const rivalSubs = ch.subscribers_raw || 0;
-    if (rivalSubs < mySubs * 1.8) continue;
+    const ratio = userPrefs?.collisionRatio || 1.8;
+    if (rivalSubs < mySubs * ratio) continue;
 
     const en = _enrichCache[ch.id];
     if (!en || !en.vids) continue;
@@ -4744,6 +4746,7 @@ function toggleBellInbox() {
   } else {
     document.getElementById('myPulsePopover')?.classList.remove('open');
     document.getElementById('comparePopover')?.classList.remove('open');
+    closeSettingsModal();
     renderBellInboxHtml();
     p.classList.add('open');
   }
@@ -4932,6 +4935,318 @@ function checkStalenessBanner() {
       <button class="btn btn-acc btn-sm" style="margin-left:auto;font-size:10.5px;padding:3px 8px" onclick="refreshAll()">Refresh Now</button>`;
   } else {
     b.style.display = 'none';
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PHASE 11: SETTINGS CONTROL ROOM & HARDENING (W3 + W5)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+let userPrefs = {
+  customStopwords: [],
+  topicAliases: { 'gdt': 'geometric dimensioning', 'euv': 'extreme ultraviolet' },
+  copycatThreshold: 60,
+  collisionRatio: 1.8,
+  surgeVelThreshold: 2000,
+  accentColor: 'cyan'
+};
+
+try {
+  const stored = localStorage.getItem('yt_user_prefs');
+  if (stored) userPrefs = { ...userPrefs, ...JSON.parse(stored) };
+} catch {}
+
+function saveUserPrefs() {
+  try { localStorage.setItem('yt_user_prefs', JSON.stringify(userPrefs)); } catch {}
+}
+
+let settingsTab = 'topics'; // 'topics' | 'alerts' | 'data' | 'theme'
+
+function openSettingsModal() {
+  document.getElementById('settingsOvrl')?.classList.add('open');
+  document.getElementById('settingsModal')?.classList.add('open');
+  switchSettingsTab(settingsTab);
+}
+
+function closeSettingsModal() {
+  document.getElementById('settingsOvrl')?.classList.remove('open');
+  document.getElementById('settingsModal')?.classList.remove('open');
+}
+
+function switchSettingsTab(tab) {
+  settingsTab = tab;
+  document.querySelectorAll('#settingsModalSeg .vid-seg-btn').forEach(b => {
+    b.classList.toggle('on', b.id === 'setTab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+  });
+  renderSettingsBody();
+}
+
+function renderSettingsBody() {
+  const body = document.getElementById('settingsPanelBody');
+  if (!body) return;
+
+  if (settingsTab === 'topics') {
+    body.innerHTML = `
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:4px">Custom Stopwords Filter</div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Exclude generic niche terms from the topic intelligence engine.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+          ${userPrefs.customStopwords.map((w, idx) => `
+            <span class="chip" style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px">
+              <span>${esc(w)}</span>
+              <span style="cursor:pointer;color:var(--down);font-weight:700" onclick="removeCustomStopword(${idx})">✕</span>
+            </span>`).join('')}
+          ${!userPrefs.customStopwords.length ? '<span style="font-size:11px;color:var(--t4)">No custom stopwords added yet.</span>' : ''}
+        </div>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="addStopwordInp" placeholder="Add stopword (e.g. review, ep)..."
+            style="flex:1;padding:6px 10px;font-size:11.5px;background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);color:var(--t1);outline:none">
+          <button class="btn btn-acc btn-sm" onclick="addCustomStopword()">+ Add</button>
+        </div>
+      </div>
+
+      <div style="padding-top:14px;border-top:1px solid var(--line-1)">
+        <div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:4px">Topic Aliases & Synonym Merge</div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Merge synonyms under a single canonical topic keyword.</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+          ${Object.entries(userPrefs.topicAliases).map(([from, to]) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-3);padding:6px 10px;border-radius:var(--r-s);font-size:11.5px">
+              <span><strong style="color:var(--acc)">${esc(from)}</strong> → <span style="color:var(--t1)">${esc(to)}</span></span>
+              <button class="icon-btn" style="width:20px;height:20px;color:var(--down)" onclick="removeTopicAlias('${esc(from)}')">✕</button>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="aliasFromInp" placeholder="From (e.g. gdt)" style="flex:1;padding:6px 10px;font-size:11px;background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);color:var(--t1);outline:none">
+          <input type="text" id="aliasToInp" placeholder="To (e.g. geometric dimensioning)" style="flex:1;padding:6px 10px;font-size:11px;background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);color:var(--t1);outline:none">
+          <button class="btn btn-acc btn-sm" onclick="addTopicAlias()">+ Link</button>
+        </div>
+      </div>
+
+      <div style="padding-top:10px;border-top:1px solid var(--line-1);display:flex;justify-content:flex-end">
+        <button class="btn btn-gh btn-sm" onclick="rebuildTopicEngine()"><span class="msi">refresh</span> Rebuild Topic Index</button>
+      </div>`;
+  } else if (settingsTab === 'alerts') {
+    body.innerHTML = `
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">🕵️ Copycat Match Sensitivity</div>
+          <span class="badge bdg-pr" id="lblCopycat">${userPrefs.copycatThreshold}% Overlap</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Minimum token overlap ratio to flag competitor uploads as copycats.</div>
+        <input type="range" min="40" max="90" step="5" value="${userPrefs.copycatThreshold}"
+          style="width:100%;accent-color:var(--acc)" oninput="updateAlertPref('copycatThreshold', this.value, 'lblCopycat', '% Overlap')">
+      </div>
+
+      <div style="padding-top:14px;border-top:1px solid var(--line-1)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">⚡ Collision Size Multiplier</div>
+          <span class="badge bdg-pr" id="lblCollision">${userPrefs.collisionRatio}× Size</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Competitor must be at least this much larger than your channel to flag traffic cannibalization.</div>
+        <input type="range" min="1.2" max="3.5" step="0.1" value="${userPrefs.collisionRatio}"
+          style="width:100%;accent-color:var(--acc)" oninput="updateAlertPref('collisionRatio', this.value, 'lblCollision', '× Size')">
+      </div>
+
+      <div style="padding-top:14px;border-top:1px solid var(--line-1)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">🚀 Viral Surge Velocity Trigger</div>
+          <span class="badge bdg-pr" id="lblSurge">${fmtN(userPrefs.surgeVelThreshold)}/day</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Daily view rate threshold to flag viral competitor breakout videos in Field Feed.</div>
+        <input type="range" min="500" max="10000" step="500" value="${userPrefs.surgeVelThreshold}"
+          style="width:100%;accent-color:var(--acc)" oninput="updateAlertPref('surgeVelThreshold', this.value, 'lblSurge', '/day', true)">
+      </div>`;
+  } else if (settingsTab === 'data') {
+    const storageKb = Math.round(JSON.stringify(localStorage).length / 1024);
+    body.innerHTML = `
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:4px">Storage & Cache Inspector</div>
+        <div style="font-size:11px;color:var(--t2);line-height:1.45;margin-bottom:12px">
+          • <strong>Local Cache Size:</strong> ~${storageKb} KB<br>
+          • <strong>Tracked Channels:</strong> ${all.length} channels cached<br>
+          • <strong>Topic Index Size:</strong> ${_topicCache.topics.size} topics indexed
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-gh btn-sm" onclick="purgeTopicCache()"><span class="msi">delete_sweep</span> Purge Topic Index</button>
+          <button class="btn btn-gh btn-sm" onclick="purgeVideoEnrichCache()"><span class="msi">cached</span> Clear Video Cache</button>
+        </div>
+      </div>
+
+      <div style="padding-top:14px;border-top:1px solid var(--line-1)">
+        <div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:4px">Full Data Backup & Restore</div>
+        <div style="font-size:10.5px;color:var(--t3);margin-bottom:10px">Export or restore your tracked channels, pipeline cards, topic merges, and custom settings.</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="btn btn-acc btn-sm" onclick="exportDataBackup()"><span class="msi">download</span> 📦 Export JSON Backup</button>
+          <label class="btn btn-gh btn-sm" style="cursor:pointer">
+            <span class="msi">upload</span> 📥 Restore JSON Backup
+            <input type="file" accept=".json" style="display:none" onchange="importDataBackup(event)">
+          </label>
+        </div>
+      </div>`;
+  } else if (settingsTab === 'theme') {
+    const themes = [
+      { key: 'cyan', name: 'Cyan (Default)', color: '#00e5ff' },
+      { key: 'emerald', name: 'Emerald', color: '#3ddc97' },
+      { key: 'gold', name: 'Gold', color: '#f5a623' },
+      { key: 'purple', name: 'Purple', color: '#a78bfa' },
+      { key: 'crimson', name: 'Crimson', color: '#ff4d4d' }
+    ];
+    body.innerHTML = `
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:6px">Accent Color Palette</div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
+          ${themes.map(th => `
+            <div onclick="setThemeAccent('${th.key}', '${th.color}')"
+                 style="width:32px;height:32px;border-radius:50%;background:${th.color};cursor:pointer;border:2.5px solid ${userPrefs.accentColor === th.key ? '#fff' : 'transparent'};box-shadow:0 0 10px ${th.color}66"
+                 title="${th.name}"></div>`).join('')}
+        </div>
+      </div>
+
+      <div style="padding-top:14px;border-top:1px solid var(--line-1);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">Onboarding Tour</div>
+          <div style="font-size:10.5px;color:var(--t3)">Replay the 6-step guided walkthrough across the dashboard.</div>
+        </div>
+        <button class="btn btn-gh btn-sm" onclick="closeSettingsModal();startSpotlightTour()">Replay Tour 🚀</button>
+      </div>`;
+  }
+}
+
+function addCustomStopword() {
+  const inp = document.getElementById('addStopwordInp');
+  const val = (inp?.value || '').trim().toLowerCase();
+  if (!val) return;
+  if (!userPrefs.customStopwords.includes(val)) {
+    userPrefs.customStopwords.push(val);
+    saveUserPrefs();
+    rebuildTopicEngine();
+    renderSettingsBody();
+    toast(`Added stopword: ${val}`, 's');
+  }
+  if (inp) inp.value = '';
+}
+
+function removeCustomStopword(idx) {
+  userPrefs.customStopwords.splice(idx, 1);
+  saveUserPrefs();
+  rebuildTopicEngine();
+  renderSettingsBody();
+}
+
+function addTopicAlias() {
+  const fromInp = document.getElementById('aliasFromInp');
+  const toInp = document.getElementById('aliasToInp');
+  const f = (fromInp?.value || '').trim().toLowerCase();
+  const t = (toInp?.value || '').trim().toLowerCase();
+  if (!f || !t) return;
+  userPrefs.topicAliases[f] = t;
+  saveUserPrefs();
+  rebuildTopicEngine();
+  renderSettingsBody();
+  toast(`Linked '${f}' → '${t}'`, 's');
+  if (fromInp) fromInp.value = '';
+  if (toInp) toInp.value = '';
+}
+
+function removeTopicAlias(key) {
+  delete userPrefs.topicAliases[key];
+  saveUserPrefs();
+  rebuildTopicEngine();
+  renderSettingsBody();
+}
+
+function rebuildTopicEngine() {
+  buildTopicCache();
+  renderTopicRadar();
+  toast('Topic Intelligence index recomputed!', 's');
+}
+
+function updateAlertPref(key, val, lblId, suffix, isFmt = false) {
+  const num = parseFloat(val);
+  userPrefs[key] = num;
+  saveUserPrefs();
+  const lbl = document.getElementById(lblId);
+  if (lbl) lbl.textContent = (isFmt ? fmtN(num) : num) + suffix;
+}
+
+function purgeTopicCache() {
+  _topicCache.topics.clear();
+  _topicCache.perChannel.clear();
+  try { localStorage.removeItem('yt_topic_cache'); } catch {}
+  buildTopicCache();
+  renderTopicRadar();
+  renderSettingsBody();
+  toast('Topic cache purged & rebuilt!', 's');
+}
+
+function purgeVideoEnrichCache() {
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('yt_enrich_')) {
+      localStorage.removeItem(k);
+    }
+  }
+  toast('Video history cache cleared!', 's');
+  renderSettingsBody();
+}
+
+function exportDataBackup() {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    version: '1.0.0',
+    prefs: userPrefs,
+    pipelineCards: pipelineCards || [],
+    inboxItems: inboxItems || [],
+    channels: all || []
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `yt_tracker_backup_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Backup exported successfully!', 's');
+}
+
+function importDataBackup(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    try {
+      const data = JSON.parse(evt.target.result);
+      if (data.prefs) userPrefs = { ...userPrefs, ...data.prefs };
+      if (data.pipelineCards) pipelineCards = data.pipelineCards;
+      if (data.inboxItems) inboxItems = data.inboxItems;
+      saveUserPrefs();
+      savePipelineCards();
+      try { localStorage.setItem('yt_inbox_items', JSON.stringify(inboxItems)); } catch {}
+      rebuildTopicEngine();
+      updateBellBadge();
+      renderSettingsBody();
+      toast('Backup restored successfully!', 's');
+    } catch {
+      toast('Invalid backup file format', 'e');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function setThemeAccent(key, hex) {
+  userPrefs.accentColor = key;
+  saveUserPrefs();
+  document.documentElement.style.setProperty('--acc', hex);
+  renderSettingsBody();
+  toast(`Accent set to ${key.toUpperCase()}`, 's');
+}
+
+// Initialize theme on boot
+if (userPrefs?.accentColor) {
+  const themeMap = { cyan: '#00e5ff', emerald: '#3ddc97', gold: '#f5a623', purple: '#a78bfa', crimson: '#ff4d4d' };
+  if (themeMap[userPrefs.accentColor]) {
+    document.documentElement.style.setProperty('--acc', themeMap[userPrefs.accentColor]);
   }
 }
 

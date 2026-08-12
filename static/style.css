@@ -3680,3 +3680,73 @@ button {
     font-size: 18px !important;
   }
 }
+
+
+/* ==============================================================================
+   PHASE 11: SETTINGS CONTROL ROOM & HARDENING STYLES
+   ============================================================================== */
+
+/* Hardening: content-visibility for ultra-fast frame rates on long catalogs */
+.lb-table tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 48px;
+}
+
+.dd-vrow {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 54px;
+}
+
+.rrow {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 60px;
+}
+
+.pipeline-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 90px;
+}
+
+/* Settings Modal Elements */
+#settingsModal {
+  max-width: 580px;
+  width: 90vw;
+}
+
+#settingsPanelBody input[type="range"] {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-3);
+  outline: none;
+  cursor: pointer;
+}
+
+#settingsPanelBody input[type="range"]::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--acc);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+}
+
+@media (max-width: 640px) {
+  #settingsModal {
+    width: calc(100vw - 20px) !important;
+    max-width: none !important;
+    padding: 14px !important;
+  }
+  #settingsModalSeg {
+    overflow-x: auto;
+    width: 100%;
+    scrollbar-width: none;
+  }
+  #settingsModalSeg::-webkit-scrollbar {
+    display: none;
+  }
+  #settingsModalSeg .vid-seg-btn {
+    white-space: nowrap;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
