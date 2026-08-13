@@ -564,6 +564,14 @@ function prevTourStep() {
   }
 }
 
+function skipTour() {
+  const overlay = document.getElementById('spotlightOverlay');
+  const card = document.getElementById('spotlightCard');
+  if (overlay) overlay.style.display = 'none';
+  if (card) card.style.display = 'none';
+  try { localStorage.setItem('yt_tour_completed', '1'); } catch { }
+}
+
 function switchHelpTab(tab) {
   const isShortcuts = tab === 'shortcuts';
   document.getElementById('helpTabShortcuts')?.classList.toggle('on', isShortcuts);
@@ -673,6 +681,7 @@ document.addEventListener('keydown', e => {
     closeSearchSuggestions();
     closeAddSuggestions();
     closeNavOverflow();
+    skipTour();
     document.getElementById('comparePopover')?.classList.remove('open');
     document.getElementById('bellPopover')?.classList.remove('open');
     document.getElementById('myPulsePopover')?.classList.remove('open');
