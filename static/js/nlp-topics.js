@@ -237,7 +237,7 @@ async function topicDeepScan(chId) {
   if (btn) { btn.disabled = true; btn.textContent = 'Scanning…'; }
   toast('Deep scanning… (~4 API units)', '');
   try {
-    const r = await fetch(`/api/channels/${chId}/videos?max=200`);
+    const r = await apiFetch(`/api/channels/${chId}/videos?max=200`);
     const vids = await r.json();
     if (!Array.isArray(vids)) throw new Error('bad response');
     try { localStorage.setItem(DEEP_KEY, JSON.stringify({ ts: Date.now(), vids })); } catch { }
@@ -288,13 +288,53 @@ function renderTopicRadar() {
       <div class="topic-radar-card">
         <div class="topic-radar-hdr">
           <div class="topic-radar-title">
-            <span class="msi" style="color:var(--down);font-size:16px">whatshot</span>
+            <span class="msi" style="color:var(--down);font-size:16px">local_fire_department</span>
             TOPIC RADAR <span>· what's hot across your field</span>
           </div>
+          <div class="race-seg" style="opacity:0.6">
+            <div class="skel" style="width:110px;height:24px;border-radius:var(--r-full)"></div>
+          </div>
         </div>
-        <div style="padding:24px;color:var(--t3);font-size:12px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;min-height:80px">
-          <div class="spin"></div>
-          Building topic index from cached videos… Enrich a few channels to begin.
+        <div class="topic-radar-body" style="min-height:220px">
+          <!-- Hot Column Shimmer -->
+          <div class="topic-hot-col" style="gap:10px">
+            <div class="topic-section-label">HOT NOW</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div class="skel" style="height:32px;border-radius:var(--r-s)"></div>
+              <div class="skel" style="height:32px;border-radius:var(--r-s)"></div>
+              <div class="skel" style="height:32px;border-radius:var(--r-s)"></div>
+              <div class="skel" style="height:32px;border-radius:var(--r-s)"></div>
+            </div>
+          </div>
+          <!-- Matrix Column Shimmer -->
+          <div class="topic-matrix-col" style="display:flex;flex-direction:column;gap:10px">
+            <div class="topic-section-label">HEAT MATRIX · WHO OWNS WHAT TOPIC</div>
+            <div style="display:grid;grid-template-columns:100px repeat(4, 1fr);gap:8px">
+              <div class="skel" style="height:24px"></div>
+              <div class="skel" style="height:24px"></div>
+              <div class="skel" style="height:24px"></div>
+              <div class="skel" style="height:24px"></div>
+              <div class="skel" style="height:24px"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:100px repeat(4, 1fr);gap:8px">
+              <div class="skel" style="height:28px"></div>
+              <div class="skel" style="height:28px"></div>
+              <div class="skel" style="height:28px"></div>
+              <div class="skel" style="height:28px"></div>
+              <div class="skel" style="height:28px"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:100px repeat(4, 1fr);gap:8px">
+              <div class="skel" style="height:28px"></div>
+              <div class="skel" style="height:28px"></div>
+              <div class="skel" style="height:28px"></div>
+              <div class="skel" style="height:28px"></div>
+              <div class="skel" style="height:28px"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:auto;font-size:11px;color:var(--t3)">
+              <div class="spin" style="width:12px;height:12px"></div>
+              <span>Building topic intelligence index from catalog…</span>
+            </div>
+          </div>
         </div>
       </div>`;
     return;

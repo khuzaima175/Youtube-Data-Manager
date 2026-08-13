@@ -2,7 +2,30 @@
    YT TRACKER — MAIN BOOTSTRAP, ROUTING & WAYFINDING
    ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── 04. Navigation ───────────────────────────────────────────────────────── */
+/* ── 00. Boot Font Guard (C1: Zero-CLS & Fail-safe Fallback) ─────────────── */
+(function initIconGuard() {
+  if ('fonts' in document) {
+    document.fonts.load('16px "' + ICON_FONT + '"').then(fonts => {
+      if (fonts && fonts.length > 0) {
+        document.body.classList.add('icons-ready');
+      } else {
+        document.body.classList.add('icons-fallback');
+      }
+    }).catch(() => {
+      document.body.classList.add('icons-fallback');
+    });
+    // Fallback safety timer
+    setTimeout(() => {
+      if (!document.body.classList.contains('icons-ready') && !document.body.classList.contains('icons-fallback')) {
+        document.body.classList.add('icons-ready');
+      }
+    }, 1500);
+  } else {
+    document.body.classList.add('icons-ready');
+  }
+})();
+
+/* ── 04. Navigation & Density Controller ──────────────────────────────────── */
 function sp(p) {
   closeDeepDive();
   document.querySelectorAll('.page').forEach(x => x.classList.remove('on'));
@@ -19,6 +42,207 @@ function sp(p) {
     setTimeout(() => document.getElementById('srInput')?.focus(), 50);
   }
   serializeStateToHash();
+}
+
+function setDensity(mode) {
+  appDensity = mode;
+  try { localStorage.setItem('yt_density', mode); } catch { }
+  if (mode === 'compact') {
+    document.body.classList.add('density-compact');
+    toast('Density: Compact mode', 's');
+  } else {
+    document.body.classList.remove('density-compact');
+    toast('Density: Comfortable mode', 's');
+  }
+  if (navOverflowOpen) renderNavOverflow();
+}
+
+function toggleDensity() {
+  setDensity(appDensity === 'compact' ? 'comfortable' : 'compact');
+}
+
+/* ── 04b. Top Bar Overflow Menu (⋯) & A11y ────────────────────────────────── */
+let navOverflowOpen = false;
+let navOverflowIndex = 0;
+
+function toggleNavOverflow(e) {
+  if (e) e.stopPropagation();
+  navOverflowOpen = !navOverflowOpen;
+  const p = document.getElementById('navOverflowPopover');
+  const btn = document.getElementById('navOverflowBtn');
+  if (!p) return;
+
+  if (navOverflowOpen) {
+    renderNavOverflow();
+    p.classList.add('open');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    navOverflowIndex = 0;
+    setTimeout(() => {
+      const items = p.querySelectorAll('.nav-overflow-item');
+      if (items[0]) items[0].focus();
+    }, 50);
+  } else {
+    p.classList.remove('open');
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.focus();
+    }
+  }
+}
+
+function closeNavOverflow() {
+  navOverflowOpen = false;
+  const p = document.getElementById('navOverflowPopover');
+  const btn = document.getElementById('navOverflowBtn');
+  if (p) p.classList.remove('open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function renderNavOverflow() {
+  const p = document.getElementById('navOverflowPopover');
+  if (!p) return;
+
+  const isCompact = appDensity === 'compact';
+
+  p.innerHTML = `
+    <button class="nav-overflow-item" role="menuitem" onclick="closeNavOverflow();copyShareLink()">
+      <span class="msi">share</span>
+      <span>Share Workspace Link</span>
+    </button>
+    <button class="nav-overflow-item" role="menuitem" onclick="closeNavOverflow();openReportModal()">
+      <span class="msi">description</span>
+      <span>Export Intelligence Report</span>
+    </button>
+    <button class="nav-overflow-item" role="menuitem" onclick="closeNavOverflow();toggleDataHealthPopover()">
+      <span class="msi">monitor_heart</span>
+      <span>Data Health & Quota</span>
+    </button>
+    <div class="nav-overflow-div"></div>
+    <button class="nav-overflow-item" role="menuitem" onclick="toggleDensity()">
+      <span class="msi">${isCompact ? 'check_box' : 'check_box_outline_blank'}</span>
+      <span>Compact Density</span>
+      <kbd class="mono" style="margin-left:auto;font-size:10px;color:var(--t3);background:var(--bg-3);padding:1px 4px;border-radius:3px">[ ]</kbd>
+    </button>
+    <button class="nav-overflow-item" role="menuitem" onclick="closeNavOverflow();openShortcutsModal()">
+      <span class="msi">help</span>
+      <span>Help & Metric Glossary</span>
+      <kbd class="mono" style="margin-left:auto;font-size:10px;color:var(--t3);background:var(--bg-3);padding:1px 4px;border-radius:3px">?</kbd>
+    </button>
+    <button class="nav-overflow-item" role="menuitem" onclick="closeNavOverflow();startSpotlightTour()">
+      <span class="msi">explore</span>
+      <span>Replay Product Tour</span>
+    </button>
+    <div class="nav-overflow-div"></div>
+    <button class="nav-overflow-item" role="menuitem" onclick="closeNavOverflow();openSettingsModal()">
+      <span class="msi">settings</span>
+      <span>Settings & Control Room</span>
+    </button>`;
+
+  // Setup keyboard accessibility for overflow menu
+  const items = p.querySelectorAll('.nav-overflow-item');
+  items.forEach((item, idx) => {
+    item.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = (idx + 1) % items.length;
+        items[next]?.focus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = (idx - 1 + items.length) % items.length;
+        items[prev]?.focus();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeNavOverflow();
+        document.getElementById('navOverflowBtn')?.focus();
+      }
+    });
+  });
+}
+
+/* ── 04c. Status Footer Bar & Data Health Inspector ───────────────────────── */
+let dataHealthOpen = false;
+
+function updateStatusFooter() {
+  try {
+    const quotaUsed = typeof getDailyQuota === 'function' ? getDailyQuota() : 0;
+    const quotaMax = 10000;
+    const pct = Math.min(100, Math.max(1, Math.round((quotaUsed / quotaMax) * 100)));
+
+    const fillEl = document.getElementById('sfQuotaFill');
+    const valEl = document.getElementById('sfQuotaVal');
+    if (fillEl) {
+      fillEl.style.width = pct + '%';
+      fillEl.className = 'sf-quota-fill' + (pct > 85 ? ' danger' : pct > 60 ? ' warn' : '');
+    }
+    if (valEl) {
+      valEl.textContent = `${quotaUsed.toLocaleString()} / 10,000u`;
+    }
+
+    // Cache & freshness calculation
+    const health = typeof getDataHealthReport === 'function' ? getDataHealthReport() : [];
+    const freshCount = health.filter(h => !h.isStale).length;
+    const totalCount = health.length || (all ? all.length : 0);
+    const dotEl = document.getElementById('sfCacheDot');
+    const textEl = document.getElementById('sfCacheText');
+
+    if (dotEl) {
+      dotEl.className = 'sf-cache-dot' + (freshCount < totalCount ? ' stale' : '');
+    }
+    if (textEl) {
+      textEl.textContent = `cache ${freshCount}/${totalCount} fresh · ⟳ ${ago(lastRefreshedTs)}`;
+    }
+
+    const agoEl = document.getElementById('lastUpdatedAgo');
+    if (agoEl) {
+      agoEl.textContent = ago(lastRefreshedTs);
+    }
+  } catch (err) {
+    console.error('Error updating status footer:', err);
+  }
+}
+
+function toggleDataHealthPopover(e) {
+  if (e) e.stopPropagation();
+  dataHealthOpen = !dataHealthOpen;
+  const p = document.getElementById('dataHealthPopover');
+  if (!p) return;
+  if (dataHealthOpen) {
+    renderDataHealthPopover();
+    p.classList.add('open');
+  } else {
+    p.classList.remove('open');
+  }
+}
+
+function renderDataHealthPopover() {
+  const list = document.getElementById('dhPopoverList');
+  if (!list) return;
+  const health = typeof getDataHealthReport === 'function' ? getDataHealthReport() : [];
+
+  if (!health.length) {
+    list.innerHTML = '<div style="color:var(--t3);font-size:11.5px;padding:12px 0;text-align:center">No channel caches recorded yet.</div>';
+    return;
+  }
+
+  list.innerHTML = health.map(h => {
+    const isFresh = !h.isStale;
+    return `
+      <div class="dh-ch-row">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span style="width:7px;height:7px;border-radius:50%;background:${isFresh ? 'var(--up)' : 'var(--warn)'}"></span>
+          <div style="min-width:0">
+            <div style="font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.name)} ${h.isPrimary ? '⭐' : ''}</div>
+            <div style="font-size:10px;color:var(--t3)">${h.vidsCount} videos cached · enriched ${h.ts ? ago(h.ts) : 'never'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="badge ${isFresh ? 'bdg-gr' : 'bdg-rd'}" style="font-size:9.5px">${isFresh ? 'FRESH' : 'STALE'}</span>
+          <button class="icon-btn" style="width:22px;height:22px" onclick="refreshOne('${esc(h.id)}')" title="Force re-enrich">
+            <span class="msi" style="font-size:12px">refresh</span>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 /* ── 05. Compare Tray Engine ──────────────────────────────────────────────── */
@@ -148,6 +372,8 @@ function renderCommandPalette(query) {
     { title: 'Go to My Channels', icon: 'subscriptions', action: () => sp('channels') },
     { title: 'Go to Studio (Title Lab & Kanban)', icon: 'movie_filter', action: () => sp('studio') },
     { title: 'Generate Intelligence Report (PDF / Markdown)', icon: 'description', action: () => openReportModal() },
+    { title: 'Toggle Compact / Comfortable Density', icon: 'view_compact', action: () => toggleDensity() },
+    { title: 'Data Health & Cache Inspector', icon: 'monitor_heart', action: () => toggleDataHealthPopover() },
     { title: 'Copy Shareable Dashboard State Link', icon: 'share', action: () => copyShareLink() },
     { title: 'My Channel Pulse & Achievements', icon: 'person', action: () => toggleMyPulse() },
     { title: 'Settings & Control Room', icon: 'settings', action: () => openSettingsModal() },
@@ -178,32 +404,30 @@ function renderCommandPalette(query) {
       const isSelected = !channels.length && i === 0;
       html += `
         <div class="cmd-item ${isSelected ? 'selected' : ''}" data-type="action" data-index="${i}">
-          <span class="msi" style="font-size:16px">${a.icon}</span>
+          <span class="msi" style="font-size:16px;color:var(--t3)">${a.icon}</span>
           <span style="flex:1">${esc(a.title)}</span>
         </div>`;
     });
   }
 
   if (!channels.length && !actions.length) {
-    html = '<div style="color:var(--t3);padding:24px;text-align:center">No matching channels or commands.</div>';
+    html = '<div style="padding:24px;text-align:center;color:var(--t3)">No results found.</div>';
   }
 
   listEl.innerHTML = html;
 
   listEl.querySelectorAll('.cmd-item').forEach(item => {
-    item.addEventListener('click', () => executeCmdItem(item, actions));
+    item.addEventListener('click', () => {
+      const type = item.dataset.type;
+      if (type === 'channel') {
+        openDeepDive(item.dataset.id);
+        closeCommandPalette();
+      } else if (type === 'action') {
+        actions[parseInt(item.dataset.index)]?.action();
+        closeCommandPalette();
+      }
+    });
   });
-}
-
-function executeCmdItem(item, actions) {
-  closeCommandPalette();
-  const type = item.dataset.type;
-  if (type === 'channel') {
-    openDeepDive(item.dataset.id);
-  } else if (type === 'action') {
-    const idx = parseInt(item.dataset.index);
-    if (actions[idx]) actions[idx].action();
-  }
 }
 
 document.getElementById('cmdInp')?.addEventListener('input', e => {
@@ -211,140 +435,69 @@ document.getElementById('cmdInp')?.addEventListener('input', e => {
 });
 
 document.getElementById('cmdInp')?.addEventListener('keydown', e => {
-  const listEl = document.getElementById('cmdList');
-  const items = listEl ? [...listEl.querySelectorAll('.cmd-item')] : [];
+  const items = document.querySelectorAll('.cmd-item');
   if (!items.length) return;
 
   if (e.key === 'ArrowDown') {
     e.preventDefault();
+    items[cmdIndex]?.classList.remove('selected');
     cmdIndex = (cmdIndex + 1) % items.length;
-    items.forEach((it, i) => it.classList.toggle('selected', i === cmdIndex));
+    items[cmdIndex]?.classList.add('selected');
     items[cmdIndex]?.scrollIntoView({ block: 'nearest' });
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
+    items[cmdIndex]?.classList.remove('selected');
     cmdIndex = (cmdIndex - 1 + items.length) % items.length;
-    items.forEach((it, i) => it.classList.toggle('selected', i === cmdIndex));
+    items[cmdIndex]?.classList.add('selected');
     items[cmdIndex]?.scrollIntoView({ block: 'nearest' });
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    if (items[cmdIndex]) items[cmdIndex].click();
+    items[cmdIndex]?.click();
+  } else if (e.key === 'Escape') {
+    closeCommandPalette();
   }
 });
 
 function openShortcutsModal() {
-  document.getElementById('scOvrl')?.classList.add('open');
-  document.getElementById('scModal')?.classList.add('open');
+  document.getElementById('shortcutsModal')?.classList.add('open');
 }
 
 function closeShortcutsModal() {
-  document.getElementById('scOvrl')?.classList.remove('open');
-  document.getElementById('scModal')?.classList.remove('open');
+  document.getElementById('shortcutsModal')?.classList.remove('open');
 }
 
-/* ── W1.1 Section Scroll-Spy ──────────────────────────────────────────────── */
-let _isClickScrolling = false;
-let _clickScrollTimer = null;
-
-function setupDashScrollSpy() {
-  const sections = ['sec-hero', 'sec-yvf', 'sec-drops', 'sec-radar', 'sec-lb', 'sec-vel', 'sec-timing', 'sec-recent'];
-  const items = document.querySelectorAll('#dashSpyRail .dash-spy-item');
-  if (!items.length) return;
-
-  const onScroll = () => {
-    if (_isClickScrolling) return; // Don't fight deliberate dot click target during smooth scroll
-
-    const winHeight = window.innerHeight;
-    const focalY = winHeight * 0.35; // Target focal line 35% from viewport top
-
-    let closestSec = sections[0];
-    let minDistance = Infinity;
-
-    sections.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        // Calculate center of the visible element relative to focal line
-        const elemCenter = (rect.top + rect.bottom) / 2;
-        const distance = Math.abs(elemCenter - focalY);
-
-        if (distance < minDistance) {
-          minDistance = distance;
-          closestSec = id;
-        }
-      }
-    });
-
-    items.forEach(it => {
-      it.classList.toggle('on', it.dataset.sec === closestSec);
-    });
-  };
-
-  window.removeEventListener('scroll', window._dashScrollSpyFn || (() => { }));
-  window._dashScrollSpyFn = onScroll;
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
-}
-
-function scrollToSection(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-
-  // Set click-scroll lock so smooth scrolling animation doesn't jitter
-  _isClickScrolling = true;
-  clearTimeout(_clickScrollTimer);
-  _clickScrollTimer = setTimeout(() => { _isClickScrolling = false; }, 650);
-
-  // Instantly highlight target dot for crisp user feedback
-  const items = document.querySelectorAll('#dashSpyRail .dash-spy-item');
-  items.forEach(it => it.classList.toggle('on', it.dataset.sec === id));
-
-  const top = el.getBoundingClientRect().top + window.scrollY - 75;
-  window.scrollTo({ top, behavior: 'smooth' });
-}
-
-/* ── W1.2 Metric Glossary / Help Modal ─────────────────────────────────────── */
-function switchHelpTab(tab) {
-  const isShortcuts = tab === 'shortcuts';
-  document.getElementById('helpTabShortcuts')?.classList.toggle('on', isShortcuts);
-  document.getElementById('helpTabGlossary')?.classList.toggle('on', !isShortcuts);
-  const p1 = document.getElementById('helpPanelShortcuts');
-  const p2 = document.getElementById('helpPanelGlossary');
-  if (p1) p1.style.display = isShortcuts ? 'flex' : 'none';
-  if (p2) p2.style.display = !isShortcuts ? 'flex' : 'none';
-}
-
-/* ── W1.3 Spotlight Onboarding Tour ───────────────────────────────────────── */
+/* ── 09. Spotlight Product Tour Engine ────────────────────────────────────── */
 let tourCurrentStep = 0;
 const tourSteps = [
   {
-    target: '#compareTray',
-    lbl: 'Step 1 of 6 • Compare Tray',
-    title: 'Multi-Channel Compare Tray',
-    body: 'Pin up to 5 rival channels here to compare them head-to-head anywhere across the dashboard.'
+    target: '#sec-hero',
+    lbl: 'Step 1 of 6 • Command Hero Strip',
+    title: 'Your Channel Pulse',
+    body: 'Monitor live sub targets, next milestone progress, and view velocity metrics in one unified strip.'
   },
   {
-    target: '#myPulseBtn',
-    lbl: 'Step 2 of 6 • My Pulse',
-    title: 'Real-Time Health & Cadence',
-    body: 'Click your profile pulse icon in the topbar to inspect 7-day views, upload streak, and velocity.'
+    target: '#sec-yvf',
+    lbl: 'Step 2 of 6 • You vs Field',
+    title: 'Rank Ladder & Benchmarking',
+    body: 'Inspect your exact position across the tracked field with automated algorithmic insights.'
   },
   {
     target: '#sec-drops',
     lbl: 'Step 3 of 6 • Latest Drops',
-    title: 'Latest Drops Race Window',
-    body: 'Track newest uploads across the field in 7d/30d/90d windows, ranked by daily view velocity.'
+    title: 'Real-time Release Race',
+    body: 'See who is publishing what right now, ranked by instant 24h upload velocity.'
   },
   {
     target: '#sec-radar',
-    lbl: 'Step 4 of 6 • Topic Radar',
-    title: 'Topic Intelligence & Heat Matrix',
-    body: 'Discover what is hot now, detect surging momentum topics, and inspect untapped gaps.'
+    lbl: 'Step 4 of 6 • Topic Intelligence',
+    title: 'Niche Topic Heatmap',
+    body: 'Discover surge topics, breakout trends, and which competitor owns what keyword niche.'
   },
   {
-    target: '#nav-studio',
-    lbl: 'Step 5 of 6 • Creator Studio',
-    title: 'Title Lab & Content Pipeline',
-    body: 'Turn intelligence into high-CTR titles with live 0-100 scoring and manage your production Kanban.'
+    target: '#sec-timing',
+    lbl: 'Step 5 of 6 • Timing Heatmap',
+    title: 'Optimal Release Windows',
+    body: 'Find high-viewer activity time slots tailored to your audience to maximize drop performance.'
   },
   {
     target: '#sec-hero',
@@ -411,12 +564,72 @@ function prevTourStep() {
   }
 }
 
-function skipTour() {
-  const overlay = document.getElementById('spotlightOverlay');
-  const card = document.getElementById('spotlightCard');
-  if (overlay) overlay.style.display = 'none';
-  if (card) card.style.display = 'none';
-  try { localStorage.setItem('yt_tour_completed', '1'); } catch { }
+function switchHelpTab(tab) {
+  const isShortcuts = tab === 'shortcuts';
+  document.getElementById('helpTabShortcuts')?.classList.toggle('on', isShortcuts);
+  document.getElementById('helpTabGlossary')?.classList.toggle('on', !isShortcuts);
+  const p1 = document.getElementById('helpPanelShortcuts');
+  const p2 = document.getElementById('helpPanelGlossary');
+  if (p1) p1.style.display = isShortcuts ? 'flex' : 'none';
+  if (p2) p2.style.display = !isShortcuts ? 'flex' : 'none';
+}
+
+/* ── W1.1 Section Scroll-Spy (Dots-Only Default, Focal Point Tracking) ──────── */
+let _isClickScrolling = false;
+let _clickScrollTimer = null;
+
+function setupDashScrollSpy() {
+  const sections = ['sec-hero', 'sec-yvf', 'sec-drops', 'sec-radar', 'sec-lb', 'sec-vel', 'sec-timing', 'sec-recent'];
+  const items = document.querySelectorAll('#dashSpyRail .dash-spy-item');
+  if (!items.length) return;
+
+  const onScroll = () => {
+    if (_isClickScrolling) return;
+
+    const winHeight = window.innerHeight;
+    const focalY = winHeight * 0.35;
+
+    let closestSec = sections[0];
+    let minDistance = Infinity;
+
+    sections.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const elemCenter = (rect.top + rect.bottom) / 2;
+        const distance = Math.abs(elemCenter - focalY);
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestSec = id;
+        }
+      }
+    });
+
+    items.forEach(it => {
+      it.classList.toggle('on', it.dataset.sec === closestSec);
+    });
+  };
+
+  window.removeEventListener('scroll', window._dashScrollSpyFn || (() => { }));
+  window._dashScrollSpyFn = onScroll;
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+}
+
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  _isClickScrolling = true;
+  clearTimeout(_clickScrollTimer);
+  _clickScrollTimer = setTimeout(() => { _isClickScrolling = false; }, 650);
+
+  const items = document.querySelectorAll('#dashSpyRail .dash-spy-item');
+  items.forEach(it => it.classList.toggle('on', it.dataset.sec === id));
+
+  const top = el.getBoundingClientRect().top + window.scrollY - 75;
+  window.scrollTo({ top, behavior: 'smooth' });
 }
 
 /* ── 10. Global Shortcuts & Init ──────────────────────────────────────────── */
@@ -439,6 +652,18 @@ document.addEventListener('keydown', e => {
     return;
   }
 
+  if (e.key === '[' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    e.preventDefault();
+    setDensity('compact');
+    return;
+  }
+
+  if (e.key === ']' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    e.preventDefault();
+    setDensity('comfortable');
+    return;
+  }
+
   if (e.key === 'Escape') {
     closeDeepDive();
     closeCommandPalette();
@@ -447,9 +672,12 @@ document.addEventListener('keydown', e => {
     closeReportModal();
     closeSearchSuggestions();
     closeAddSuggestions();
+    closeNavOverflow();
     document.getElementById('comparePopover')?.classList.remove('open');
     document.getElementById('bellPopover')?.classList.remove('open');
     document.getElementById('myPulsePopover')?.classList.remove('open');
+    document.getElementById('dataHealthPopover')?.classList.remove('open');
+    dataHealthOpen = false;
   }
 });
 
@@ -473,9 +701,28 @@ document.addEventListener('click', e => {
   if (mp && mp.classList.contains('open') && !mp.contains(e.target) && !path.includes(mp) && e.target !== mpBtn && !path.includes(mpBtn)) {
     mp.classList.remove('open');
   }
+
+  const op = document.getElementById('navOverflowPopover');
+  const oBtn = document.getElementById('navOverflowBtn');
+  if (op && op.classList.contains('open') && !op.contains(e.target) && !path.includes(op) && e.target !== oBtn && !path.includes(oBtn)) {
+    closeNavOverflow();
+  }
+
+  const dh = document.getElementById('dataHealthPopover');
+  const dhBtn = document.getElementById('sfCacheChip');
+  if (dh && dh.classList.contains('open') && !dh.contains(e.target) && !path.includes(dh) && e.target !== dhBtn && !path.includes(dhBtn)) {
+    dh.classList.remove('open');
+    dataHealthOpen = false;
+  }
 });
 
 (async () => {
+  // Update OS-specific button text
+  const kbdChip = document.getElementById('topbarKbdLabel');
+  if (kbdChip) kbdChip.textContent = kbdShortcutText;
+  const sfHint = document.getElementById('sfKbdHint');
+  if (sfHint) sfHint.textContent = kbdShortcutText;
+
   await fetchAll();
   await loadAllSnapshots();
   loadInboxItems();

@@ -46,7 +46,8 @@ async function renderChannels() {
     </div>
     <div class="ghost-add-card" onclick="toggleAdd()">
       <span class="msi">add</span> + Track another channel
-    </div>`;
+    </div>
+    ${renderFieldPulseRow()}`;
 
   summaryStrip?.querySelectorAll('.count-val').forEach(v => countUp(v, v.dataset.val));
 
@@ -303,6 +304,53 @@ async function toggleTrackSearchResult(channelId) {
   doSearch();
 }
 
+function renderFieldPulseRow() {
+  if (!all || all.length < 2) return '';
+
+  let fastestRiser = null, maxAvg = -1;
+  let mostActive = null, maxVids = -1;
+  let quietest = null, maxDays = -1;
+  const now = Date.now();
+
+  all.forEach(ch => {
+    const avg = ch.avg_views_raw || 0;
+    if (avg > maxAvg) { maxAvg = avg; fastestRiser = ch; }
+
+    const en = _enrichCache[ch.id];
+    const nVids = en?.vids?.length || (ch.total_videos_raw || 0);
+    if (nVids > maxVids) { maxVids = nVids; mostActive = ch; }
+
+    const lastD = ch.video?.date;
+    const days = lastD ? Math.floor((now - new Date(lastD).getTime()) / 864e5) : 999;
+    if (days > maxDays && lastD) { maxDays = days; quietest = ch; }
+  });
+
+  return `
+    <div class="field-pulse-row" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;margin-top:16px;padding:12px 16px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-m)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="ic-tile green"><span class="msi" style="font-size:15px">trending_up</span></span>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.04em">Fastest Riser</div>
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">${esc(fastestRiser?.name || '—')} <span style="font-size:10.5px;color:var(--up);font-weight:600">(${esc(fastestRiser?.avg_views || '')} avg)</span></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="ic-tile cyan"><span class="msi" style="font-size:15px">bolt</span></span>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.04em">Most Active</div>
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">${esc(mostActive?.name || '—')} <span style="font-size:10.5px;color:var(--acc);font-weight:600">(${maxVids} vids)</span></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="ic-tile gold"><span class="msi" style="font-size:15px">bedtime</span></span>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.04em">Quietest Cohort</div>
+          <div style="font-size:12px;font-weight:700;color:var(--t1)">${esc(quietest?.name || '—')} <span style="font-size:10.5px;color:var(--warn);font-weight:600">(${maxDays > 0 && maxDays < 900 ? maxDays + 'd ago' : 'inactive'})</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+
 /* Autocomplete for inline Add Panel on My Channels */
 let _addDebounce = null;
 document.getElementById('addInput')?.addEventListener('keyup', e => {
@@ -315,7 +363,7 @@ document.getElementById('addInput')?.addEventListener('keyup', e => {
 
 async function doAddAutocomplete(q) {
   try {
-    const r = await fetch('/api/channels/search-suggest?q=' + encodeURIComponent(q));
+    const r = await apiFetch('/api/channels/search-suggest?q=' + encodeURIComponent(q));
     if (!r.ok) { closeAddSuggestions(); return; }
     const items = await r.json();
     const dd = document.getElementById('addDropdown');

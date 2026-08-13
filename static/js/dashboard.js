@@ -46,6 +46,80 @@ function genInsights(me, allChannels) {
   return insights.slice(0, 4);
 }
 
+/* ── 00b. Next Best Action Engine ─────────────────────────────────────────── */
+function genNextBestAction(primary, allChannels) {
+  const lastActed = getNBALastActed();
+
+  // Priority 1: Timing × Topic Synergy
+  const bestSlots = typeof getBestPostingSlots === 'function' ? getBestPostingSlots(primary?.id) : [];
+  const hotTopics = _topicCache.topics.size ? [..._topicCache.topics.values()].sort((a, b) => b.n - a.n) : [];
+  const topTopic = hotTopics[0]?.name || null;
+
+  const cand1 = {
+    id: 'nba_timing_topic',
+    type: 'Timing Synergy',
+    icon: 'schedule',
+    title: topTopic ? `Drop "${topTopic}" in your Peak Slot` : 'Peak Publishing Window',
+    sub: bestSlots.length ? `${bestSlots[0].day} @ ${bestSlots[0].hour}:00 · High audience receptivity` : 'High weekend viewer surge window detected',
+    actionText: '→ Pipeline',
+    actionFn: `addNBAToPipeline('${esc(topTopic || "Peak Slot Upload")}', 'Timing Synergy', 'nba_timing_topic')`
+  };
+
+  // Priority 2: Gap Attack Opportunity
+  const gapTopic = hotTopics.find(t => !t.channelCounts?.[primary?.id] && t.n >= 2);
+  const cand2 = {
+    id: 'nba_gap_attack',
+    type: 'Gap Attack',
+    icon: 'radar',
+    title: gapTopic ? `Unclaimed Field Topic: "${gapTopic.name}"` : 'Topic Gap Attack Opportunity',
+    sub: 'Competitors are gaining traction on this topic while your catalog has 0 coverage.',
+    actionText: '→ Pipeline',
+    actionFn: `addNBAToPipeline('${esc(gapTopic?.name || "Topic Gap")}', 'Gap Attack', 'nba_gap_attack')`
+  };
+
+  // Priority 3: Cadence Alert
+  const enrichData = _enrichCache[primary?.id];
+  const lastVid = enrichData?.latestVideo;
+  const daysSince = lastVid ? Math.floor((Date.now() - new Date(lastVid.published_at || lastVid.date).getTime()) / 864e5) : 0;
+  const cand3 = {
+    id: 'nba_cadence_alert',
+    type: 'Cadence Optimizer',
+    icon: 'timer',
+    title: daysSince >= 7 ? `${daysSince}d Since Last Upload` : 'Maintain Upload Cadence',
+    sub: daysSince >= 7 ? 'Field upload velocity is outpacing your current release rhythm.' : 'You are sustaining steady momentum across your niche cohort.',
+    actionText: '→ Pipeline',
+    actionFn: `addNBAToPipeline('Next High-Impact Upload', 'Cadence Optimizer', 'nba_cadence_alert')`
+  };
+
+  // Priority 4: Evergreen Fallback
+  const fallback = {
+    id: 'nba_evergreen',
+    type: 'Next Best Action',
+    icon: 'auto_awesome',
+    title: 'Maintain Channel Momentum',
+    sub: 'Plan your next title concept in Studio to keep your audience engaged.',
+    actionText: 'Open Studio',
+    actionFn: `sp('studio')`
+  };
+
+  const candidates = [cand1, cand2, cand3].filter(c => !nbaDismissed.has(c.id) && c.id !== lastActed);
+  return candidates[0] || fallback;
+}
+
+function addNBAToPipeline(title, tag, actionId) {
+  if (typeof createPipelineCard === 'function') {
+    createPipelineCard({
+      title: title || 'New Video Concept',
+      stage: 'idea',
+      tag: tag || 'Opportunity',
+      notes: 'Prescribed from Next Best Action engine'
+    });
+  }
+  if (actionId) setNBALastActed(actionId);
+  toast(`Added "${title}" to Studio Pipeline!`, 's');
+  sp('studio');
+}
+
 async function renderDash() {
   const el = document.getElementById('dashMain');
   if (!el) return;
@@ -73,13 +147,18 @@ async function renderDash() {
   const stones = [1e3, 5e3, 10e3, 25e3, 50e3, 100e3, 250e3, 500e3, 1e6, 2e6, 5e6, 10e6, 50e6, 100e6];
   const ms = stones.find(s => s > subRaw);
   const msPct = ms ? Math.min(99, Math.round((subRaw / ms) * 100)) : 100;
-  const circum = 2 * Math.PI * 10;
-  const msDash = ms ? (msPct / 100 * circum) : circum;
+  const ringRadius = 16;
+  const ringCircum = 2 * Math.PI * ringRadius;
+  const ringDash = ms ? (msPct / 100 * ringCircum) : ringCircum;
 
-  // 1. My Channel Strip
+  // Next Best Action prescription
+  const nba = genNextBestAction(primary, all);
+
+  // 1. My Channel Strip (Hero v3: 3-Column Architecture)
   const stripHtml = `
-    <div id="sec-hero" class="my-channel-strip rev in" onclick="openDeepDive('${esc(primary.id)}')">
-      <div class="mcs-identity">
+    <div id="sec-hero" class="my-channel-strip rev in">
+      <!-- Left Column: Identity -->
+      <div class="mcs-identity" onclick="openDeepDive('${esc(primary.id)}')">
         ${primary.logo_url
       ? `<img class="mcs-logo" src="${esc(proxyImg(primary.logo_url))}" alt="">`
       : `<div class="mcs-logo-fb">${(primary.name || '?')[0].toUpperCase()}</div>`}
@@ -93,24 +172,28 @@ async function renderDash() {
         </div>
       </div>
 
+      <!-- Center Column: 5 Stat Tiles in 1 Row -->
       <div class="mcs-tiles">
         <div class="tile">
           <span class="lbl">Subscribers</span>
           <span class="val gold count-val" data-val="${primary.subscribers_raw || 0}">${esc(primary.subscribers)}</span>
-          <span class="foot">${sparkSVG(sp30Vals, 80, 18, 'var(--me)')}</span>
+          <span class="foot">${sparkSVG(sp30Vals, 70, 16, 'var(--me)')}</span>
         </div>
         <div class="tile">
-          <span class="lbl">Next Milestone</span>
+          <span class="lbl">Milestone</span>
           <span class="val gold count-val" data-val="${ms || subRaw}">${ms ? fmtN(ms) : 'Max'}</span>
-          <span class="foot" style="gap:6px">
-            <svg class="milestone-ring" viewBox="0 0 24 24" style="width:20px;height:20px">
-              <circle cx="12" cy="12" r="10" fill="none" stroke="var(--bg-3)" stroke-width="2.5"/>
-              <circle cx="12" cy="12" r="10" fill="none" stroke="var(--me)" stroke-width="2.5"
-                stroke-dasharray="${circum.toFixed(1)}"
-                stroke-dashoffset="${(circum - msDash).toFixed(1)}"
-                stroke-linecap="round"/>
-            </svg>
-            <span style="font-size:10.5px;color:var(--me);font-family:var(--f-mono)">${msPct}%</span>
+          <span class="foot" style="align-items:center">
+            <div class="milestone-ring-wrap">
+              <svg viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="${ringRadius}" fill="none" stroke="var(--bg-1)" stroke-width="3"/>
+                <circle cx="18" cy="18" r="${ringRadius}" fill="none" stroke="var(--me)" stroke-width="3"
+                  stroke-dasharray="${ringCircum.toFixed(1)}"
+                  stroke-dashoffset="${(ringCircum - ringDash).toFixed(1)}"
+                  stroke-linecap="round" style="transition:stroke-dashoffset 0.8s ease"/>
+              </svg>
+              <span class="milestone-ring-pct">${msPct}%</span>
+            </div>
+            <span style="font-size:9.5px;color:var(--t3);margin-left:4px">to target</span>
           </span>
         </div>
         <div class="tile">
@@ -121,7 +204,7 @@ async function renderDash() {
         <div class="tile">
           <span class="lbl">Avg Views</span>
           <span class="val green count-val" data-val="${primary.avg_views_raw || 0}">${esc(primary.avg_views)}</span>
-          <span class="foot"><span style="font-size:10px;color:var(--t3)">per video</span></span>
+          <span class="foot"><span style="font-size:10px;color:var(--t3)">per upload</span></span>
         </div>
         <div class="tile">
           <span class="lbl">Engagement</span>
@@ -132,9 +215,22 @@ async function renderDash() {
         </div>
       </div>
 
-      <div class="mcs-action">
-        <span>Deep Dive</span>
-        <span class="msi" style="font-size:15px">arrow_forward</span>
+      <!-- Right Column: Next Best Action Card -->
+      <div class="next-best-action-card">
+        <div class="nba-hdr">
+          <span class="nba-title"><span class="msi" style="font-size:13px">${nba.icon}</span> ${nba.type}</span>
+          <span class="nba-dismiss" onclick="event.stopPropagation();dismissNBA('${nba.id}');renderDash();" title="Dismiss suggestion">✕</span>
+        </div>
+        <div class="nba-body">${nba.title}</div>
+        <div class="nba-sub">${nba.sub}</div>
+        <div class="nba-actions">
+          <button class="btn btn-acc btn-sm" style="flex:1;padding:4px 8px;font-size:11px" onclick="event.stopPropagation();${nba.actionFn}">
+            ${nba.actionText}
+          </button>
+          <button class="btn btn-gh btn-sm" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();openDeepDive('${esc(primary.id)}')" title="Deep Dive">
+            <span class="msi" style="font-size:13px">arrow_forward</span>
+          </button>
+        </div>
       </div>
     </div>`;
 
@@ -156,6 +252,7 @@ async function renderDash() {
           <button class="chip chip-btn ${yvfMetric === 'subscribers_raw' ? 'on' : ''}" onclick="setYvfMetric('subscribers_raw')">Subscribers</button>
           <button class="chip chip-btn ${yvfMetric === 'avg_views_raw' ? 'on' : ''}" onclick="setYvfMetric('avg_views_raw')">Avg Views</button>
           <button class="chip chip-btn ${yvfMetric === 'total_views_raw' ? 'on' : ''}" onclick="setYvfMetric('total_views_raw')">Total Views</button>
+          <span class="card-prov" data-tip="Telemetry synchronized across active cohort" onclick="fetchAll().then(()=>renderDash())">live sync</span>
         </div>
       </div>
 
@@ -201,7 +298,10 @@ async function renderDash() {
         <div class="sect-lbl" style="margin:0">
           <span class="msi">leaderboard</span> Full Leaderboard (${all.length} channels)
         </div>
-        <span style="font-size:11.5px;color:var(--t3)">Click any header to sort</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11.5px;color:var(--t3)">Click header to sort</span>
+          <span class="card-prov" data-tip="Click to refresh all channel rows" onclick="refreshAll()">refreshed ${ago(lastRefreshedTs)}</span>
+        </div>
       </div>
       <div style="overflow-x:auto">
         <table class="lb-table">
@@ -225,7 +325,7 @@ async function renderDash() {
               <th onclick="setLeaderboardSort('total_views_raw')">Total Views ▾</th>
               <th onclick="setLeaderboardSort('total_videos_raw')">Videos ▾</th>
               <th>Last Upload</th>
-              <th onclick="setLeaderboardSort('threat_score')" style="text-align:center" title="Topic Overlap Threat vs Your Channel">Threat ▾</th>
+              <th onclick="${_topicCache.topics.size ? "setLeaderboardSort('threat_score')" : ""}" style="text-align:center" title="Topic Overlap Threat vs Your Channel">Threat ${_topicCache.topics.size ? '▾' : ''}</th>
               <th style="text-align:center">Compare</th>
             </tr>
           </thead>
@@ -249,7 +349,10 @@ async function renderDash() {
         <div class="sect-lbl" style="margin:0">
           <span class="msi">bar_chart</span> 6-Month Upload Velocity
         </div>
-        <div class="vel-legend-chips" id="velLegendChips"></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="vel-legend-chips" id="velLegendChips"></div>
+          <span class="card-prov" data-tip="6-month aggregate upload cadence">6m cadence</span>
+        </div>
       </div>
       <div class="chart-box" id="dashVelocity"></div>
     </div>`;
@@ -264,9 +367,12 @@ async function renderDash() {
         <div class="sect-lbl" style="margin:0">
           <span class="msi">play_circle</span> Your Recent Uploads
         </div>
-        <div style="display:flex;gap:4px">
-          <button class="icon-btn" onclick="scrollRecentRail(-230)"><span class="msi">chevron_left</span></button>
-          <button class="icon-btn" onclick="scrollRecentRail(230)"><span class="msi">chevron_right</span></button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="card-prov" data-tip="Enriched ${ago(primaryEnrich.ts)} · Click to refresh" onclick="refreshOne('${primary.id}')">enriched ${ago(primaryEnrich.ts)}</span>
+          <div style="display:flex;gap:4px">
+            <button class="icon-btn" onclick="scrollRecentRail(-230)"><span class="msi">chevron_left</span></button>
+            <button class="icon-btn" onclick="scrollRecentRail(230)"><span class="msi">chevron_right</span></button>
+          </div>
         </div>
       </div>
       <div class="recent-rail-wrap">
@@ -485,7 +591,9 @@ function renderLeaderboardRows(primary, allChannels) {
         <td style="text-align:center;padding:6px 4px" onclick="event.stopPropagation()">
           ${isMe
         ? `<span class="badge bdg-gd">YOU</span>`
-        : `<span class="badge" style="background:${threatScore >= 50 ? 'rgba(255,107,107,0.12)' : threatScore >= 25 ? 'rgba(245,197,66,0.12)' : 'var(--bg-3)'};color:${threatColor}" title="Shared topics: ${(ch._sharedTopics || []).join(', ') || 'none'}">⚔️ ${threatScore}%</span>`}
+        : !_topicCache.topics.size
+          ? `<span class="badge bdg-dim" title="Enrich channels to compute threat score">—</span>`
+          : `<span class="badge" style="background:${threatScore >= 50 ? 'rgba(255,107,107,0.12)' : threatScore >= 25 ? 'rgba(245,197,66,0.12)' : 'var(--bg-3)'};color:${threatColor}" title="Shared topics: ${(ch._sharedTopics || []).join(', ') || 'none'}">⚔️ ${threatScore}%</span>`}
         </td>
         <td style="text-align:center;overflow:visible;text-overflow:clip;padding:6px 0" onclick="event.stopPropagation()">
           <button class="icon-btn ${inCompare ? 'active' : ''}" style="display:inline-flex;margin:0 auto" onclick="toggleCompare('${esc(ch.id)}')" title="Toggle compare tray">
@@ -682,8 +790,8 @@ function renderRaceWindow() {
             <button class="race-seg-btn ${raceState.sort === 'views' ? 'on' : ''}" onclick="setRaceSort('views')">👁 Views</button>
             <button class="race-seg-btn ${raceState.sort === 'newest' ? 'on' : ''}" onclick="setRaceSort('newest')">🕒 Newest</button>
           </div>
-          <button class="icon-btn" onclick="raceExpandAll()" title="Expand / collapse all rows"><span class="msi" style="font-size:16px">unfold_more</span></button>
-          <button class="icon-btn" onclick="raceToggleSlim()" title="Collapse window to caption bar"><span class="msi" style="font-size:16px">${isSlim ? 'expand_more' : 'remove'}</span></button>
+          <button class="icon-btn" onclick="raceExpandAll()" title="Expand all drops insets"><span class="msi" style="font-size:16px">unfold_more</span></button>
+          <button class="icon-btn" onclick="raceToggleSlim()" title="${isSlim ? 'Expand Drops Window' : 'Minimize Drops Window'}"><span class="msi" style="font-size:16px">${isSlim ? 'expand_more' : 'minimize'}</span></button>
         </div>
       </div>
       <div class="race-caption"><span>${caption}</span></div>
@@ -735,7 +843,6 @@ function raceToggleSlim() {
 }
 
 function scrollRecentRail(offset) {
-
   const rail = document.getElementById('dashRecentUploads');
   if (rail) rail.scrollBy({ left: offset, behavior: 'smooth' });
 }
@@ -744,7 +851,7 @@ async function loadDashboardRecentUploads(primaryId) {
   const el = document.getElementById('dashRecentUploads');
   if (!el) return;
   try {
-    const r = await fetch(`/api/channels/${primaryId}/videos?max=10`);
+    const r = await apiFetch(`/api/channels/${primaryId}/videos?max=10`);
     const vids = await r.json();
     if (!vids || !vids.length) {
       el.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:12px 0">No uploads found.</div>';
@@ -792,13 +899,18 @@ async function loadDashboardRecentUploads(primaryId) {
   }
 }
 
+let velPopoverOpen = false;
+
 function loadVelocityWithFit(channels) {
   const box = document.getElementById('dashVelocity');
   const legendChipsEl = document.getElementById('velLegendChips');
   if (!box || !channels.length) return;
 
   if (legendChipsEl) {
-    legendChipsEl.innerHTML = channels.map(ch => {
+    const top4 = channels.slice(0, 4);
+    const overflow = channels.slice(4);
+
+    let html = top4.map(ch => {
       const isMuted = mutedVelocity.has(ch.id);
       return `
         <div class="vel-legend-chip ${isMuted ? 'muted' : ''}" onclick="toggleMuteVelocity('${esc(ch.id)}')">
@@ -806,10 +918,46 @@ function loadVelocityWithFit(channels) {
           <span>${esc(ch.name.length > 8 ? ch.name.slice(0, 8) + '…' : ch.name)}</span>
         </div>`;
     }).join('');
+
+    if (overflow.length > 0) {
+      html += `
+        <div style="position:relative;display:inline-block">
+          <button class="chip chip-btn" style="padding:2px 8px;font-size:10.5px" onclick="toggleVelPopover(event)">
+            +${overflow.length} more
+          </button>
+          <div class="nav-overflow-popover" id="velLegendPopover" style="position:absolute;right:0;top:calc(100% + 4px);width:200px;display:${velPopoverOpen ? 'flex' : 'none'};z-index:90">
+            <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;padding:4px 8px">All Channels</div>
+            ${channels.map(ch => `
+              <div class="nav-overflow-item" onclick="toggleMuteVelocity('${esc(ch.id)}')" style="font-size:11px;padding:5px 8px">
+                <span style="width:8px;height:8px;border-radius:2px;background:${colorOf(ch)};opacity:${mutedVelocity.has(ch.id) ? 0.3 : 1}"></span>
+                <span style="flex:1;text-decoration:${mutedVelocity.has(ch.id) ? 'line-through' : 'none'}">${esc(ch.name)}</span>
+                <span class="msi" style="font-size:13px">${mutedVelocity.has(ch.id) ? 'visibility_off' : 'visibility'}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+    }
+
+    legendChipsEl.innerHTML = html;
   }
 
   fit(box, (w, h) => drawVelocitySvg(box, channels, w, h));
 }
+
+function toggleVelPopover(e) {
+  if (e) e.stopPropagation();
+  velPopoverOpen = !velPopoverOpen;
+  const p = document.getElementById('velLegendPopover');
+  if (p) p.style.display = velPopoverOpen ? 'flex' : 'none';
+}
+
+document.addEventListener('click', (e) => {
+  if (velPopoverOpen && !e.target.closest('#velLegendPopover')) {
+    velPopoverOpen = false;
+    const p = document.getElementById('velLegendPopover');
+    if (p) p.style.display = 'none';
+  }
+});
 
 function toggleMuteVelocity(channelId) {
   if (mutedVelocity.has(channelId)) {
@@ -830,6 +978,7 @@ async function drawVelocitySvg(box, channels, width, height) {
       months.push({
         key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
         label: d.toLocaleString('en-US', { month: 'short' }) + " '" + String(d.getFullYear()).slice(2),
+        isCurrent: i === 0
       });
     }
 
@@ -844,7 +993,7 @@ async function drawVelocitySvg(box, channels, width, height) {
         const cached = _enrichCache[ch.id];
         if (cached && cached.vids && cached.vids.length > 0) return cached.vids;
         try {
-          const r = await fetch(`/api/channels/${ch.id}/videos?max=50`);
+          const r = await apiFetch(`/api/channels/${ch.id}/videos?max=50`);
           const vids = await r.json();
           if (Array.isArray(vids)) {
             _enrichCache[ch.id] = { ts: Date.now(), vids };
@@ -866,31 +1015,45 @@ async function drawVelocitySvg(box, channels, width, height) {
     const maxC = Math.max(...data.flatMap(d => d.counts), 1);
     const W = Math.max(width || 400, 280);
     const H = Math.max(height || 180, 140);
-    const padB = 26, padT = 16, pH = H - padB - padT;
+    const padB = 26, padT = 16, padL = 36, padR = 16;
+    const pH = H - padB - padT;
+    const plotW = W - padL - padR;
 
+    const nMonths = months.length;
+    const bandW = plotW / nMonths;
     const nCh = activeChannels.length;
-    const bW = Math.min(16, Math.max(5, Math.floor((W - 60) / (months.length * nCh)) - 2));
-    const bGap = 2, gGap = 14;
-    const gW = nCh * (bW + bGap) + gGap;
+    const bW = Math.min(14, Math.max(3, Math.floor((bandW * 0.75) / nCh)));
+    const bGap = 2;
+    const groupW = nCh * bW + (nCh - 1) * bGap;
 
     let bars = '';
     [0, Math.round(maxC / 2), maxC].forEach(t => {
       const y = H - padB - Math.round((t / maxC) * pH);
-      bars += `<line x1="28" y1="${y}" x2="${W - 10}" y2="${y}" stroke="var(--line-1)" stroke-width="1" stroke-dasharray="3 3"/>
-               <text x="24" y="${y + 3}" text-anchor="end" fill="var(--t3)" font-size="8" font-family="JetBrains Mono">${t}</text>`;
+      bars += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--line-1)" stroke-width="1" stroke-dasharray="3 3"/>
+               <text x="${padL - 6}" y="${y + 3}" text-anchor="end" fill="var(--t3)" font-size="8.5" font-family="JetBrains Mono">${t}</text>`;
     });
 
     months.forEach((m, mi) => {
-      const gx = 32 + mi * gW;
+      const bandCenterX = padL + mi * bandW + bandW / 2;
+      const startX = bandCenterX - groupW / 2;
+
       data.forEach((d, ci) => {
         const c = d.counts[mi];
         if (c === 0) return;
         const h = Math.max(4, Math.round((c / maxC) * pH));
-        const x = gx + ci * (bW + bGap), y = H - padB - h;
+        const x = startX + ci * (bW + bGap), y = H - padB - h;
         bars += `<rect class="bars" x="${x}" y="${y}" width="${bW}" height="${h}" rx="2" fill="${d.color}" opacity="0.9"
                        data-tip="<strong>${esc(d.ch.name)}</strong> · ${m.label}: ${c} videos" style="cursor:pointer"/>`;
       });
-      bars += `<text x="${gx + nCh * (bW + bGap) / 2}" y="${H - 6}" text-anchor="middle" font-size="8.5" fill="var(--t3)" font-family="DM Sans">${m.label}</text>`;
+
+      // Today tick & label on ongoing month
+      if (m.isCurrent) {
+        bars += `
+          <line x1="${bandCenterX + groupW / 2 + 6}" y1="${padT}" x2="${bandCenterX + groupW / 2 + 6}" y2="${H - padB}" stroke="var(--acc)" stroke-width="1" stroke-dasharray="2 2" opacity="0.7"/>
+          <text x="${bandCenterX + groupW / 2 + 8}" y="${padT + 8}" font-size="8" fill="var(--acc)" font-family="JetBrains Mono" font-weight="700">today</text>`;
+      }
+
+      bars += `<text x="${bandCenterX}" y="${H - 6}" text-anchor="middle" font-size="9" fill="${m.isCurrent ? 'var(--acc)' : 'var(--t3)'}" font-family="DM Sans" font-weight="${m.isCurrent ? '700' : '400'}">${m.label}</text>`;
     });
 
     box.innerHTML = `

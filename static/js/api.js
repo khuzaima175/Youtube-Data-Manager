@@ -2,6 +2,27 @@
    YT TRACKER — API & DATA COMMUNICATIONS ENGINE
    ══════════════════════════════════════════════════════════════════════════════ */
 
+/* ── Centralized API Choke Point with Quota Accounting ───────────────────── */
+async function apiFetch(url, options = {}) {
+  let cost = 1;
+  const u = String(url);
+  if (u.includes('/search-suggest') || u.includes('/channel?q=') || u.includes('/channels/add')) {
+    cost = 100;
+  } else if (u.includes('/videos?max=200')) {
+    cost = 4; // deep scan
+  } else if (u.includes('/refresh')) {
+    cost = 2;
+  } else if (u.includes('/img-proxy') || u.includes('/snapshots') || u.includes('/export/')) {
+    cost = 0;
+  }
+
+  if (cost > 0) {
+    recordQuotaUsage(cost);
+  }
+
+  return fetch(url, options);
+}
+
 /* ── 07. Enrichment Pipeline with LocalStorage Cache ──────────────────────── */
 const _enrichQueue = [];
 let _enrichActiveWorkers = 0;
@@ -42,7 +63,7 @@ async function processEnrichQueue() {
   const ch = all.find(c => c.id === channelId);
 
   try {
-    const r = await fetch(`/api/channels/${channelId}/videos?max=20`);
+    const r = await apiFetch(`/api/channels/${channelId}/videos?max=20`);
     const vids = await r.json();
     if (!Array.isArray(vids)) {
       resolve(null);
@@ -105,20 +126,62 @@ async function processEnrichQueue() {
   }
 }
 
-/* ── 08. Insights Generator ───────────────────────────────────────────────── */
+/* ── 08. Data Health Telemetry ────────────────────────────────────────────── */
+function getDataHealthReport() {
+  const now = Date.now();
+  return all.map(ch => {
+    const en = _enrichCache[ch.id];
+    const ts = en?.ts || null;
+    const isStale = !ts || (now - ts) > (4 * 3600000);
+    return {
+      id: ch.id,
+      name: ch.name,
+      handle: ch.handle,
+      logo_url: ch.logo_url,
+      ts,
+      vidsCount: en?.vids?.length || 0,
+      isStale,
+      isPrimary: !!ch.is_primary
+    };
+  });
+}
+
+async function refreshStaleChannels() {
+  const health = getDataHealthReport();
+  const stale = health.filter(h => h.isStale);
+  if (!stale.length) {
+    toast('All channels fresh (<4h)', 's');
+    return;
+  }
+  toast(`Refreshing ${stale.length} stale channels…`);
+  for (const item of stale) {
+    await refreshOne(item.id);
+  }
+  toast('Stale channels refreshed!', 's');
+  renderDataHealthPopover();
+}
 
 /* ── 09. API Data Fetching ────────────────────────────────────────────────── */
 async function fetchAll() {
   try {
-    const r = await fetch('/api/channels');
-    all = await r.json();
+    const r = await apiFetch('/api/channels');
+    if (!r.ok) {
+      console.error('fetchAll failed: HTTP status', r.status);
+      return all;
+    }
+    const data = await r.json();
+    if (Array.isArray(data)) {
+      all = data;
+    }
     lastRefreshedTs = Date.now();
     const b = document.getElementById('sbBadge');
     if (b) b.textContent = all.length || '';
-    renderCompareTray();
+    if (typeof renderCompareTray === 'function') renderCompareTray();
+    if (typeof updateStatusFooter === 'function') updateStatusFooter();
     return all;
-  } catch {
-    return [];
+  } catch (err) {
+    console.error('fetchAll network error:', err);
+    return all;
   }
 }
 
@@ -134,7 +197,7 @@ async function refreshAll() {
     toast(`Refreshing ${all.length} channels…`);
     for (const ch of all) {
       try {
-        await fetch(`/api/channels/${ch.id}/refresh`, { method: 'POST' });
+        await apiFetch(`/api/channels/${ch.id}/refresh`, { method: 'POST' });
         delete _enrichCache[ch.id];
         try { localStorage.removeItem('yt_enrich_' + ch.id); } catch { }
       } catch { }
@@ -154,6 +217,7 @@ async function refreshAll() {
       btn.style.animation = '';
       btn.disabled = false;
     }
+    if (typeof updateStatusFooter === 'function') updateStatusFooter();
   }
 }
 
@@ -172,7 +236,7 @@ async function addCh() {
   if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
 
   try {
-    const r = await fetch('/api/channels/add', {
+    const r = await apiFetch('/api/channels/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ q })
@@ -193,7 +257,7 @@ async function addCh() {
 
 async function setPrimary(id) {
   try {
-    const r = await fetch(`/api/channels/${id}/set-primary`, { method: 'POST' });
+    const r = await apiFetch(`/api/channels/${id}/set-primary`, { method: 'POST' });
     if (!r.ok) { toast('Could not set primary', 'e'); return; }
     toast('Primary channel updated!', 's');
     if (typeof clearTimingCache === 'function') clearTimingCache();
@@ -207,7 +271,7 @@ async function setPrimary(id) {
 
 async function refreshOne(id) {
   try {
-    const r = await fetch(`/api/channels/${id}/refresh`, { method: 'POST' });
+    const r = await apiFetch(`/api/channels/${id}/refresh`, { method: 'POST' });
     if (!r.ok) { toast('Refresh failed', 'e'); return; }
     const prevVids = _enrichCache[id]?.vids || [];
     delete _enrichCache[id];
@@ -231,7 +295,7 @@ async function refreshOne(id) {
 
 async function deleteChannel(id) {
   try {
-    await fetch(`/api/channels/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/channels/${id}`, { method: 'DELETE' });
     delete _enrichCache[id];
     try { localStorage.removeItem('yt_enrich_' + id); } catch { }
     if (typeof clearTimingCache === 'function') clearTimingCache();
@@ -280,7 +344,7 @@ document.getElementById('srInput')?.addEventListener('blur', () => {
 async function loadAllSnapshots() {
   if (_snapshotsCache) return _snapshotsCache;
   try {
-    const r = await fetch('/api/snapshots');
+    const r = await apiFetch('/api/snapshots');
     if (r.ok) {
       _snapshotsCache = await r.json();
       calcRankDeltas();

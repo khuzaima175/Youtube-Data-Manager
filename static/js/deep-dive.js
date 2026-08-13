@@ -2,16 +2,14 @@
    YT TRACKER — DEEP DIVE FORENSICS ENGINE
    ══════════════════════════════════════════════════════════════════════════════ */
 
-async function openDeepDive(channelId, tab = null) {
+async function openDeepDive(channelId, tab = 'overview') {
   const ch = all.find(c => c.id === channelId);
   if (!ch) return;
 
-  // Restore last tab per channel if no explicit tab given
-  const persistedTab = localStorage.getItem('dd_tab_' + channelId) || 'overview';
-  const resolvedTab = tab || persistedTab;
+  const targetTab = tab || 'overview';
 
   ddChannelId = channelId;
-  ddActiveTab = resolvedTab;
+  ddActiveTab = targetTab;
   ddFullVideos = null;
   ddSnapshots = null;
   ddVidPage = 0;
@@ -52,7 +50,7 @@ async function openDeepDive(channelId, tab = null) {
   saveAchievements();
   checkAchievements();
 
-  switchDDTab(tab);
+  switchDDTab(targetTab);
   serializeStateToHash();
 }
 
@@ -66,16 +64,17 @@ function closeDeepDive() {
   serializeStateToHash();
 }
 
-function switchDDTab(tab) {
-  ddActiveTab = tab;
+function switchDDTab(tab = 'overview') {
+  const targetTab = tab || 'overview';
+  ddActiveTab = targetTab;
   // Persist last tab per channel
-  if (ddChannelId) localStorage.setItem('dd_tab_' + ddChannelId, tab);
+  if (ddChannelId) localStorage.setItem('dd_tab_' + ddChannelId, targetTab);
 
   document.querySelectorAll('#ddTabsWrap .tab').forEach(t => t.classList.remove('on'));
   document.querySelectorAll('.dd-panel').forEach(p => p.classList.remove('on'));
 
-  const tabBtn = document.getElementById('ddTab-' + tab);
-  const panelEl = document.getElementById('ddPanel-' + tab);
+  const tabBtn = document.getElementById('ddTab-' + targetTab);
+  const panelEl = document.getElementById('ddPanel-' + targetTab);
   if (tabBtn) tabBtn.classList.add('on');
   if (panelEl) panelEl.classList.add('on');
 
@@ -84,11 +83,11 @@ function switchDDTab(tab) {
 
   serializeStateToHash();
 
-  if (tab === 'overview') renderDDOverview(ch);
-  if (tab === 'videos') renderDDVideos(ch);
-  if (tab === 'growth') renderDDGrowth(ch);
-  if (tab === 'compare') renderDDCompare(ch);
-  if (tab === 'topics') renderDDTopics(ch);
+  if (targetTab === 'overview') renderDDOverview(ch);
+  if (targetTab === 'videos') renderDDVideos(ch);
+  if (targetTab === 'growth') renderDDGrowth(ch);
+  if (targetTab === 'compare') renderDDCompare(ch);
+  if (targetTab === 'topics') renderDDTopics(ch);
 }
 
 /* ── Deep Dive Tab 1: Overview (Bento Rebuild) ─────────────────────────────── */

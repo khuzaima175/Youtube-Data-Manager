@@ -1,37 +1,38 @@
-/* 1. My Channel Strip */
+/* 1. My Channel Strip (Hero v3 — 3-Column Architecture) */
 .my-channel-strip {
   background: var(--bg-2);
   border: 1px solid var(--line-1);
   border-left: 4px solid var(--me);
-  border-radius: var(--r-m);
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
+  border-radius: var(--r-l);
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: 270px 1fr 260px;
+  align-items: stretch;
+  gap: 16px;
   box-shadow: var(--sh-1);
-  cursor: pointer;
   transition: all var(--d-2) var(--e-out);
+  margin-bottom: var(--s4);
 }
 
 .my-channel-strip:hover {
   border-color: rgba(245, 197, 66, 0.4);
   border-left-color: var(--me);
   box-shadow: var(--sh-glow-me);
-  transform: translateY(-2px);
 }
 
 .mcs-identity {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-width: 230px;
-  flex-shrink: 0;
+  gap: 12px;
+  min-width: 0;
+  padding-right: 12px;
+  border-right: 1px solid var(--line-1);
+  cursor: pointer;
 }
 
 .mcs-logo {
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--me);
@@ -39,8 +40,8 @@
 }
 
 .mcs-logo-fb {
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   background: var(--bg-3);
   border: 2px solid var(--me);
@@ -64,7 +65,7 @@
 .mcs-name {
   font-family: var(--f-disp);
   font-weight: 700;
-  font-size: 15.5px;
+  font-size: 15px;
   color: var(--t1);
   display: flex;
   align-items: center;
@@ -84,25 +85,127 @@
 
 .mcs-tiles {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  flex: 1;
+  grid-template-columns: repeat(5, minmax(118px, 1fr));
+  gap: 10px;
   min-width: 0;
+  align-items: stretch;
 }
 
-.mcs-action {
+@media (max-width: 1240px) and (min-width: 1050px) {
+  .mcs-tiles {
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+}
+
+@media (max-width: 1050px) {
+  .my-channel-strip {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .mcs-identity {
+    border-right: none;
+    border-bottom: 1px solid var(--line-1);
+    padding-bottom: 12px;
+  }
+  .mcs-tiles {
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  }
+}
+
+/* Next Best Action Card (Hero Right Rail) */
+.next-best-action-card {
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-m);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  position: relative;
+}
+
+.nba-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.nba-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--acc);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nba-dismiss {
+  cursor: pointer;
+  color: var(--t3);
+  font-size: 12px;
+  transition: color var(--d-1);
+}
+
+.nba-dismiss:hover {
+  color: var(--down);
+}
+
+.nba-body {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--t1);
+  line-height: 1.35;
+}
+
+.nba-sub {
+  font-size: 10px;
+  color: var(--t3);
+  line-height: 1.3;
+}
+
+.nba-actions {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--acc);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 8px 14px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-1);
+}
+
+/* Card Provenance Pill */
+.card-prov {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--t3);
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  padding: 2px 7px;
   border-radius: var(--r-s);
-  background: rgba(34, 211, 238, 0.08);
-  border: 1px solid rgba(34, 211, 238, 0.25);
-  white-space: nowrap;
-  flex-shrink: 0;
+  cursor: pointer;
+  transition: all var(--d-1);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.card-prov:hover {
+  background: var(--bg-hover);
+  color: var(--t1);
+  border-color: var(--line-2);
+}
+
+.card-prov::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--up);
+  display: inline-block;
 }
 
 /* 2. You vs Field Panel */
@@ -953,29 +1056,31 @@
    PHASE 10: WAYFINDING, INBOX & ALWAYS-ON INTELLIGENCE STYLES
    ============================================================================== */
 
-/* -- W1.1 Section Scroll-Spy Rail -------------------------------------------- */
+/* -- W1.1 Section Scroll-Spy Rail (F7: Dots-only by default, hover backdrop) -- */
 .dash-spy-rail {
   position: fixed;
-  right: 18px;
+  right: 14px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   gap: 12px;
   z-index: 80;
-  padding: 10px 8px;
-  background: rgba(14, 18, 26, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--line-1);
+  padding: 10px 6px;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: var(--r-l);
-  box-shadow: var(--sh-1);
-  opacity: 0.35;
-  transition: opacity var(--d-1), transform var(--d-1);
+  box-shadow: none;
+  opacity: 1;
+  transition: background var(--d-2) var(--e-out), border-color var(--d-2) var(--e-out), box-shadow var(--d-2) var(--e-out);
 }
 
 .dash-spy-rail:hover {
-  opacity: 1;
+  background: rgba(14, 18, 26, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: var(--line-2);
+  box-shadow: var(--sh-2);
 }
 
 .dash-spy-item {
@@ -983,7 +1088,7 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  padding: 3px 4px;
+  padding: 4px 6px;
   border-radius: var(--r-s);
   transition: all var(--d-1);
 }
@@ -1015,11 +1120,235 @@
 .dash-spy-item.on .spy-dot {
   background: var(--acc);
   transform: scale(1.4);
-  box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
 }
 
 .dash-spy-item.on .spy-label {
   color: var(--acc);
+}
+
+/* 40px Milestone SVG Ring */
+.milestone-ring-wrap {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.milestone-ring-wrap svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.milestone-ring-pct {
+  position: absolute;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--me);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   STATUS FOOTER BAR & DATA HEALTH POPOVER
+   ══════════════════════════════════════════════════════════════════════════════ */
+.status-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background: rgba(13, 18, 24, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid;
+  border-image: linear-gradient(90deg, transparent, var(--line-2) 20%, var(--line-2) 80%, transparent) 1;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+}
+
+.status-footer-inner {
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--t3);
+}
+
+.sf-left, .sf-center, .sf-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sf-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--t2);
+  font-size: 11px;
+}
+
+.sf-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--up);
+  box-shadow: 0 0 6px var(--up);
+}
+
+.sf-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--line-1);
+}
+
+.sf-quota {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--t3);
+}
+
+.sf-quota-bar {
+  width: 54px;
+  height: 4px;
+  background: var(--bg-3);
+  border-radius: var(--r-full);
+  overflow: hidden;
+}
+
+.sf-quota-fill {
+  height: 100%;
+  width: 2%;
+  background: var(--acc);
+  border-radius: var(--r-full);
+  transition: width 0.4s ease, background 0.4s ease;
+}
+
+.sf-quota-fill.warn {
+  background: var(--warn);
+}
+
+.sf-quota-fill.danger {
+  background: var(--down);
+}
+
+.sf-cache-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: all var(--d-1);
+  font-size: 10.5px;
+  color: var(--t2);
+}
+
+.sf-cache-chip:hover {
+  background: var(--bg-hover);
+  color: var(--t1);
+  border-color: var(--line-2);
+}
+
+.sf-cache-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--up);
+}
+
+.sf-cache-dot.stale {
+  background: var(--warn);
+}
+
+.sf-cache-dot.error {
+  background: var(--down);
+}
+
+.sf-shortcuts-hint {
+  color: var(--t3);
+  font-size: 10.5px;
+}
+
+.sf-shortcuts-hint kbd {
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--t2);
+}
+
+/* Data Health Popover */
+.data-health-popover {
+  position: fixed;
+  bottom: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  max-width: 92vw;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-m);
+  box-shadow: var(--sh-2);
+  padding: 14px;
+  z-index: 100;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.data-health-popover.open {
+  display: flex;
+  animation: pop 0.18s var(--e-out) forwards;
+}
+
+.dh-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.dh-body {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dh-ch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--bg-3);
+  border-radius: var(--r-s);
+  font-size: 11.5px;
+}
+
+.dh-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-1);
 }
 
 

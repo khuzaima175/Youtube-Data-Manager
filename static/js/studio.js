@@ -451,25 +451,43 @@ function renderStudioLabHtml() {
 
         <!-- Idea Grid -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:14px">
-          ${filteredIdeas.map(idea => `
+          ${filteredIdeas.map(idea => {
+      const st = scoreTone(idea.score);
+      const ringRadius = 11;
+      const ringCircum = 2 * Math.PI * ringRadius;
+      const ringDash = (idea.score / 100) * ringCircum;
+      const formulaIcon = idea.formula.includes('Collision') ? 'bolt' : idea.formula.includes('Moat') ? 'shield' : idea.formula.includes('Gap') ? 'radar' : idea.formula.includes('Breakout') ? 'trending_up' : 'lightbulb';
+      return `
             <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m);padding:14px;display:flex;flex-direction:column;justify-content:space-between;transition:border-color var(--d-1)" onmouseenter="this.style.borderColor='var(--line-2)'" onmouseleave="this.style.borderColor='var(--line-1)'">
               <div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                  <span class="badge bdg-pr" style="font-size:9.5px">${idea.formula}</span>
-                  <span class="badge bdg-gr" style="font-size:10px;font-weight:700">🔥 ${idea.score} Potential</span>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                  <span class="chip chip-acc" style="font-size:10px;padding:2px 8px">
+                    <span class="msi" style="font-size:13px">${formulaIcon}</span> ${idea.formula}
+                  </span>
+                  <div style="position:relative;width:28px;height:28px;display:flex;align-items:center;justify-content:center" title="${idea.score}% Potential Score">
+                    <svg viewBox="0 0 28 28" style="width:28px;height:28px;transform:rotate(-90deg)">
+                      <circle cx="14" cy="14" r="${ringRadius}" fill="none" stroke="var(--bg-1)" stroke-width="2.5"/>
+                      <circle cx="14" cy="14" r="${ringRadius}" fill="none" stroke="${st.col}" stroke-width="2.5"
+                        stroke-dasharray="${ringCircum.toFixed(1)}"
+                        stroke-dashoffset="${(ringCircum - ringDash).toFixed(1)}"
+                        stroke-linecap="round"/>
+                    </svg>
+                    <span style="position:absolute;font-family:var(--f-mono);font-size:8.5px;font-weight:800;color:${st.col}">${idea.score}</span>
+                  </div>
                 </div>
                 <div style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.4;margin-bottom:6px">${esc(idea.title)}</div>
                 <div style="font-size:10.5px;color:var(--t3);line-height:1.4;margin-bottom:12px">${esc(idea.reason)}</div>
               </div>
-              <div style="display:flex;gap:6px;padding-top:10px;border-top:1px solid var(--line-1)">
-                <button class="btn btn-gh btn-sm" style="flex:1" onclick="useIdeaInTitleLab('${esc(idea.title)}')">
-                  🧪 Test in Lab
+              <div style="display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line-1)">
+                <button class="btn btn-acc btn-sm" style="flex:1" onclick="sendIdeaToPipeline('${esc(idea.title)}', '${esc(idea.topic)}', ${idea.score})">
+                  <span class="msi" style="font-size:14px">add</span> + Pipeline
                 </button>
-                <button class="btn btn-acc btn-sm" onclick="sendIdeaToPipeline('${esc(idea.title)}', '${esc(idea.topic)}', ${idea.score})">
-                  + Pipeline
+                <button class="icon-btn" onclick="useIdeaInTitleLab('${esc(idea.title)}')" title="Test this idea in Title Lab">
+                  <span class="msi" style="font-size:14px">science</span>
                 </button>
               </div>
-            </div>`).join('')}
+            </div>`;
+    }).join('')}
         </div>
       </div>
     </div>`;
