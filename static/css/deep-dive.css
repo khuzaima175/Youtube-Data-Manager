@@ -7,6 +7,10 @@
   z-index: 120;
   background: var(--bg-0);
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   display: none;
 }
 
@@ -20,6 +24,7 @@
   z-index: 70;
   background: rgba(8, 12, 16, 0.94);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--line-1);
   padding: 10px 36px;
 }
@@ -97,12 +102,29 @@
   margin: 8px auto 0;
   display: flex;
   gap: 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 6px 12px;
+  -webkit-mask-image: linear-gradient(90deg, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, #000 94%, transparent);
+}
+
+.dd-tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.dd-tabs-bar .tab,
+.dd-tab {
+  flex: 0 0 auto;
 }
 
 .dd-body {
   max-width: 1440px;
   margin: 0 auto;
   padding: 24px 36px 80px;
+  min-width: 0;
 }
 
 .dd-panel {
@@ -161,7 +183,8 @@
   border-right: 1px solid var(--line-1);
 }
 
-.cmp td, .cmp th {
+.cmp td,
+.cmp th {
   min-width: 120px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--line-1);
@@ -222,18 +245,41 @@
    ══════════════════════════════════════════════════════════════════════════════ */
 
 @keyframes pulse-ring {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @keyframes newPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5); }
-  50%       { box-shadow: 0 0 0 4px rgba(34, 211, 238, 0); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(34, 211, 238, 0);
+  }
 }
 
 /* Race Window Shell */
@@ -366,7 +412,7 @@
   grid-template-rows: 1fr;
 }
 
-.fold > .fold-inner {
+.fold>.fold-inner {
   overflow: hidden;
   min-height: 0;
 }
@@ -1074,19 +1120,227 @@
   border-bottom: 1px solid var(--line-1);
 }
 
-.dd-topic-row:last-child { border-bottom: none; }
+.dd-topic-row:last-child {
+  border-bottom: none;
+}
 
 
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   PHASE 8: COMPETITIVE INTELLIGENCE STYLES
+   DEEP DIVE MOBILE RESPONSIVE BREAKPOINTS (< 960px & < 720px)
    ══════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 959px) {
+  .dd-overview-bento {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
+  }
 
-.dd-series-strip {
-  animation: fadeUp .3s var(--e-out);
+  .dd-overview-bento>* {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .dd-overview-right {
+    flex-direction: column;
+    display: flex;
+    gap: 16px;
+    width: 100%;
+  }
+
+  .dd-about-card,
+  .dd-health-card,
+  .dd-about-col,
+  .dd-health-col {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .dd-kpi-strip {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px;
+  }
+
+  .dd-body {
+    padding: 14px 14px 80px;
+  }
 }
 
-.dd-series-card:hover {
-  border-color: var(--line-2);
-  transform: translateY(-1px);
+@media (max-width: 719px) {
+  .dd-sticky-hdr {
+    padding: 8px 12px 6px;
+  }
+
+  .dd-hdr-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .dd-hdr-left {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .dd-ch-summary {
+    flex: 1;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .dd-name {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+  }
+
+  .dd-sub {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+  }
+
+  .dd-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .dd-back-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .dd-hdr-acts {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    padding-top: 4px;
+    border-top: 1px solid var(--line-1);
+  }
+
+  .dd-hdr-acts .btn {
+    flex: 1;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .dd-tabs-bar {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px 12px;
+    -webkit-mask-image: linear-gradient(90deg, #000 94%, transparent);
+    mask-image: linear-gradient(90deg, #000 94%, transparent);
+  }
+
+  .dd-tabs-bar .tabs {
+    width: max-content;
+  }
+
+  .dd-tabs-bar .tab,
+  .dd-tab {
+    padding: 8px 10px;
+    font-size: 12px;
+    gap: 6px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  /* Deep Dive Video Rows Mobile Reflow */
+  .dd-vrow {
+    grid-template-columns: 20px 70px 1fr auto !important;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .dd-vrow-thumb-wrap,
+  .dd-vrow-thumb {
+    width: 70px;
+    height: 40px;
+  }
+
+  .dd-vrow-views-wrap,
+  .dd-vrow-vel,
+  .dd-vrow-eng {
+    display: none !important;
+  }
+
+  .dd-top-vid-row {
+    grid-template-columns: 16px 56px 1fr auto !important;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .dd-vid-filter-bar {
+    position: static;
+    margin: -12px -12px 10px;
+    padding: 8px 10px;
+  }
+
+  .dd-vid-filter-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .dd-vid-filter-top .vid-seg {
+    width: 100%;
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .dd-vid-filter-top .vid-seg::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dd-vid-filter-top .vid-seg-btn {
+    flex: 1;
+    font-size: 11px;
+    padding: 4px 6px;
+  }
+
+  /* Channel Health Card Row Mobile */
+  .dd-health-row,
+  .health-row {
+    display: flex !important;
+    align-items: baseline !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+  }
+
+  .dd-health-label,
+  .health-row .lbl {
+    min-width: 0 !important;
+    flex: 0 0 auto !important;
+  }
+
+  .dd-health-val,
+  .health-row .val {
+    margin-left: auto !important;
+    text-align: right !important;
+  }
+
+  .dd-health-row .badge,
+  .health-row .chip {
+    white-space: normal !important;
+    text-align: right !important;
+    line-height: 1.2 !important;
+    margin-left: auto !important;
+  }
+
+  .gauge-bar,
+  .health-gauge {
+    width: 100% !important;
+  }
 }

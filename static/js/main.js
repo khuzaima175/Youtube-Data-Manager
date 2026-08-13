@@ -30,10 +30,15 @@ function sp(p) {
   closeDeepDive();
   document.querySelectorAll('.page').forEach(x => x.classList.remove('on'));
   document.querySelectorAll('.nav-link').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('.m-nav-item').forEach(x => x.classList.remove('on'));
+
   const pageEl = document.getElementById('page-' + p);
   const linkEl = document.getElementById('nav-' + p);
+  const mLinkEl = document.getElementById('m-nav-' + p);
+
   if (pageEl) pageEl.classList.add('on');
   if (linkEl) linkEl.classList.add('on');
+  if (mLinkEl) mLinkEl.classList.add('on');
 
   if (p === 'dash') renderDash();
   if (p === 'channels') renderChannels();
@@ -42,6 +47,7 @@ function sp(p) {
     setTimeout(() => document.getElementById('srInput')?.focus(), 50);
   }
   serializeStateToHash();
+  window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
 function setDensity(mode) {
@@ -540,8 +546,10 @@ function renderTourStep() {
     targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => {
       const rect = targetEl.getBoundingClientRect();
-      const cardTop = Math.min(window.innerHeight - 220, Math.max(80, rect.bottom + 12));
-      const cardLeft = Math.min(window.innerWidth - 340, Math.max(20, rect.left));
+      const cardWidth = Math.min(320, window.innerWidth - 24);
+      const cardLeft = Math.max(12, Math.min(window.innerWidth - cardWidth - 12, rect.left));
+      const cardTop = Math.max(70, Math.min(window.innerHeight - 240, rect.bottom + 12));
+      cardEl.style.width = cardWidth + 'px';
       cardEl.style.top = cardTop + 'px';
       cardEl.style.left = cardLeft + 'px';
     }, 150);
@@ -748,3 +756,48 @@ document.addEventListener('click', e => {
     }
   } catch { }
 })();
+
+/* ── 11. Touch Ergonomics & Orientation Handlers (Phase 14) ───────────────── */
+let _touchTipTimer = null;
+
+document.addEventListener('touchstart', e => {
+  const target = e.target.closest('[data-tip]');
+  if (target) {
+    const tipText = target.dataset.tip;
+    if (tipText) {
+      const touch = e.touches[0];
+      const x = Math.min(window.innerWidth - 80, Math.max(80, touch.clientX));
+      const y = Math.max(40, touch.clientY - 10);
+      showTip(tipText, x, y);
+      clearTimeout(_touchTipTimer);
+      _touchTipTimer = setTimeout(hideTip, 3200);
+    }
+  } else if (!e.target.closest('.tip')) {
+    hideTip();
+  }
+}, { passive: true });
+
+// Handle mobile orientation changes & resize re-fits
+let _resizeDebounce = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeDebounce);
+  _resizeDebounce = setTimeout(() => {
+    // Re-render chart boxes if active
+    const yvfBox = document.getElementById('yvfChartWrap');
+    const primary = all.find(c => c.is_primary) || all[0];
+    if (yvfBox && primary && typeof drawYvfBarsSvg === 'function') {
+      drawYvfBarsSvg(yvfBox, primary, all, yvfMetric, yvfBox.clientWidth, yvfBox.clientHeight);
+    }
+    if (typeof loadVelocityWithFit === 'function' && document.getElementById('dashVelocity')) {
+      loadVelocityWithFit(all);
+    }
+  }, 200);
+});
+
+window.addEventListener('orientationchange', () => {
+  hideTip();
+  setTimeout(() => {
+    if (document.getElementById('page-dash')?.classList.contains('on')) renderDash();
+    else if (ddChannelId) switchDDTab(ddActiveTab);
+  }, 250);
+});

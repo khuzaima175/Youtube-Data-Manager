@@ -75,7 +75,14 @@ function switchDDTab(tab = 'overview') {
 
   const tabBtn = document.getElementById('ddTab-' + targetTab);
   const panelEl = document.getElementById('ddPanel-' + targetTab);
-  if (tabBtn) tabBtn.classList.add('on');
+  if (tabBtn) {
+    tabBtn.classList.add('on');
+    requestAnimationFrame(() => {
+      try {
+        tabBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      } catch { }
+    });
+  }
   if (panelEl) panelEl.classList.add('on');
 
   const ch = all.find(c => c.id === ddChannelId);
@@ -90,7 +97,6 @@ function switchDDTab(tab = 'overview') {
   if (targetTab === 'topics') renderDDTopics(ch);
 }
 
-/* ── Deep Dive Tab 1: Overview (Bento Rebuild) ─────────────────────────────── */
 async function renderDDOverview(ch) {
   const panel = document.getElementById('ddPanel-overview');
   if (!panel) return;
@@ -101,6 +107,7 @@ async function renderDDOverview(ch) {
     </div>`;
 
   const en = await enrich(ch.id) || {};
+  if (ddChannelId !== ch.id || ddActiveTab !== 'overview') return; // Guard against rapid tab switching
   const vids = en.vids || [];
   const allVids = [...(en.longForm || vids)];
   const top5 = [...allVids].sort((a, b) => (b.view_count ?? b.views_raw ?? 0) - (a.view_count ?? a.views_raw ?? 0)).slice(0, 5);

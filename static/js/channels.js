@@ -82,57 +82,56 @@ function renderDenseChannelRow(ch) {
   return `
     <div class="ch-row ${isMine ? 'me' : ''}" onclick="openDeepDive('${esc(ch.id)}')">
       <!-- 1. Avatar -->
-      <div>
+      <div class="ch-avatar">
         ${ch.logo_url
       ? `<img class="ch-row-av" src="${esc(proxyImg(ch.logo_url))}" style="border:2px solid ${col}" alt="">`
       : `<div class="ch-row-av" style="background:var(--bg-3);border:2px solid ${col};display:flex;align-items:center;justify-content:center;font-weight:700">${(ch.name || '?')[0]}</div>`}
       </div>
 
       <!-- 2. Identity -->
-      <div class="ch-row-ident">
-        <div class="ch-row-name">
+      <div class="ch-row-ident ch-id">
+        <div class="ch-row-name name">
           ${esc(ch.name)}
           ${isMine ? '<span class="badge bdg-gd">⭐ Mine</span>' : ''}
         </div>
-        <div class="ch-row-sub">
+        <div class="ch-row-sub handle">
           <span>${esc(ch.handle || '')}</span>
-          ${ch.country ? `<span>• ${esc(ch.country)}</span>` : ''}
+          ${ch.country ? `<span class="country"> • ${esc(ch.country)}</span>` : ''}
         </div>
       </div>
 
       <!-- 3. Sparkline (30-day views) -->
-      <div id="row-spark-${esc(ch.id)}" style="display:flex;align-items:center;justify-content:center">
+      <div class="ch-spark" id="row-spark-${esc(ch.id)}" style="display:flex;align-items:center;justify-content:center">
         <div class="skel" style="width:75px;height:16px"></div>
       </div>
 
-      <!-- 4. Subscribers -->
-      <div>
-        <div style="font-family:var(--f-mono);font-weight:700;color:var(--t1);display:flex;align-items:center;gap:4px">
-          ${esc(ch.subscribers)} ${renderRankDeltaChip(ch.id)}
+      <!-- 4. Stats Container -->
+      <div class="ch-stats">
+        <div class="ch-stat">
+          <div class="val" style="font-family:var(--f-mono);font-weight:700;color:var(--t1);display:flex;align-items:center;gap:4px">
+            ${esc(ch.subscribers)} ${renderRankDeltaChip(ch.id)}
+          </div>
+          <div class="lbl" style="font-size:10px;color:var(--t3)">subscribers</div>
         </div>
-        <div style="font-size:10px;color:var(--t3)">subscribers</div>
+
+        <div class="ch-stat">
+          <div class="val" style="font-family:var(--f-mono);font-weight:700;color:var(--up)">${esc(ch.avg_views)}</div>
+          <div class="lbl" style="font-size:10px;color:var(--t3)">avg views</div>
+        </div>
+
+        <div class="ch-stat">
+          <div class="val" style="font-family:var(--f-mono);font-weight:700;color:var(--t3)" id="row-eng-${esc(ch.id)}">—</div>
+          <div class="lbl" style="font-size:10px;color:var(--t3)">engagement</div>
+        </div>
+
+        <div class="ch-stat">
+          <div class="val" style="font-size:11px;color:var(--t2)">${ch.video?.date || '—'}</div>
+          <div class="lbl" style="font-size:10px;color:var(--t3)">last upload</div>
+        </div>
       </div>
 
-      <!-- 5. Avg Views -->
-      <div>
-        <div style="font-family:var(--f-mono);font-weight:700;color:var(--up)">${esc(ch.avg_views)}</div>
-        <div style="font-size:10px;color:var(--t3)">avg views</div>
-      </div>
-
-      <!-- 6. Engagement -->
-      <div>
-        <div style="font-family:var(--f-mono);font-weight:700;color:var(--t3)" id="row-eng-${esc(ch.id)}">—</div>
-        <div style="font-size:10px;color:var(--t3)">engagement</div>
-      </div>
-
-      <!-- 7. Last Upload -->
-      <div>
-        <div style="font-size:11px;color:var(--t2)">${ch.video?.date || '—'}</div>
-        <div style="font-size:10px;color:var(--t3)">last upload</div>
-      </div>
-
-      <!-- 8. Actions -->
-      <div class="ch-row-acts" onclick="event.stopPropagation()">
+      <!-- 5. Actions -->
+      <div class="ch-row-acts ch-actions" onclick="event.stopPropagation()">
         ${!isMine ? `<button class="icon-btn" title="Set as My Channel" onclick="setPrimary('${esc(ch.id)}')"><span class="msi" style="font-size:14px">star</span></button>` : ''}
         <button class="icon-btn ${inCompare ? 'active' : ''}" title="Toggle compare" onclick="toggleCompare('${esc(ch.id)}')"><span class="msi" style="font-size:14px">compare_arrows</span></button>
         <button class="icon-btn" title="Refresh" onclick="refreshOne('${esc(ch.id)}')"><span class="msi" style="font-size:14px">refresh</span></button>

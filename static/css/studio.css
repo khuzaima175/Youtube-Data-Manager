@@ -11,14 +11,59 @@
   opacity: 0.7;
 }
 
-@media (max-width: 960px) {
-  #studioSubPanel > div > div[style*="grid-template-columns:repeat(4, 1fr)"] {
+.studio-kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-height: 500px;
+}
+
+@media (max-width: 959px) {
+  .studio-kanban-board {
+    grid-auto-flow: column;
+    grid-auto-columns: 82vw;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 14px;
+    scrollbar-width: none;
+  }
+
+  .studio-kanban-board::-webkit-scrollbar {
+    display: none;
+  }
+
+  .studio-kanban-col {
+    scroll-snap-align: center;
+    max-height: calc(100dvh - 200px);
+  }
+
+  .tl-factors-grid {
     grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
   }
 }
 
 @media (max-width: 640px) {
-  #studioSubPanel > div > div[style*="grid-template-columns:repeat(4, 1fr)"] {
+  .studio-kanban-board {
+    grid-auto-columns: 86vw;
+  }
+
+  .tl-factors-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+@media (pointer: coarse),
+(max-width: 719px) {
+  .pipeline-card .icon-btn {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .pipeline-card .icon-btn .msi {
+    font-size: 16px !important;
   }
 }

@@ -386,7 +386,7 @@ function renderStudioLabHtml() {
         </div>
 
         <!-- 4 Factor Grid -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+        <div class="tl-factors-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
           <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
             <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">📏 Length (25 max)</div>
             <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
@@ -452,12 +452,12 @@ function renderStudioLabHtml() {
         <!-- Idea Grid -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:14px">
           ${filteredIdeas.map(idea => {
-      const st = scoreTone(idea.score);
-      const ringRadius = 11;
-      const ringCircum = 2 * Math.PI * ringRadius;
-      const ringDash = (idea.score / 100) * ringCircum;
-      const formulaIcon = idea.formula.includes('Collision') ? 'bolt' : idea.formula.includes('Moat') ? 'shield' : idea.formula.includes('Gap') ? 'radar' : idea.formula.includes('Breakout') ? 'trending_up' : 'lightbulb';
-      return `
+    const st = scoreTone(idea.score);
+    const ringRadius = 11;
+    const ringCircum = 2 * Math.PI * ringRadius;
+    const ringDash = (idea.score / 100) * ringCircum;
+    const formulaIcon = idea.formula.includes('Collision') ? 'bolt' : idea.formula.includes('Moat') ? 'shield' : idea.formula.includes('Gap') ? 'radar' : idea.formula.includes('Breakout') ? 'trending_up' : 'lightbulb';
+    return `
             <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m);padding:14px;display:flex;flex-direction:column;justify-content:space-between;transition:border-color var(--d-1)" onmouseenter="this.style.borderColor='var(--line-2)'" onmouseleave="this.style.borderColor='var(--line-1)'">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -487,7 +487,7 @@ function renderStudioLabHtml() {
                 </button>
               </div>
             </div>`;
-    }).join('')}
+  }).join('')}
         </div>
       </div>
     </div>`;
@@ -515,11 +515,11 @@ function renderStudioPipelineHtml() {
       </div>
 
       <!-- 4-Column Board -->
-      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:14px;align-items:start;min-height:500px">
+      <div class="studio-kanban-board">
         ${stages.map(st => {
     const cardsInStage = pipelineCards.filter(c => c.stage === st.key);
     return `
-            <div style="background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-m);display:flex;flex-direction:column;max-height:75vh;overflow:hidden"
+            <div class="studio-kanban-col" style="background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-m);display:flex;flex-direction:column;max-height:75vh;overflow:hidden"
                  ondragover="event.preventDefault()"
                  ondrop="pipelineDrop(event, '${st.key}')">
               <!-- Column Header -->

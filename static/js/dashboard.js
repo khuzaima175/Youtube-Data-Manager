@@ -291,19 +291,31 @@ async function renderDash() {
       </div>
     </div>`;
 
-  // 3. Full-Width Leaderboard Table
+  // 3. Full-Width Leaderboard Table & Mobile Cards
   const lbHtml = `
     <div id="sec-lb" class="lb-wrap rev in" style="--i:2">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
         <div class="sect-lbl" style="margin:0">
           <span class="msi">leaderboard</span> Full Leaderboard (${all.length} channels)
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:11.5px;color:var(--t3)">Click header to sort</span>
+          <span class="lb-desktop-hint" style="font-size:11.5px;color:var(--t3)">Click header to sort</span>
           <span class="card-prov" data-tip="Click to refresh all channel rows" onclick="refreshAll()">refreshed ${ago(lastRefreshedTs)}</span>
         </div>
       </div>
-      <div style="overflow-x:auto">
+
+      <!-- Mobile Sort Bar (< 720px) -->
+      <div class="lb-mobile-sort" style="margin-bottom:10px">
+        <div class="race-seg" style="width:100%;display:flex;overflow-x:auto;scrollbar-width:none">
+          <button class="race-seg-btn ${sort === 'subscribers_raw' ? 'on' : ''}" style="flex:1" onclick="setLeaderboardSort('subscribers_raw')">Subs</button>
+          <button class="race-seg-btn ${sort === 'avg_views_raw' ? 'on' : ''}" style="flex:1" onclick="setLeaderboardSort('avg_views_raw')">Avg Views</button>
+          <button class="race-seg-btn ${sort === 'total_views_raw' ? 'on' : ''}" style="flex:1" onclick="setLeaderboardSort('total_views_raw')">Total Views</button>
+          <button class="race-seg-btn ${sort === 'threat_score' ? 'on' : ''}" style="flex:1" onclick="setLeaderboardSort('threat_score')">Threat</button>
+        </div>
+      </div>
+
+      <!-- Desktop Table (>= 720px) -->
+      <div class="lb-table-wrap" style="overflow-x:auto">
         <table class="lb-table">
           <colgroup>
             <col style="width:36px">
@@ -333,6 +345,11 @@ async function renderDash() {
             ${renderLeaderboardRows(primary, all)}
           </tbody>
         </table>
+      </div>
+
+      <!-- Mobile Stacked Cards (< 720px) -->
+      <div class="lb-cards-list" id="lbCardsList">
+        ${renderLeaderboardCards(primary, all)}
       </div>
     </div>`;
 
@@ -449,12 +466,12 @@ function renderLadderRows(primary, allChannels, metricKey) {
     return `
       <div class="ladder-row ${isMe ? 'me' : ''}" onclick="openDeepDive('${esc(ch.id)}')">
         <div class="ladder-row-bar" style="width:${pct}%;background:${col}"></div>
-        <div style="display:flex;align-items:center;gap:6px;position:relative;z-index:1;min-width:0">
-          <span style="font-family:var(--f-mono);font-size:10px;color:var(--t3);display:flex;align-items:center;gap:3px">#${i + 1} ${renderRankDeltaChip(ch.id)}</span>
+        <div class="ladder-left">
+          <span style="font-family:var(--f-mono);font-size:10px;color:var(--t3);display:flex;align-items:center;gap:3px;flex-shrink:0">#${i + 1} ${renderRankDeltaChip(ch.id)}</span>
           <span style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0"></span>
-          <span class="ladder-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.name)} ${isMe ? '◀ YOU' : ''}</span>
+          <span class="ladder-name">${esc(ch.name)} ${isMe ? '◀ YOU' : ''}</span>
         </div>
-        <span class="ladder-val" style="position:relative;z-index:1">${fmtN(ch[metricKey] || 0)}</span>
+        <span class="ladder-val">${fmtN(ch[metricKey] || 0)}</span>
       </div>`;
   }).join('');
 }
@@ -533,12 +550,24 @@ function drawYvfBarsSvg(box, primary, allChannels, metricKey, width, height) {
 function setLeaderboardSort(field) {
   sort = field;
   const tbody = document.getElementById('lbTableBody');
+  const cardsList = document.getElementById('lbCardsList');
   const primary = all.find(c => c.is_primary) || all[0];
   if (tbody) {
     flip(tbody, () => {
       tbody.innerHTML = renderLeaderboardRows(primary, all);
     });
   }
+  if (cardsList) {
+    cardsList.innerHTML = renderLeaderboardCards(primary, all);
+  }
+  document.querySelectorAll('.lb-mobile-sort .race-seg-btn').forEach(btn => {
+    const txt = btn.textContent.toLowerCase();
+    const active = (field === 'subscribers_raw' && txt === 'subs') ||
+      (field === 'avg_views_raw' && txt.includes('avg')) ||
+      (field === 'total_views_raw' && txt.includes('total')) ||
+      (field === 'threat_score' && txt.includes('threat'));
+    btn.classList.toggle('on', active);
+  });
   serializeStateToHash();
 }
 
@@ -601,6 +630,60 @@ function renderLeaderboardRows(primary, allChannels) {
           </button>
         </td>
       </tr>`;
+  }).join('');
+}
+
+function renderLeaderboardCards(primary, allChannels) {
+  const withThreat = allChannels.map(ch => {
+    const threat = calcThreatScore(ch.id, primary?.id);
+    return { ...ch, _threatScore: threat.score, _sharedTopics: threat.sharedTopics };
+  });
+
+  const sorted = [...withThreat].sort((a, b) => {
+    if (sort === 'threat_score') return (b._threatScore || 0) - (a._threatScore || 0);
+    return (b[sort] || 0) - (a[sort] || 0);
+  });
+  const maxVal = Math.max(...sorted.map(c => sort === 'threat_score' ? (c._threatScore || 0) : (c[sort] || 0)), 1);
+
+  return sorted.map((ch, i) => {
+    const isMe = ch.id === primary?.id;
+    const curVal = sort === 'threat_score' ? (ch._threatScore || 0) : (ch[sort] || 0);
+    const pct = Math.max(4, Math.round((curVal / maxVal) * 100));
+    const col = colorOf(ch);
+    const inCompare = compareSet.includes(ch.id) || isMe;
+    const threatScore = ch._threatScore || 0;
+    const threatColor = threatScore >= 50 ? 'var(--down)' : threatScore >= 25 ? 'var(--warn)' : 'var(--t3)';
+
+    return `
+      <div class="lb-card ${isMe ? 'me' : ''}" onclick="openDeepDive('${esc(ch.id)}', 'overview')">
+        <div class="lb-card-top">
+          <div class="lb-card-ident">
+            <span class="lb-card-rank">#${i + 1}</span>
+            ${ch.logo_url
+        ? `<img class="lb-card-av" src="${esc(proxyImg(ch.logo_url))}" style="border:1.5px solid ${col}" alt="">`
+        : `<div class="lb-card-av-fb" style="border:1.5px solid ${col};color:${col}">${(ch.name || '?')[0]}</div>`}
+            <div style="min-width:0">
+              <div class="lb-card-name">${esc(ch.name)} ${isMe ? '<span class="badge bdg-gd" style="font-size:9px">YOU</span>' : ''}</div>
+              <div class="lb-card-meta">${esc(ch.handle || '')} ${renderRankDeltaChip(ch.id)}</div>
+            </div>
+          </div>
+          <div class="lb-card-acts" onclick="event.stopPropagation()">
+            ${threatScore > 0 && !isMe ? `<span class="badge" style="background:${threatScore >= 50 ? 'rgba(255,107,107,0.12)' : 'rgba(245,197,66,0.12)'};color:${threatColor};font-size:9.5px">⚔️ ${threatScore}%</span>` : ''}
+            <button class="icon-btn ${inCompare ? 'active' : ''}" style="width:28px;height:28px" onclick="toggleCompare('${esc(ch.id)}')" title="Toggle compare">
+              <span class="msi" style="font-size:14px">${inCompare ? 'check' : 'add'}</span>
+            </button>
+          </div>
+        </div>
+        <div class="lb-card-bar">
+          <div class="lb-card-bar-fill" style="width:${pct}%;background:${col}"></div>
+        </div>
+        <div class="lb-card-stats">
+          <div class="lb-stat-item"><span class="lb-stat-lbl">Subs</span><span class="mono" style="color:var(--t1);font-weight:700">${esc(ch.subscribers)}</span></div>
+          <div class="lb-stat-item"><span class="lb-stat-lbl">Avg</span><span class="mono" style="color:var(--up);font-weight:700">${esc(ch.avg_views)}</span></div>
+          <div class="lb-stat-item"><span class="lb-stat-lbl">Total</span><span class="mono" style="color:var(--t2)">${esc(ch.total_views)}</span></div>
+          <div class="lb-stat-item"><span class="lb-stat-lbl">Vids</span><span class="mono" style="color:var(--t3)">${esc(ch.total_videos)}</span></div>
+        </div>
+      </div>`;
   }).join('');
 }
 
@@ -742,12 +825,14 @@ function renderRaceWindow() {
           </div>
           <div class="rrow-vid-title" title="${esc(v.title)}">${esc(v.title)}</div>
         </div>
-        <div class="rrow-views">${fmtN(vc)}<br><span style="font-size:9.5px;color:var(--t3);font-family:var(--f-ui);font-weight:400">views</span></div>
-        <div class="rrow-vel">${fmtN(vel)}<span style="font-size:9.5px;font-weight:400">/day</span> ⚡</div>
-        <div class="rrow-eng">${eng !== null ? eng + '%' : '<span style="color:var(--t3)">—</span>'}</div>
-        <div class="race-vs-wrap">
-          <span class="race-vs-label">${Math.round(pct)}% of best</span>
-          <div class="race-vs-track"><div class="race-vs-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="rrow-stats-strip">
+          <div class="rrow-views">${fmtN(vc)} <span style="font-size:9.5px;color:var(--t3);font-family:var(--f-ui);font-weight:400">views</span></div>
+          <div class="rrow-vel">${fmtN(vel)}<span style="font-size:9.5px;font-weight:400">/d</span> ⚡</div>
+          <div class="rrow-eng">${eng !== null ? eng + '%' : '<span style="color:var(--t3)">—</span>'}</div>
+          <div class="race-vs-wrap">
+            <span class="race-vs-label">${Math.round(pct)}% of best</span>
+            <div class="race-vs-track"><div class="race-vs-fill" style="width:${pct}%;background:${col}"></div></div>
+          </div>
         </div>
         <div class="rrow-chev"><span class="msi" style="font-size:18px">expand_more</span></div>
       </div>

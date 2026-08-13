@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>YT Tracker — YouTube Channel Analytics & Management Suite</title>
   <meta name="description"
     content="Compare your YouTube channel against competitors, track upload velocity, and inspect deep growth trends." />
@@ -496,6 +496,28 @@
       <button class="btn btn-acc btn-sm" onclick="toggleDataHealthPopover();openSettingsModal();switchSettingsTab('data')">Storage Settings →</button>
     </div>
   </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       MOBILE BOTTOM TAB NAVIGATION BAR (< 720px)
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <nav class="m-nav" id="mobileNav" aria-label="Mobile Navigation">
+    <button class="m-nav-item on" id="m-nav-dash" onclick="sp('dash')" aria-label="Dashboard">
+      <span class="msi">dashboard</span>
+      <span class="m-nav-lbl">Dashboard</span>
+    </button>
+    <button class="m-nav-item" id="m-nav-channels" onclick="sp('channels')" aria-label="My Channels">
+      <span class="msi">subscriptions</span>
+      <span class="m-nav-lbl">Channels</span>
+    </button>
+    <button class="m-nav-item" id="m-nav-studio" onclick="sp('studio')" aria-label="Creator Studio">
+      <span class="msi">movie_filter</span>
+      <span class="m-nav-lbl">Studio</span>
+    </button>
+    <button class="m-nav-item" id="m-nav-search" onclick="sp('search')" aria-label="Search Channels">
+      <span class="msi">search</span>
+      <span class="m-nav-lbl">Search</span>
+    </button>
+  </nav>
 
   <!-- Core Modular JS Application Engine -->
   <script src="static/js/state.js" defer></script>

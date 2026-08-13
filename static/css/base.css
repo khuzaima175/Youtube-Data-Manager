@@ -1,7 +1,8 @@
 /* ── 01. Base & Atmosphere ────────────────────────────────────────────────── */
 html {
   scroll-behavior: smooth;
-  overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
   background: var(--bg-0);
 }
 
@@ -13,13 +14,41 @@ body {
     var(--bg-0);
   color: var(--t1);
   min-height: 100vh;
-  overflow-x: hidden;
-  max-width: 100vw;
+  min-height: 100dvh;
+  overflow-x: clip;
+  max-width: 100%;
   font-size: 13px;
   line-height: 1.5;
   padding-bottom: 44px; /* Fixed status footer clearance */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+img, svg, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+.card, .lb-wrap, .dd-body, [class*="grid"] > * {
+  min-width: 0;
+}
+
+/* Reusable Horizontal Scroll Container with Edge Fade Support */
+.scroll-x {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  max-width: 100%;
+}
+
+.scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-x.fade-x {
+  mask-image: linear-gradient(90deg, #000 0%, #000 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 88%, transparent 100%);
 }
 
 body::before {
@@ -1168,5 +1197,127 @@ body.density-compact .pipeline-card {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   PAGE 1: DASHBOARD
+   MOBILE CHROME & BOTTOM NAVIGATION BAR (< 720px)
    ══════════════════════════════════════════════════════════════════════════════ */
+.m-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 75;
+  display: none;
+  grid-template-columns: repeat(4, 1fr);
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(8, 12, 16, 0.94);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-top: 1px solid var(--line-1);
+}
+
+.m-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  color: var(--t3);
+  font-family: var(--f-ui);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 0;
+  transition: all var(--d-1) var(--e-out);
+  position: relative;
+  user-select: none;
+}
+
+.m-nav-item .msi {
+  font-size: 20px;
+  transition: transform var(--d-1) var(--e-out);
+}
+
+.m-nav-item:active .msi {
+  transform: scale(0.92);
+}
+
+.m-nav-item.on {
+  color: var(--acc);
+}
+
+.m-nav-item.on::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--acc);
+  box-shadow: 0 0 6px var(--acc);
+}
+
+@media (max-width: 719px) {
+  .m-nav {
+    display: grid;
+  }
+  .nav-links,
+  .status-footer,
+  .dash-spy-rail,
+  .topbar-kbd-chip,
+  .topbar-refresh-pill .refresh-pill-text,
+  .nav-v-div:last-of-type,
+  .compare-tray-label {
+    display: none !important;
+  }
+  .topnav-inner {
+    padding: 0 14px;
+    height: 50px;
+  }
+  .nav-brand {
+    font-size: 17px;
+  }
+  .nav-utility-cluster {
+    gap: 4px;
+  }
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+  }
+  body {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  #toast {
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .main {
+    padding: 14px 12px calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  #dashMain {
+    padding-bottom: 20px;
+  }
+}
+
+/* Touch Ergonomics on Coarse Pointers */
+@media (pointer: coarse) {
+  .btn,
+  .icon-btn,
+  .chip-btn,
+  .tab,
+  .vid-seg-btn,
+  .race-seg-btn,
+  .m-nav-item {
+    min-height: 40px;
+  }
+  .icon-btn {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  .tile:hover,
+  .card:hover,
+  .rrow:hover,
+  .ch-row:hover {
+    transform: none !important;
+  }
+}

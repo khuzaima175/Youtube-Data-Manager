@@ -103,11 +103,13 @@
     grid-template-columns: 1fr;
     gap: 14px;
   }
+
   .mcs-identity {
     border-right: none;
     border-bottom: 1px solid var(--line-1);
     padding-bottom: 12px;
   }
+
   .mcs-tiles {
     grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   }
@@ -277,9 +279,10 @@
 }
 
 .ladder-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 6px 10px;
   border-radius: var(--r-s);
   font-size: 12px;
@@ -289,6 +292,32 @@
   overflow: hidden;
   cursor: pointer;
   transition: all var(--d-1);
+}
+
+.ladder-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ladder-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.ladder-val {
+  font-family: var(--f-mono);
+  font-weight: 700;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
 }
 
 .ladder-row-bar {
@@ -433,6 +462,155 @@
   height: 100%;
   border-radius: var(--r-full);
   transition: width 0.6s var(--e-out);
+}
+
+/* 3b. Mobile Leaderboard Cards (< 720px) */
+.lb-mobile-sort {
+  display: none;
+}
+
+.lb-cards-list {
+  display: none;
+}
+
+.lb-card {
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-m);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: all var(--d-1) var(--e-out);
+}
+
+.lb-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--line-2);
+}
+
+.lb-card.me {
+  border-left: 3px solid var(--me);
+  background: rgba(245, 197, 66, 0.03);
+}
+
+.lb-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lb-card-ident {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.lb-card-rank {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--t3);
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.lb-card-av {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.lb-card-av-fb {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.lb-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lb-card-meta {
+  font-size: 10.5px;
+  color: var(--t3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-card-acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.lb-card-bar {
+  width: 100%;
+  height: 3px;
+  background: var(--bg-1);
+  border-radius: var(--r-full);
+  overflow: hidden;
+}
+
+.lb-card-bar-fill {
+  height: 100%;
+  border-radius: var(--r-full);
+  transition: width 0.6s var(--e-out);
+}
+
+.lb-card-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  background: var(--bg-2);
+  padding: 6px 8px;
+  border-radius: var(--r-s);
+}
+
+.lb-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 11px;
+  min-width: 0;
+}
+
+.lb-stat-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--t3);
+  letter-spacing: 0.04em;
+}
+
+.rrow-stats-strip {
+  display: contents;
 }
 
 /* 4. Velocity & Face-Off Grid */
@@ -624,6 +802,10 @@
   padding: 10px 14px;
   cursor: pointer;
   transition: all var(--d-1) var(--e-out);
+}
+
+.ch-stats {
+  display: contents;
 }
 
 .ch-row:hover {
@@ -1183,7 +1365,9 @@
   color: var(--t3);
 }
 
-.sf-left, .sf-center, .sf-right {
+.sf-left,
+.sf-center,
+.sf-right {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1561,6 +1745,274 @@
   font-size: 11px;
   color: var(--t2);
   flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   DASHBOARD MOBILE BREAKPOINTS (< 720px)
+   ══════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 719px) {
+
+  /* Hero Strip */
+  .my-channel-strip {
+    grid-template-columns: 1fr !important;
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .mcs-identity {
+    border-right: none;
+    border-bottom: 1px solid var(--line-1);
+    padding-bottom: 10px;
+    padding-right: 0;
+  }
+
+  .mcs-tiles {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .mcs-tiles .tile:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+
+  .next-best-action-card {
+    padding: 10px;
+  }
+
+  /* You vs Field */
+  .you-vs-field {
+    padding: 14px 12px;
+  }
+
+  .yvf-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  .yvf-chips {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .yvf-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .yvf-chips .chip {
+    flex-shrink: 0;
+  }
+
+  /* Leaderboard Dual Mode */
+  .lb-wrap {
+    padding: 12px;
+  }
+
+  .lb-table-wrap,
+  .lb-desktop-hint {
+    display: none !important;
+  }
+
+  .lb-mobile-sort {
+    display: block !important;
+  }
+
+  .lb-cards-list {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Latest Drops Race Window */
+  .rrow {
+    grid-template-areas:
+      "rank channel chev"
+      "vid vid vid"
+      "stats stats stats";
+    grid-template-columns: 28px minmax(0, 1fr) 28px !important;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .rrow-rank {
+    grid-area: rank;
+    justify-self: center;
+  }
+
+  .rrow-ch {
+    grid-area: channel;
+    min-width: 0;
+  }
+
+  .rrow-chev {
+    grid-area: chev;
+    justify-self: end;
+  }
+
+  .rrow-vid {
+    grid-area: vid;
+    min-width: 0;
+  }
+
+  .rrow-stats-strip {
+    grid-area: stats;
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--line-1);
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+
+  .race-win-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .race-controls {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .race-controls::-webkit-scrollbar {
+    display: none;
+  }
+
+  .race-inset {
+    padding: 8px 12px 10px 12px;
+  }
+
+  .race-inset-row {
+    grid-template-columns: 16px 56px 1fr auto;
+    gap: 6px;
+  }
+
+  /* Topic Radar */
+  .topic-radar-body {
+    grid-template-columns: 1fr !important;
+  }
+
+  .topic-hot-col {
+    border-right: none !important;
+    border-bottom: 1px solid var(--line-1);
+    padding: 12px;
+  }
+
+  .topic-matrix-col {
+    padding: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .matrix-topic-label,
+  .matrix-topic-col {
+    position: sticky;
+    left: 0;
+    background: var(--bg-2);
+    z-index: 2;
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Timing Heatmap */
+  .timing-insights {
+    grid-template-columns: 1fr !important;
+  }
+
+  .timing-insight-card {
+    padding: 10px 12px;
+  }
+
+  /* Channel Rows Mobile Reflow */
+  .ch-row {
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    grid-template-areas:
+      "avatar identity actions"
+      "spark  spark    spark"
+      "stats  stats    stats" !important;
+    row-gap: 10px !important;
+    padding: 12px !important;
+    max-width: 100% !important;
+  }
+
+  .ch-avatar {
+    grid-area: avatar;
+  }
+
+  .ch-id {
+    grid-area: identity;
+    min-width: 0;
+  }
+
+  .ch-id .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ch-id .handle {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ch-id .country {
+    display: inline;
+  }
+
+  .ch-spark {
+    grid-area: spark;
+    width: 100% !important;
+    height: 28px !important;
+  }
+
+  .ch-spark svg {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .ch-actions {
+    grid-area: actions;
+    opacity: 1 !important;
+  }
+
+  .ch-actions .icon-btn {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .ch-stats {
+    grid-area: stats;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .ch-stat {
+    min-width: 0;
+  }
+
+  .ch-stat .val {
+    font-size: 12px;
+    font-family: var(--f-mono);
+    font-weight: 700;
+  }
+
+  .ch-stat .lbl {
+    font-size: 9px;
+    letter-spacing: .05em;
+    color: var(--t3);
+    text-transform: uppercase;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
