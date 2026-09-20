@@ -16,17 +16,23 @@ body {
   max-width: 100%;
   font-size: 13px;
   line-height: 1.5;
-  padding-bottom: 44px; /* Fixed status footer clearance */
+  padding-bottom: 44px;
+  /* Fixed status footer clearance */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-img, svg, canvas {
+img,
+svg,
+canvas {
   max-width: 100%;
   height: auto;
 }
 
-.card, .lb-wrap, .dd-body, [class*="grid"] > * {
+.card,
+.lb-wrap,
+.dd-body,
+[class*="grid"]>* {
   min-width: 0;
 }
 
@@ -69,32 +75,64 @@ button {
 
 /* ── 02. Motion & Keyframes ───────────────────────────────────────────────── */
 @keyframes grow {
-  from { transform: scaleY(0); }
-  to { transform: scaleY(1); }
+  from {
+    transform: scaleY(0);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
 }
 
 @keyframes draw {
-  to { stroke-dashoffset: 0; }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 @keyframes shim {
-  from { background-position: 100% 0; }
-  to { background-position: -100% 0; }
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
 }
 
 @keyframes pop {
-  0% { transform: scale(0.6); opacity: 0; }
-  70% { transform: scale(1.06); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+
+  70% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 @keyframes rot {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes modalIn {
-  from { opacity: 0; transform: translate(-50%, -46%) scale(0.96); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .rev {
@@ -111,11 +149,18 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+
+  *,
+  *::before,
+  *::after {
     animation: none !important;
     transition: none !important;
   }
-  .rev { opacity: 1 !important; transform: none !important; }
+
+  .rev {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 
 /* ── 03. Custom Scrollbars ────────────────────────────────────────────────── */
@@ -250,10 +295,29 @@ body.icons-fallback .msi {
   flex-shrink: 0;
 }
 
-.ic-tile.cyan { background: rgba(56, 189, 248, 0.1); color: var(--acc); border-color: rgba(56, 189, 248, 0.25); }
-.ic-tile.gold { background: rgba(245, 158, 11, 0.1); color: var(--me); border-color: rgba(245, 158, 11, 0.25); }
-.ic-tile.green { background: rgba(16, 185, 129, 0.1); color: var(--up); border-color: rgba(16, 185, 129, 0.25); }
-.ic-tile.red { background: rgba(244, 63, 94, 0.1); color: var(--down); border-color: rgba(244, 63, 94, 0.25); }
+.ic-tile.cyan {
+  background: rgba(56, 189, 248, 0.1);
+  color: var(--acc);
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.ic-tile.gold {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--me);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.ic-tile.green {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--up);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.ic-tile.red {
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--down);
+  border-color: rgba(244, 63, 94, 0.25);
+}
 
 .sect-lbl {
   font-size: 11px;
@@ -375,10 +439,21 @@ body.icons-fallback .msi {
   font-variant-numeric: tabular-nums;
 }
 
-.tile .val.gold { color: var(--me); }
-.tile .val.cyan { color: var(--acc); }
-.tile .val.green { color: var(--up); }
-.tile .val.red { color: var(--down); }
+.tile .val.gold {
+  color: var(--me);
+}
+
+.tile .val.cyan {
+  color: var(--acc);
+}
+
+.tile .val.green {
+  color: var(--up);
+}
+
+.tile .val.red {
+  color: var(--down);
+}
 
 .tile .foot {
   display: flex;
@@ -441,6 +516,7 @@ body.icons-fallback .msi {
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(255, 255, 255, 0.15);
 }
+
 .chip-acc,
 .chip-cyan {
   background: rgba(56, 189, 248, 0.1);
@@ -495,11 +571,35 @@ body.icons-fallback .msi {
   font-variant-numeric: tabular-nums;
 }
 
-.bdg-gd { background: rgba(245, 158, 11, 0.1); color: var(--me); border: 1px solid rgba(245, 158, 11, 0.25); }
-.bdg-pr { background: rgba(56, 189, 248, 0.1); color: var(--acc); border: 1px solid rgba(56, 189, 248, 0.25); }
-.bdg-gr { background: rgba(16, 185, 129, 0.1); color: var(--up); border: 1px solid rgba(16, 185, 129, 0.25); }
-.bdg-rd { background: rgba(244, 63, 94, 0.1); color: var(--down); border: 1px solid rgba(244, 63, 94, 0.25); }
-.bdg-dim { background: var(--bg-3); color: var(--t3); border: 1px solid var(--line-1); }
+.bdg-gd {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--me);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.bdg-pr {
+  background: rgba(56, 189, 248, 0.1);
+  color: var(--acc);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.bdg-gr {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--up);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.bdg-rd {
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--down);
+  border: 1px solid rgba(244, 63, 94, 0.25);
+}
+
+.bdg-dim {
+  background: var(--bg-3);
+  color: var(--t3);
+  border: 1px solid var(--line-1);
+}
 
 /* Buttons & Interactive Micro-states */
 .btn {
@@ -532,10 +632,10 @@ body.icons-fallback .msi {
   transform: translateY(1px) scale(0.97) !important;
 }
 
-.btn:disabled { 
-  opacity: 0.45; 
-  cursor: not-allowed; 
-  transform: none !important; 
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
 .btn-acc {
@@ -627,7 +727,8 @@ body.icons-fallback .msi {
   transition: border-color var(--d-1) var(--e-out), color var(--d-1) var(--e-out);
 }
 
-.sel:hover, .sel:focus {
+.sel:hover,
+.sel:focus {
   border-color: var(--acc);
   color: var(--t1);
 }
@@ -735,7 +836,8 @@ body.icons-fallback .msi {
 /* Toast */
 #toast {
   position: fixed;
-  bottom: 52px; /* Clears fixed status footer */
+  bottom: 52px;
+  /* Clears fixed status footer */
   left: 50%;
   transform: translateX(-50%) translateY(16px);
   background: rgba(18, 26, 34, 0.95);
@@ -758,8 +860,15 @@ body.icons-fallback .msi {
   transform: translateX(-50%) translateY(0);
 }
 
-#toast.s { border-color: rgba(61, 220, 151, 0.4); color: var(--up); }
-#toast.e { border-color: rgba(255, 107, 107, 0.4); color: var(--down); }
+#toast.s {
+  border-color: rgba(61, 220, 151, 0.4);
+  color: var(--up);
+}
+
+#toast.e {
+  border-color: rgba(255, 107, 107, 0.4);
+  color: var(--down);
+}
 
 /* ── 07. Shell: Top Nav Bar & Utility Cluster ─────────────────────────────── */
 .topnav {
@@ -1294,6 +1403,7 @@ body.density-compact .pipeline-card {
   .m-nav {
     display: grid;
   }
+
   .nav-links,
   .status-footer,
   .dash-spy-rail,
@@ -1303,29 +1413,37 @@ body.density-compact .pipeline-card {
   .compare-tray-label {
     display: none !important;
   }
+
   .topnav-inner {
     padding: 0 14px;
     height: 50px;
   }
+
   .nav-brand {
     font-size: 17px;
   }
+
   .nav-utility-cluster {
     gap: 4px;
   }
+
   .icon-btn {
     width: 32px;
     height: 32px;
   }
+
   body {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
   }
+
   #toast {
     bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
   }
+
   .main {
     padding: 14px 12px calc(64px + env(safe-area-inset-bottom, 0px));
   }
+
   #dashMain {
     padding-bottom: 20px;
   }
@@ -1333,6 +1451,7 @@ body.density-compact .pipeline-card {
 
 /* Touch Ergonomics on Coarse Pointers */
 @media (pointer: coarse) {
+
   .btn,
   .icon-btn,
   .chip-btn,
@@ -1342,10 +1461,12 @@ body.density-compact .pipeline-card {
   .m-nav-item {
     min-height: 40px;
   }
+
   .icon-btn {
     min-width: 36px;
     min-height: 36px;
   }
+
   .tile:hover,
   .card:hover,
   .rrow:hover,

@@ -411,9 +411,9 @@ function renderVoidMinerResultsHtml() {
       <!-- Results Grid -->
       <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:12px">
         ${_voidMinerResults.map(item => {
-          const isVoid = item.is_void;
-          const simPct = Math.round((item.overlap || 0) * 100);
-          return `
+    const isVoid = item.is_void;
+    const simPct = Math.round((item.overlap || 0) * 100);
+    return `
             <div class="card" style="padding:14px;background:var(--bg-3);border:1.5px solid ${isVoid ? 'rgba(0, 229, 255, 0.35)' : 'var(--line-1)'};border-radius:var(--r-m);display:flex;flex-direction:column;justify-content:space-between;box-shadow:${isVoid ? '0 0 16px rgba(0, 229, 255, 0.08)' : 'none'}">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -447,7 +447,7 @@ function renderVoidMinerResultsHtml() {
                 </button>
               </div>
             </div>`;
-        }).join('')}
+  }).join('')}
       </div>
     </div>`;
 }
@@ -596,11 +596,11 @@ function renderAiSynthResultsBodyHtml() {
   return `
     <div style="display:flex;flex-direction:column;gap:16px">
       ${_aiSynthState.results.map((item, idx) => {
-        const sc = scoreTitle(item.title);
-        const score = Math.max(item.estimated_score || 85, sc.score);
-        const st = scoreTone(score);
-        const thumb = item.thumbnail_concept || {};
-        return `
+    const sc = scoreTitle(item.title);
+    const score = Math.max(item.estimated_score || 85, sc.score);
+    const st = scoreTone(score);
+    const thumb = item.thumbnail_concept || {};
+    return `
           <div class="card" style="padding:16px;background:var(--bg-3);border:1px solid var(--line-2);border-radius:var(--r-m);display:flex;flex-direction:column;gap:12px;box-shadow:var(--sh-1)">
             <!-- Top Bar: Archetype and Score -->
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -653,7 +653,7 @@ function renderAiSynthResultsBodyHtml() {
               </div>
             </div>
           </div>`;
-      }).join('')}
+  }).join('')}
     </div>`;
 }
 
@@ -778,12 +778,12 @@ function renderStudioLabHtml() {
         <!-- Idea Grid -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:14px">
           ${filteredIdeas.map(idea => {
-            const st = scoreTone(idea.score);
-            const ringRadius = 11;
-            const ringCircum = 2 * Math.PI * ringRadius;
-            const ringDash = (idea.score / 100) * ringCircum;
-            const formulaIcon = idea.formula.includes('Collision') ? 'bolt' : idea.formula.includes('Moat') ? 'shield' : idea.formula.includes('Gap') ? 'radar' : idea.formula.includes('Breakout') ? 'trending_up' : 'lightbulb';
-            return `
+    const st = scoreTone(idea.score);
+    const ringRadius = 11;
+    const ringCircum = 2 * Math.PI * ringRadius;
+    const ringDash = (idea.score / 100) * ringCircum;
+    const formulaIcon = idea.formula.includes('Collision') ? 'bolt' : idea.formula.includes('Moat') ? 'shield' : idea.formula.includes('Gap') ? 'radar' : idea.formula.includes('Breakout') ? 'trending_up' : 'lightbulb';
+    return `
             <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m);padding:14px;display:flex;flex-direction:column;justify-content:space-between;transition:border-color var(--d-1)" onmouseenter="this.style.borderColor='var(--line-2)'" onmouseleave="this.style.borderColor='var(--line-1)'">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -816,7 +816,7 @@ function renderStudioLabHtml() {
                 </button>
               </div>
             </div>`;
-          }).join('')}
+  }).join('')}
         </div>
       </div>
 
