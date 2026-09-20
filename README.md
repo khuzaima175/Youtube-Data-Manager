@@ -1,10 +1,10 @@
 # ⚡ YT Tracker — YouTube Competitive Intelligence & Growth Studio
 
-A production-grade, full-spectrum competitive intelligence platform and creator workflow suite for YouTube creators. Built with a high-performance **Flask & Modular Vanilla JS** architecture, cloud PostgreSQL persistence via **Supabase**, and zero unnecessary YouTube Data API quota overhead.
+A production-grade, full-spectrum competitive intelligence platform and creator workflow suite for YouTube creators. Built with a sleek obsidian SaaS aesthetic (inspired by Linear & Vercel), a high-performance **Flask & Modular Vanilla JS** architecture, cloud PostgreSQL persistence via **Supabase**, and zero unnecessary YouTube Data API quota overhead.
 
 ---
 
-## 🌟 Platform Highlights (Phases 1–14.1)
+## 🌟 Platform Highlights
 
 ### 1. 📊 Executive Command Center (Dashboard)
 - **Primary Channel Hero Bento** — Real-time subscriber counters, 30-day velocity sparklines, next subscriber milestone progress rings, and engagement rate telemetry.
@@ -26,7 +26,12 @@ A production-grade, full-spectrum competitive intelligence platform and creator 
 
 ### 3. 🛰️ Topic Radar, Timing Intelligence & Competitive Forensics
 - **NLP N-Gram Topic Extraction** — Automated multi-word topic clustering and alias normalization running 100% client-side.
-- **Surge Velocity & Heat Matrix** — Visual heatmap identifying trending topics with momentum spikes ($>1.3\times$) with sticky topic label columns on mobile.
+- **Responsive Heat Matrix** — Mobile-contained horizontal swipe heatmap (`.topic-matrix-scroll-container`) with sticky topic column, compact channel metrics, and subtle alpha gradient shading.
+- **2×2 Supply vs. Demand Saturation Grid** — Actionable opportunity classification:
+  - 🟢 **High Opportunity** (High Demand · Low Supply)
+  - 🟠 **High Competition** (High Demand · High Supply)
+  - 🔵 **Emerging Trends** (Growing Demand · Low Supply)
+  - ⚪ **Low Traction** (Low Demand · Saturated)
 - **⏰ Timing Intelligence Engine** — 7×12 publication velocity grid and day-level strips with timezone forensics to pinpoint optimal release windows.
 - **Topic Defensive Moats** — Identifies niches where your channel holds $>60\%$ video share.
 - **Untapped Competitor Gaps** — Pinpoints high-traffic topics that competitors are dominating while your channel has 0 uploads.
@@ -36,7 +41,7 @@ A production-grade, full-spectrum competitive intelligence platform and creator 
 
 ---
 
-### 4. 📱 Mobile Responsive Architecture & Touch Ergonomics (Phase 14 & 14.1)
+### 4. 📱 Mobile Responsive Architecture & Touch Ergonomics
 - **Thumb-Friendly Bottom Navigation Bar (`.m-nav`)** — 4 primary destinations (Dashboard, Channels, Studio, Search) with native safe-area insets (`env(safe-area-inset-bottom)`).
 - **Universal Horizontal Containment & `100dvh`** — Zero sideways panning, dynamic viewport units, and safe browser address bar clearance.
 - **Deep-Dive Mobile Overhaul** — 2-row condensed header, horizontal tab strip with edge-fade gradient mask and auto-centering (`inline: 'center'`), and 1-column bento reflow with stacked full-width About & Health cards.
@@ -73,7 +78,7 @@ A production-grade, full-spectrum competitive intelligence platform and creator 
 
 ---
 
-### 7. 🏆 Achievements & Dopamine Loops
+### 7. 🏆 Achievements & Gamification
 - **12 Milestones with XP & Level Progression** — Track milestones like *Velocity Vanguard*, *Giant Slayer*, *Upload Machine*, *Evergreen Master*, *Radar Commander*, *Moat Defender*, and *Niche Dominator*.
 - **Level & XP Progress Bar** — Dynamic leveling system (`Level 3 Creator • 650 / 1000 XP`).
 - **Celebration Banners** — Animated celebratory toast notification on milestone unlocks.
@@ -85,7 +90,6 @@ A production-grade, full-spectrum competitive intelligence platform and creator 
 - **Bi-Directional State Serialization** — Every view, channel inspection, deep-dive tab, compare set, and report filter synchronizes seamlessly to the URL hash (`#view=...&dd=...&tab=...&compare=...`).
 - **1-Click Share Link** — Instantly copies direct URLs that restore the exact state on any machine.
 - **Command Palette (`Ctrl + K` / `Cmd + K`)** — Quick search across channels, pages, actions, and reports.
-- **Section Scroll-Spy Rail** — Floating right-edge wayfinding rail with closest-midpoint tracking.
 - **Spotlight Onboarding Tour** — 6-step interactive walkthrough for first-time onboarding with safe viewport clamping.
 - **🔔 Bell Inbox & Morning Brief** — Unread badge and notification drawer for threat alerts, gap opportunities, and 1-click Markdown morning briefing export.
 
@@ -116,8 +120,8 @@ Youtube-Data-Manager/
 │   ├── app.js                  # Modular architecture stub
 │   │
 │   ├── css/                    # Modular Style System (7 Files)
-│   │   ├── variables.css       # Design tokens, themes & color palettes
-│   │   ├── base.css            # Reset, containment, buttons, badges, topbar & bottom nav
+│   │   ├── variables.css       # Obsidian dark tokens, SaaS color palette & typography
+│   │   ├── base.css            # Reset, button micro-lifts, badges, topbar & bottom nav
 │   │   ├── dashboard.css       # Hero, You vs Field, Leaderboard cards, Race, Radar, Timing
 │   │   ├── deep-dive.css       # Channel forensics inspector, Bento cards, Video table, Tabs
 │   │   ├── studio.css          # Title Lab, Idea generator, Swipe-snap Kanban board
@@ -125,9 +129,9 @@ Youtube-Data-Manager/
 │   │   └── print.css           # @media print rules for PDF report dossiers
 │   │
 │   └── js/                     # Modular JavaScript Engine (11 Modules)
-│       ├── state.js            # Global state, constants, formatters & AnimKit
+│       ├── state.js            # Global state, constants, SaaS cohorts, scroll-reveal AnimKit
 │       ├── api.js              # API communication, enrichment & sync queue
-│       ├── nlp-topics.js       # Topic intelligence, radar, threats & moats
+│       ├── nlp-topics.js       # Topic intelligence, heat matrix, 2x2 grid, threats & moats
 │       ├── timing.js           # Publication timing heatmap, slot recommender & timezone engine
 │       ├── dashboard.js        # Dashboard, Leaderboard cards, Race & Velocity charts
 │       ├── channels.js         # Channels grid, sorting & search autocomplete
@@ -146,10 +150,10 @@ Youtube-Data-Manager/
 
 - **Backend**: Python 3.8+ / Flask / Gunicorn
 - **Database & Snapshots**: Supabase (PostgreSQL) via `supabase-py` SDK
-- **Frontend Architecture**: Vanilla HTML5, Modular CSS3 (Tokens & Glassmorphism), Modular ES6+ JavaScript
+- **Frontend Architecture**: Vanilla HTML5, Modular CSS3 (Obsidian Dark Tokens & Glassmorphism), Modular ES6+ JavaScript
 - **API**: YouTube Data API v3 (`google-api-python-client`) with thread-local client pooling and zero-quota client caching
 - **Desktop Companion**: Python Tkinter / Pillow (PIL)
-- **Typography & Icons**: Syne, DM Sans, JetBrains Mono, Google Material Symbols
+- **Typography & Icons**: Inter, DM Sans, JetBrains Mono, Google Material Symbols
 
 ---
 
