@@ -74,9 +74,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 .mcs-meta {
   font-size: 11px;
