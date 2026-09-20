@@ -553,6 +553,28 @@ function renderTopicRadar() {
       .sort((a, b) => (b.subscribers_raw || 0) - (a.subscribers_raw || 0))
       .slice(0, 8);
 
+    function hexToRgba(color, alpha) {
+      if (!color) return `rgba(56, 189, 248, ${alpha})`;
+      if (color.startsWith('hsl(')) {
+        return color.replace('hsl(', 'hsla(').replace(')', `,${alpha})`);
+      }
+      if (color.startsWith('rgb(')) {
+        return color.replace('rgb(', 'rgba(').replace(')', `,${alpha})`);
+      }
+      if (color.startsWith('#')) {
+        let c = color.substring(1);
+        if (c.length === 3) c = c.split('').map(x => x + x).join('');
+        if (c.length === 6) {
+          const num = parseInt(c, 16);
+          const r = (num >> 16) & 255;
+          const g = (num >> 8) & 255;
+          const b = num & 255;
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+      }
+      return color;
+    }
+
     const matrixHeaderHtml = `<tr>
       <th class="matrix-topic-col">Topic</th>
       ${matrixChannels.map(ch => {
@@ -580,12 +602,12 @@ function renderTopicRadar() {
           </td>`;
         }
         const col = colorOf(ch);
-        const opacity = 0.12 + (chStat.avgViews / globalMaxAvg) * 0.78;
-        const bgStyle = col.startsWith('hsl(')
-          ? col.replace('hsl(', 'hsla(').replace(')', `,${opacity.toFixed(2)})`)
-          : col;
+        const intensity = Math.min(1, chStat.avgViews / globalMaxAvg);
+        const opacity = (0.10 + intensity * 0.48).toFixed(2);
+        const bgStyle = hexToRgba(col, opacity);
+        const borderStyle = hexToRgba(col, (0.20 + intensity * 0.35).toFixed(2));
         return `<td class="matrix-cell ${ch.is_primary ? 'matrix-me-cell' : ''}"
-          style="background:${bgStyle}"
+          style="background:${bgStyle}; border-color:${borderStyle};"
           onclick="showTopicCellPopover(event,'${esc(ch.id)}','${esc(t.topic)}')"
           title="${esc(ch.name)} · ${chStat.n} vid${chStat.n !== 1 ? 's' : ''} · avg ${fmtN(chStat.avgViews)}">
           <span class="matrix-cell-val">${fmtN(chStat.avgViews)}</span>
@@ -608,8 +630,11 @@ function renderTopicRadar() {
           <div class="topic-chips-row">${gapChips}${moatChips}</div>` : ''}
         </div>
         <div class="topic-matrix-col">
-          <div class="topic-section-label">HEAT MATRIX · WHO OWNS WHAT TOPIC</div>
-          <div style="overflow-x:auto">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+            <div class="topic-section-label" style="margin-bottom:0">HEAT MATRIX · WHO OWNS WHAT TOPIC</div>
+            <span class="topic-matrix-scroll-hint">← Swipe channels →</span>
+          </div>
+          <div class="topic-matrix-scroll-container">
             <table class="topic-matrix">
               <thead>${matrixHeaderHtml}</thead>
               <tbody>${matrixRowsHtml}</tbody>
@@ -764,7 +789,7 @@ function showTopicCellPopover(event, chId, topic) {
     }).join('');
 
   const rect = event.currentTarget?.getBoundingClientRect() || { left: event.clientX, bottom: event.clientY };
-  popover.style.left = Math.min(rect.left, window.innerWidth - 290) + window.scrollX + 'px';
+  popover.style.left = Math.max(12, Math.min(rect.left, window.innerWidth - 290)) + window.scrollX + 'px';
   popover.style.top = (rect.bottom + window.scrollY + 6) + 'px';
   popover.classList.add('open');
 }

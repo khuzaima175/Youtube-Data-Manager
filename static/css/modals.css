@@ -292,36 +292,22 @@
 
   /* Topic Radar & Heat Matrix */
   .topic-radar-body {
-    grid-template-columns: 1fr !important;
-    gap: 16px;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0;
+    min-width: 0;
+    width: 100%;
   }
   .topic-hot-col {
     border-right: none !important;
     border-bottom: 1px solid var(--line-1);
     padding-bottom: 16px;
+    min-width: 0;
   }
   .topic-matrix-col {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
     width: 100%;
-  }
-  .topic-matrix {
-    min-width: 480px;
-    width: 100%;
-  }
-  .matrix-topic-label {
-    position: sticky;
-    left: 0;
-    background: var(--bg-2);
-    z-index: 2;
-    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.3);
-  }
-  .matrix-topic-col {
-    position: sticky;
-    left: 0;
-    background: var(--bg-2);
-    z-index: 3;
-    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.3);
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   /* 6-Month Upload Velocity Chart */
