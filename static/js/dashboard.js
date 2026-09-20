@@ -167,14 +167,14 @@ async function renderDash() {
 
   // 1. My Channel Strip (Hero v3: 3-Column Architecture)
   const stripHtml = `
-    <div id="sec-hero" class="my-channel-strip rev in">
+    <div id="sec-hero" class="my-channel-strip rev">
       <!-- Left Column: Identity -->
       <div class="mcs-identity" onclick="openDeepDive('${esc(primary.id)}')">
         ${primary.logo_url
       ? `<img class="mcs-logo" src="${esc(proxyImg(primary.logo_url))}" alt="">`
       : `<div class="mcs-logo-fb">${(primary.name || '?')[0].toUpperCase()}</div>`}
         <div class="mcs-info">
-          <div class="mcs-name">${esc(primary.name)} <span class="badge bdg-gd">⭐ Mine</span></div>
+          <div class="mcs-name">${esc(primary.name)} <span class="badge bdg-gd">Primary Channel</span></div>
           <div class="mcs-meta">
             ${primary.handle ? `<span>${esc(primary.handle)}</span>` : ''}
             ${primary.country ? `<span>• ${esc(primary.country)}</span>` : ''}
@@ -253,7 +253,7 @@ async function renderDash() {
   const medAvg = sortedAvg[Math.floor(all.length / 2)]?.avg_views || '—';
 
   const yvfHtml = `
-    <div id="sec-yvf" class="you-vs-field rev in" style="--i:1">
+    <div id="sec-yvf" class="you-vs-field rev" style="--i:1">
       <div class="yvf-hdr">
         <div class="yvf-title">
           <span class="ic-tile cyan"><span class="msi" style="font-size:15px">compare_arrows</span></span>
@@ -304,7 +304,7 @@ async function renderDash() {
 
   // 3. Full-Width Leaderboard Table & Mobile Cards
   const lbHtml = `
-    <div id="sec-lb" class="lb-wrap rev in" style="--i:2">
+    <div id="sec-lb" class="lb-wrap rev" style="--i:2">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
         <div class="sect-lbl" style="margin:0">
           <span class="msi">leaderboard</span> Full Leaderboard (${all.length} channels)
@@ -365,17 +365,17 @@ async function renderDash() {
     </div>`;
 
   // 4. Latest Drops Race Window (replaces Face-off)
-  const raceHtml = `<div id="sec-drops" class="rev in" style="--i:3"><div id="dashRaceWindow"></div></div>`;
+  const raceHtml = `<div id="sec-drops" class="rev" style="--i:3"><div id="dashRaceWindow"></div></div>`;
 
   // 4b. Topic Radar (under Drops)
-  const radarHtml = `<div id="sec-radar" class="rev in" style="--i:4"><div id="dashTopicRadar"></div></div>`;
+  const radarHtml = `<div id="sec-radar" class="rev" style="--i:4"><div id="dashTopicRadar"></div></div>`;
 
   // 4c. Velocity Acceleration Radar (P5)
   const accelHtml = renderAccelerationRadar();
 
   // 5. Velocity Card (now full-width, separate from face-off)
   const velHtml = `
-    <div id="sec-vel" class="vel-card rev in" style="margin-top:var(--s5);--i:5">
+    <div id="sec-vel" class="vel-card rev" style="margin-top:var(--s5);--i:5">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div class="sect-lbl" style="margin:0">
           <span class="msi">bar_chart</span> 6-Month Upload Velocity
@@ -393,7 +393,7 @@ async function renderDash() {
 
   // 6. Recent Uploads Rail
   const recentHtml = `
-    <div id="sec-recent" class="card rev in" style="margin-top:var(--s5);--i:5">
+    <div id="sec-recent" class="card rev" style="margin-top:var(--s5);--i:6">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div class="sect-lbl" style="margin:0">
           <span class="msi">play_circle</span> Your Recent Uploads
@@ -415,21 +415,7 @@ async function renderDash() {
       </div>
     </div>`;
 
-  // 7. Right-Edge Floating Scroll-Spy Rail
-  const spyRailHtml = `
-    <div class="dash-spy-rail" id="dashSpyRail">
-      <div class="dash-spy-item on" data-sec="sec-hero" onclick="scrollToSection('sec-hero')" title="My Channel"><span class="spy-dot"></span><span class="spy-label">Channel</span></div>
-      <div class="dash-spy-item" data-sec="sec-yvf" onclick="scrollToSection('sec-yvf')" title="You vs Field"><span class="spy-dot"></span><span class="spy-label">Field</span></div>
-      <div class="dash-spy-item" data-sec="sec-drops" onclick="scrollToSection('sec-drops')" title="Latest Drops"><span class="spy-dot"></span><span class="spy-label">Drops</span></div>
-      <div class="dash-spy-item" data-sec="sec-radar" onclick="scrollToSection('sec-radar')" title="Topic Radar"><span class="spy-dot"></span><span class="spy-label">Radar</span></div>
-      <div class="dash-spy-item" data-sec="sec-accel" onclick="scrollToSection('sec-accel')" title="Acceleration"><span class="spy-dot"></span><span class="spy-label">Accel</span></div>
-      <div class="dash-spy-item" data-sec="sec-lb" onclick="scrollToSection('sec-lb')" title="Leaderboard"><span class="spy-dot"></span><span class="spy-label">Board</span></div>
-      <div class="dash-spy-item" data-sec="sec-vel" onclick="scrollToSection('sec-vel')" title="Velocity"><span class="spy-dot"></span><span class="spy-label">Velocity</span></div>
-      <div class="dash-spy-item" data-sec="sec-timing" onclick="scrollToSection('sec-timing')" title="Timing Intelligence"><span class="spy-dot"></span><span class="spy-label">Timing</span></div>
-      <div class="dash-spy-item" data-sec="sec-recent" onclick="scrollToSection('sec-recent')" title="Recent Uploads"><span class="spy-dot"></span><span class="spy-label">Recent</span></div>
-    </div>`;
-
-  el.innerHTML = stripHtml + yvfHtml + raceHtml + radarHtml + accelHtml + lbHtml + velHtml + timingHtml + recentHtml + spyRailHtml;
+  el.innerHTML = stripHtml + yvfHtml + raceHtml + radarHtml + accelHtml + lbHtml + velHtml + timingHtml + recentHtml;
 
   document.querySelectorAll('.count-val').forEach(valEl => {
     countUp(valEl, valEl.dataset.val);
@@ -447,13 +433,12 @@ async function renderDash() {
   attachTimingTooltips(el);
   loadDashboardRecentUploads(primary.id);
   setupScrollReveal();
-  setupDashScrollSpy();
 }
 
 /* ── 04c. Velocity Acceleration Radar Implementation (P5) ─────────────────── */
 function renderAccelerationRadar() {
   return `
-    <div id="sec-accel" class="card rev in" style="margin-top:var(--s5);padding:20px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
+    <div id="sec-accel" class="card rev" style="margin-top:var(--s5);padding:24px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:10px">
           <span class="ic-tile cyan"><span class="msi" style="font-size:18px">rocket_launch</span></span>

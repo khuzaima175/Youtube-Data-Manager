@@ -22,7 +22,7 @@
   position: sticky;
   top: 0;
   z-index: 70;
-  background: rgba(8, 12, 16, 0.94);
+  background: rgba(16, 18, 24, 0.95);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--line-1);
@@ -431,19 +431,22 @@
 
 .rrow:hover {
   background: var(--bg-hover);
+  border-color: var(--line-2);
+  transform: translateX(3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 .rrow.me {
   border-left: 3px solid var(--me);
-  background: rgba(245, 197, 66, 0.02);
+  background: rgba(245, 158, 11, 0.04);
 }
 
 .rrow.me:hover {
-  background: rgba(245, 197, 66, 0.05);
+  background: rgba(245, 158, 11, 0.08);
 }
 
 .rrow.open {
-  background: rgba(34, 211, 238, 0.03);
+  background: rgba(56, 189, 248, 0.04);
 }
 
 /* Race Row Cells */

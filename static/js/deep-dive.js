@@ -143,7 +143,7 @@ async function renderDDOverview(ch) {
   const col = colorOf(ch);
 
   panel.innerHTML = `
-    <div class="dd-overview-bento rev in">
+    <div class="dd-overview-bento rev">
       <!-- LEFT column -->
       <div class="dd-overview-left">
         <!-- KPI strip -->
@@ -403,7 +403,7 @@ async function renderDDVideos(ch) {
     </div>` : '';
 
   panel.innerHTML = `
-    <div class="card rev in">
+    <div class="card rev">
       <div class="dd-vid-filter-bar">
         <div class="dd-vid-filter-top">
           <div class="vid-seg" id="ddVidFormatSeg">
@@ -502,7 +502,7 @@ function renderDDVideoRows(vids, formatFilter, sortPreset, page, col, chId) {
     const copycat = isRival ? detectCopycatsForVideo(v, myTopVids) : null;
 
     return `
-      <div class="dd-vrow rev in" style="--i:${i % 10}" onclick="window.open('${esc(v.url)}','_blank')">
+      <div class="dd-vrow rev" style="--i:${i % 10}" onclick="window.open('${esc(v.url)}','_blank')">
         <span class="dd-vrow-rank">#${i + 1}</span>
         <div class="dd-vrow-thumb-wrap">
           <img class="dd-vrow-thumb" src="${esc(v.thumb || '')}" alt="" onerror="this.style.opacity='.3'">
@@ -579,7 +579,7 @@ function ddLoadMore(chId, col) {
     const copycat = isRival ? detectCopycatsForVideo(v, myTopVids) : null;
 
     return `
-      <div class="dd-vrow rev in" style="--i:${ii}" onclick="window.open('${esc(v.url)}','_blank')">
+      <div class="dd-vrow rev" style="--i:${ii}" onclick="window.open('${esc(v.url)}','_blank')">
         <span class="dd-vrow-rank">#${i + 1}</span>
         <div class="dd-vrow-thumb-wrap">
           <img class="dd-vrow-thumb" src="${esc(v.thumb || '')}" alt="" onerror="this.style.opacity='.3'">
@@ -647,7 +647,7 @@ async function renderDDGrowth(ch) {
        </div>`;
 
   panel.innerHTML = `
-    <div class="rev in" style="display:flex;flex-direction:column;gap:18px">
+    <div class="rev" style="display:flex;flex-direction:column;gap:18px">
       <div class="card">
         <div class="sect-lbl" style="margin:0 0 10px 0">
           <span class="msi">trending_up</span> Historical Growth Timeline (${snaps.length} snapshots)
@@ -808,7 +808,7 @@ function renderDDCompare(focusedCh) {
   }).join('');
 
   panel.innerHTML = `
-    <div class="card rev in">
+    <div class="card rev">
       <div class="sect-lbl" style="margin:0 0 10px 0">
         <span class="msi">table_chart</span> Full Comparison Matrix (${sorted.length} channels)
       </div>

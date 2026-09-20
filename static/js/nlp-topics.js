@@ -625,25 +625,25 @@ function renderTopicRadar() {
     const saturatedTopics = sortedTopics.filter(t => t.quadrant === 'saturated');
 
     function renderQuadrantList(list, isBlue = false) {
-      if (!list.length) return `<div style="font-size:11px;color:var(--t3);padding:10px 0">No topics in this quadrant.</div>`;
+      if (!list.length) return `<div style="font-size:11px;color:var(--t3);padding:10px 0">No topics in this category.</div>`;
       return list.slice(0, 6).map(t => `
         <div class="sat-topic-item ${isBlue ? 'sat-item-blue' : ''}" onclick="filterRaceByTopic('${esc(t.topic)}')" title="Click to filter drops">
           <div style="min-width:0;flex:1">
             <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:12px;font-weight:700;color:var(--t1)">${esc(t.topic)}</span>
-              ${isBlue ? '<span class="badge bdg-gr" style="font-size:9px">⭐ Prime</span>' : ''}
+              <span style="font-size:12px;font-weight:600;color:var(--t1)">${esc(t.topic)}</span>
+              ${isBlue ? '<span class="badge bdg-gr" style="font-size:9px">Top Pick</span>' : ''}
             </div>
-            <div style="font-size:10px;color:var(--t3);display:flex;gap:6px;margin-top:2px">
-              <span>⚡ ${t.shrunkenRpi.toFixed(2)}× RPI</span>
+            <div style="font-size:10.5px;color:var(--t3);display:flex;gap:6px;margin-top:2px">
+              <span>${t.shrunkenRpi.toFixed(2)}× RPI</span>
               <span>•</span>
-              <span>📦 ${t.supply14d} in 14d</span>
+              <span>${t.supply14d} drops/14d</span>
               <span>•</span>
-              <span>🌊 Score: ${t.blueOceanScore}</span>
+              <span>Score: ${t.blueOceanScore}</span>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:4px">
-            <button class="icon-btn" style="width:24px;height:24px" onclick="event.stopPropagation();openAiTitleSynthesizer('${esc(t.topic)}')" title="Synthesize AI Titles">
-              <span class="msi" style="font-size:13px;color:var(--acc)">auto_awesome</span>
+            <button class="icon-btn" style="width:24px;height:24px" onclick="event.stopPropagation();openAiTitleSynthesizer('${esc(t.topic)}')" title="Generate Title Ideas">
+              <span class="msi" style="font-size:13px;color:var(--acc)">lightbulb</span>
             </button>
             <button class="icon-btn" style="width:24px;height:24px" onclick="event.stopPropagation();openTitleLabWithTopic('${esc(t.topic)}')" title="Test in Title Lab">
               <span class="msi" style="font-size:13px">science</span>
@@ -656,35 +656,35 @@ function renderTopicRadar() {
       <div class="sat-matrix-container">
         <!-- Matrix Legend Subtitle -->
         <div style="font-size:11.5px;color:var(--t3);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <span>Supply / Demand Saturation Grid: Compares 90-day demand multiplier (RPI) against 14-day competitor release saturation.</span>
-          <span class="badge bdg-dim" style="font-size:10.5px">Formula: BlueOceanScore = ShrunkenRPI / (1 + Supply₁₄d)</span>
+          <span>Supply vs Demand Matrix: 90-day audience demand multiplier (RPI) vs. 14-day competitor release saturation.</span>
+          <span class="badge bdg-dim" style="font-size:10px">Opportunity Score = RPI / (1 + Supply₁₄d)</span>
         </div>
 
         <!-- 2x2 Grid -->
         <div class="sat-2x2-grid">
-          <!-- Q1: Blue Ocean (Top Left) -->
+          <!-- Q1: High Opportunity (Top Left) -->
           <div class="sat-quadrant sat-q-blue">
             <div class="sat-q-hdr">
               <div style="display:flex;align-items:center;gap:6px">
-                <span class="msi" style="color:var(--up);font-size:17px">waves</span>
-                <span class="sat-q-title" style="color:var(--up)">🌊 BLUE OCEAN</span>
+                <span class="msi" style="color:var(--up);font-size:16px">trending_up</span>
+                <span class="sat-q-title" style="color:var(--up)">High Opportunity</span>
               </div>
               <span class="badge bdg-gr" style="font-size:9.5px">High Demand · Low Supply</span>
             </div>
-            <div class="sat-q-sub">Surging audience appetite with near-zero recent competitor uploads. Target immediately!</div>
+            <div class="sat-q-sub">Surging audience demand with low recent competitor upload volume. Strong opportunity.</div>
             <div class="sat-q-list">${renderQuadrantList(blueOceanTopics, true)}</div>
           </div>
 
-          <!-- Q2: Red Ocean (Top Right) -->
+          <!-- Q2: High Competition (Top Right) -->
           <div class="sat-quadrant sat-q-red">
             <div class="sat-q-hdr">
               <div style="display:flex;align-items:center;gap:6px">
-                <span class="msi" style="color:var(--warn);font-size:17px">whatshot</span>
-                <span class="sat-q-title" style="color:var(--warn)">🔥 RED OCEAN</span>
+                <span class="msi" style="color:var(--warn);font-size:16px">local_fire_department</span>
+                <span class="sat-q-title" style="color:var(--warn)">High Competition</span>
               </div>
               <span class="badge bdg-gd" style="font-size:9.5px">High Demand · High Supply</span>
             </div>
-            <div class="sat-q-sub">High viewer interest, but heavy competitor saturation. Requires standout contrarian packaging.</div>
+            <div class="sat-q-sub">High viewer interest but saturated with competitor releases. Requires standout packaging.</div>
             <div class="sat-q-list">${renderQuadrantList(redOceanTopics)}</div>
           </div>
 
@@ -692,12 +692,12 @@ function renderTopicRadar() {
           <div class="sat-quadrant sat-q-emerging">
             <div class="sat-q-hdr">
               <div style="display:flex;align-items:center;gap:6px">
-                <span class="msi" style="color:var(--acc);font-size:17px">spa</span>
-                <span class="sat-q-title" style="color:var(--acc)">🌱 NICHE / EMERGING</span>
+                <span class="msi" style="color:var(--acc);font-size:16px">insights</span>
+                <span class="sat-q-title" style="color:var(--acc)">Emerging Trends</span>
               </div>
               <span class="badge bdg-pr" style="font-size:9.5px">Low Demand · Low Supply</span>
             </div>
-            <div class="sat-q-sub">Untested or early-stage trends. Great for sleeper compounders and establishing first-mover moats.</div>
+            <div class="sat-q-sub">Early-stage topics with growing potential. Ideal for building early topic authority.</div>
             <div class="sat-q-list">${renderQuadrantList(emergingTopics)}</div>
           </div>
 
@@ -705,12 +705,12 @@ function renderTopicRadar() {
           <div class="sat-quadrant sat-q-saturated">
             <div class="sat-q-hdr">
               <div style="display:flex;align-items:center;gap:6px">
-                <span class="msi" style="color:var(--down);font-size:17px">warning</span>
-                <span class="sat-q-title" style="color:var(--down)">⚠️ SATURATED</span>
+                <span class="msi" style="color:var(--down);font-size:16px">pause_circle</span>
+                <span class="sat-q-title" style="color:var(--down)">Low Traction</span>
               </div>
               <span class="badge bdg-rd" style="font-size:9.5px">Low Demand · High Supply</span>
             </div>
-            <div class="sat-q-sub">Overcrowded niche with below-average relative return. Avoid unless bringing a revolutionary hook.</div>
+            <div class="sat-q-sub">Overcrowded niche with below-average viewer response. Consider alternative angles.</div>
             <div class="sat-q-list">${renderQuadrantList(saturatedTopics)}</div>
           </div>
         </div>

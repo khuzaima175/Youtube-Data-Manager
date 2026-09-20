@@ -13,7 +13,7 @@ function renderStudio() {
   buildTopicCache();
 
   el.innerHTML = `
-    <div class="rev in" style="max-width:1240px;margin:0 auto">
+    <div class="rev" style="max-width:1440px;margin:0 auto">
       <!-- Studio Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
         <div>

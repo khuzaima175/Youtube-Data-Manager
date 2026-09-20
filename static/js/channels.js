@@ -245,7 +245,7 @@ function renderSearchResult(d) {
   const vid = d.video || {};
 
   resEl.innerHTML = `
-    <div class="card rev in" style="padding:22px;gap:16px">
+    <div class="card rev" style="padding:24px;gap:16px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:14px">
           <img src="${esc(proxyImg(d.logo_url))}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--acc)" alt="">

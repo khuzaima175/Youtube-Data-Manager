@@ -188,8 +188,13 @@ function hash(str) {
   return h;
 }
 
-const hueOf = id => Math.abs(hash(id)) % 360;
-const colorOf = ch => ch.is_primary ? 'var(--me)' : `hsl(${hueOf(ch.id)} 75% 62%)`;
+const COHORT_PALETTE = ['#38bdf8', '#818cf8', '#34d399', '#f472b6', '#fb923c', '#a78bfa', '#2dd4bf'];
+const colorOf = ch => {
+  if (!ch) return '#94a3b8';
+  if (ch.is_primary) return 'var(--me)';
+  const idx = Math.abs(hash(ch.id || ch.name || '0')) % COHORT_PALETTE.length;
+  return COHORT_PALETTE[idx];
+};
 
 /* ── 02. Formatting & String Helpers ──────────────────────────────────────── */
 function fmtN(n) {
@@ -386,7 +391,10 @@ function sparkSVG(v, w = 90, h = 22, c = 'var(--acc)') {
 }
 
 function setupScrollReveal() {
-  if (!('IntersectionObserver' in window)) return;
+  if (!('IntersectionObserver' in window)) {
+    document.querySelectorAll('.rev').forEach(el => el.classList.add('in'));
+    return;
+  }
   const observer = new IntersectionObserver((entries, obs) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
@@ -394,9 +402,16 @@ function setupScrollReveal() {
         obs.unobserve(entry.target);
       }
     });
-  }, { threshold: 0.08 });
+  }, { threshold: 0.04, rootMargin: '0px 0px -30px 0px' });
 
-  document.querySelectorAll('.rev:not(.in)').forEach(el => observer.observe(el));
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.rev:not(.in)').forEach((el, i) => {
+      if (!el.style.getPropertyValue('--i')) {
+        el.style.setProperty('--i', Math.min(i, 8));
+      }
+      observer.observe(el);
+    });
+  });
 }
 
 setInterval(() => {

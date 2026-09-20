@@ -490,17 +490,17 @@ function renderDashTiming() {
   const caption = `All times in your timezone (${timingData.timezone}) — the frame your audience experiences`;
 
   return `
-    <div id="sec-timing" class="card rev in" style="margin-top:var(--s5);--i:6">
+    <div id="sec-timing" class="card rev" style="margin-top:var(--s5);--i:6">
       <div class="card-h">
         <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
           <div style="display:flex;align-items:center;gap:10px">
             <div class="ic-tile"><span class="msi" style="font-size:16px">schedule</span></div>
             <div>
               <div class="card-title" style="display:flex;align-items:center;gap:8px">
-                ⏰ Timing Intelligence
+                Timing Intelligence
                 <span class="badge bdg-dim" style="font-size:10px">${timingData.tier === 2 ? '7×12 Heatmap' : timingData.tier === 1 ? 'Day-Level Strip' : 'Needs More Data'}</span>
               </div>
-              <div class="card-meta">when to publish for max early velocity</div>
+              <div class="card-meta">Optimal hours to publish for maximum initial velocity</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
@@ -542,7 +542,7 @@ function renderDDTimingSection(ch) {
   const timingData = computeTimingData('channel', ch);
   const chTz = tzOf(ch);
   return `
-    <div class="card rev in">
+    <div class="card rev">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
         <div class="sect-lbl" style="margin:0">
           <span class="msi">schedule</span> Publishing Timing Forensics
