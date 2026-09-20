@@ -7,6 +7,8 @@ Data is persisted in Supabase (cloud Postgres).
 import os
 import re
 import time
+import json
+import math
 import urllib.request
 import threading
 from dotenv import load_dotenv
@@ -124,6 +126,36 @@ def fmt_duration(secs: int) -> str:
     if h:
         return f"{h}:{m:02d}:{s:02d}"
     return f"{m}:{s:02d}"
+
+
+def classify_is_short(duration_seconds: int, thumb_width: int = 0, thumb_height: int = 0) -> bool:
+    """
+    Classify video as YouTube Short.
+    YouTube expanded Shorts to 3 min (180s) in Oct 2024 with orientation requirement.
+    """
+    if duration_seconds is None or duration_seconds > 183:  # 180s cap + small encoding buffer
+        return False
+    if thumb_width and thumb_height:
+        return thumb_height > thumb_width  # vertical or square-leaning thumbnail
+    return duration_seconds <= 60
+
+
+def best_thumb_info(thumbnails: dict):
+    """Return (url, width, height) of highest-quality available thumbnail."""
+    for size in ("maxres", "standard", "high", "medium", "default"):
+        t = thumbnails.get(size)
+        if t and t.get("url"):
+            return t.get("url"), int(t.get("width") or 0), int(t.get("height") or 0)
+    return "", 0, 0
+
+
+def jaccard_similarity(query: str, title: str) -> float:
+    """Compute token-overlap Jaccard similarity between query and title."""
+    q_tokens = set(re.findall(r'\w+', (query or '').lower()))
+    t_tokens = set(re.findall(r'\w+', (title or '').lower()))
+    if not q_tokens or not t_tokens:
+        return 0.0
+    return len(q_tokens & t_tokens) / len(q_tokens | t_tokens)
 
 
 # ── Supabase persistence helpers ─────────────────────────────────────────────
@@ -762,6 +794,727 @@ def export_csv():
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=yt_tracker_channels.csv"}
     )
+
+
+# ── Module 0: Video Persistence Sync ──────────────────────────────────────────
+
+@app.route("/api/videos/sync", methods=["POST"])
+def sync_videos():
+    """
+    Upsert a batch of enriched videos into Supabase.
+    Zero YouTube API quota cost.
+    """
+    body = request.get_json(silent=True) or {}
+    channel_id = body.get("channel_id")
+    videos = body.get("videos", [])
+    if not channel_id or not isinstance(videos, list):
+        return api_error("channel_id and videos array required", 400)
+
+    try:
+        sb = get_sb()
+        now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        rows = []
+        for v in videos:
+            vid_id = v.get("video_id") or v.get("id")
+            if not vid_id:
+                continue
+            dur = v.get("duration_seconds")
+            if dur is None:
+                dur = v.get("duration_secs", 0)
+            tw = int(v.get("thumbnail_width") or 0)
+            th = int(v.get("thumbnail_height") or 0)
+            is_short = v.get("is_short")
+            if is_short is None:
+                is_short = classify_is_short(dur, tw, th)
+
+            published_at = v.get("published_at") or v.get("date") or now_iso
+            # Standardize date to ISO if needed
+            if len(str(published_at)) == 10:
+                published_at = f"{published_at}T00:00:00Z"
+
+            views = int(v.get("views") or v.get("views_raw") or v.get("view_count") or 0)
+            likes = int(v.get("likes") or v.get("likes_raw") or v.get("like_count") or 0)
+            comments = int(v.get("comments") or v.get("comments_raw") or v.get("comment_count") or 0)
+            thumb = v.get("thumbnail_url") or v.get("thumb") or ""
+
+            rows.append({
+                "video_id":         vid_id,
+                "channel_id":       channel_id,
+                "title":            v.get("title", ""),
+                "published_at":     published_at,
+                "duration_seconds": dur,
+                "views":            views,
+                "likes":            likes,
+                "comments":         comments,
+                "thumbnail_url":    thumb,
+                "thumbnail_width":  tw,
+                "thumbnail_height": th,
+                "is_short":         bool(is_short),
+                "last_synced_at":   now_iso
+            })
+
+        if rows:
+            # Batch upsert to Supabase
+            for i in range(0, len(rows), 50):
+                batch = rows[i:i + 50]
+                sb.table("videos").upsert(batch, on_conflict="video_id").execute()
+
+        # Invalidate baseline cache when new videos are synced
+        _baseline_cache["data"] = None
+
+        return jsonify({"synced": len(rows), "channel_id": channel_id})
+    except Exception as exc:
+        print(f"[Supabase] sync_videos error: {exc}")
+        # Return 200 with synced:0 and error note so client is never blocked
+        return jsonify({"synced": 0, "error": str(exc), "channel_id": channel_id}), 200
+
+
+# ── Module 1: Channel Baselines View ─────────────────────────────────────────
+
+_baseline_cache: dict = {"data": None, "ts": 0}
+BASELINE_CACHE_TTL = 6 * 3600  # 6 hours
+
+@app.route("/api/channel-baselines")
+def get_channel_baselines():
+    """
+    Return rolling 90-day long-form median views for all tracked channels.
+    Cached in-memory for 6 hours. Zero YouTube API quota.
+    """
+    now = time.time()
+    if _baseline_cache["data"] and (now - _baseline_cache["ts"]) < BASELINE_CACHE_TTL:
+        return jsonify(_baseline_cache["data"])
+
+    channels = load_channels()
+    result = {}
+
+    try:
+        sb = get_sb()
+        cutoff = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 90 * 86400))
+        r = sb.table("videos").select("channel_id, views, is_short, published_at").gte("published_at", cutoff).execute()
+        rows = r.data or []
+
+        by_channel: dict[str, list[int]] = {}
+        for row in rows:
+            if row.get("is_short") is True:
+                continue
+            cid = row.get("channel_id")
+            if cid:
+                by_channel.setdefault(cid, []).append(int(row.get("views") or 0))
+
+        for ch in channels:
+            cid = ch["id"]
+            views_list = by_channel.get(cid, [])
+            if len(views_list) >= 5:
+                views_list.sort()
+                mid = len(views_list) // 2
+                if len(views_list) % 2 == 1:
+                    median = views_list[mid]
+                else:
+                    median = (views_list[mid - 1] + views_list[mid]) // 2
+                result[cid] = {"median": median, "count": len(views_list)}
+            else:
+                result[cid] = {"median": None, "count": len(views_list)}
+
+        _baseline_cache["data"] = result
+        _baseline_cache["ts"] = now
+        return jsonify(result)
+    except Exception as ex:
+        print(f"[Supabase] get_channel_baselines fallback error: {ex}")
+        for ch in channels:
+            result[ch["id"]] = {"median": None, "count": 0}
+        return jsonify(result)
+
+
+# ── Module 2: Supply/Demand Saturation Recalculation ──────────────────────────
+
+@app.route("/api/recalculate-topic-metrics", methods=["POST", "GET"])
+def recalculate_topic_metrics():
+    """
+    Recalculate RPI + Saturation Matrix metrics across all videos.
+    Independent scheduled job endpoint. Zero YouTube API quota.
+    """
+    try:
+        sb = get_sb()
+        now = time.time()
+        now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        cut_14d = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 14 * 86400))
+
+        # 1. Fetch videos and baselines
+        r_vids = sb.table("videos").select("video_id, channel_id, title, views, is_short, published_at").execute()
+        videos = r_vids.data or []
+        if not videos:
+            return jsonify({"topics_processed": 0, "blue_oceans": 0, "message": "No videos found in database"})
+
+        # Get baselines
+        baselines = {}
+        by_channel = {}
+        for v in videos:
+            if v.get("is_short") is not True:
+                by_channel.setdefault(v["channel_id"], []).append(int(v.get("views") or 0))
+        for cid, vlist in by_channel.items():
+            if len(vlist) >= 5:
+                vlist.sort()
+                mid = len(vlist) // 2
+                med = vlist[mid] if len(vlist) % 2 == 1 else (vlist[mid - 1] + vlist[mid]) // 2
+                baselines[cid] = med
+
+        # Group videos by topic keywords
+        stop_words = {'how','what','why','does','do','the','a','an','to','of','in','on','for','with','and','or',
+                      'using','use','that','this','you','your','my','we','it','is','are','was','full','guide',
+                      'tutorial','vs','part','video','new','best','top','first','last','build','get','all'}
+        topic_groups = {}
+        for v in videos:
+            title = v.get("title", "").lower()
+            words = [w for w in re.findall(r'\b\w+\b', title) if len(w) > 2 and w not in stop_words]
+            tokens = set(words)
+            for i in range(len(words) - 1):
+                tokens.add(f"{words[i]} {words[i+1]}")
+
+            cid = v.get("channel_id")
+            base = baselines.get(cid)
+            v_views = int(v.get("views") or 0)
+            rpi = (v_views / base) if (base and base > 0) else 1.0
+            pub = v.get("published_at", "")
+            is_recent_14d = bool(pub and pub >= cut_14d)
+
+            for t in tokens:
+                if t not in topic_groups:
+                    topic_groups[t] = {"videos": [], "recent_14d": 0}
+                topic_groups[t]["videos"].append(rpi)
+                if is_recent_14d:
+                    topic_groups[t]["recent_14d"] += 1
+
+        topic_rows = []
+        blue_oceans_count = 0
+        for topic, info in topic_groups.items():
+            rpis = info["videos"]
+            n = len(rpis)
+            if n < 2:
+                continue
+
+            raw_mean_rpi = sum(rpis) / n
+            w = n / (n + 5.0)
+            shrunken_rpi = round(w * raw_mean_rpi + (1.0 - w) * 1.0, 2)
+            recent_14d = info["recent_14d"]
+            blue_ocean_score = round(float(shrunken_rpi) / math.log10(recent_14d + 2.0), 2)
+
+            if shrunken_rpi >= 1.5 and recent_14d <= 2:
+                saturation_label = "BLUE_OCEAN"
+                blue_oceans_count += 1
+            elif shrunken_rpi >= 1.5 and recent_14d >= 5:
+                saturation_label = "RED_OCEAN"
+            elif shrunken_rpi < 1.0 and recent_14d <= 2:
+                saturation_label = "WATCH"
+            else:
+                saturation_label = "DEAD"
+
+            topic_rows.append({
+                "topic_key":          topic,
+                "canonical_name":     topic.title(),
+                "total_videos":       n,
+                "recent_uploads_14d": recent_14d,
+                "shrunken_rpi":       shrunken_rpi,
+                "blue_ocean_score":   blue_ocean_score,
+                "saturation_label":   saturation_label,
+                "calculated_at":      now_iso
+            })
+
+        if topic_rows:
+            # Batch upsert to topic_metrics table
+            for i in range(0, len(topic_rows), 100):
+                batch = topic_rows[i:i + 100]
+                sb.table("topic_metrics").upsert(batch, on_conflict="topic_key").execute()
+
+        return jsonify({
+            "success": True,
+            "topics_processed": len(topic_rows),
+            "blue_oceans": blue_oceans_count
+        })
+    except Exception as ex:
+        print(f"[Supabase] recalculate_topic_metrics error: {ex}")
+        return jsonify({"success": False, "error": str(ex), "topics_processed": 0, "blue_oceans": 0}), 200
+
+
+# ── Module 3: Autocomplete Void Miner ─────────────────────────────────────────
+
+_void_cache: dict = {}
+VOID_CACHE_TTL = 24 * 3600  # 24 hours
+
+@app.route("/api/autocomplete-voids")
+def autocomplete_voids():
+    """
+    Mine YouTube search suggestions with depth cap <= 2 and calculate
+    Jaccard token coverage against competitor catalog. Zero YouTube API quota.
+    """
+    q = request.args.get("q", "").strip()
+    depth = min(int(request.args.get("depth", 1)), 2)
+    if not q:
+        return api_error("Seed query 'q' is required", 400)
+
+    cache_key = f"{q.lower()}_d{depth}"
+    now = time.time()
+    cached = _void_cache.get(cache_key)
+    if cached and (now - cached["ts"]) < VOID_CACHE_TTL:
+        return jsonify(cached["data"])
+
+    # 1. Scrape suggestions from suggestqueries.google.com
+    suggestions = []
+    seen = set()
+
+    def fetch_suggestions(query_str):
+        try:
+            url = f"https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q={urllib.parse.quote(query_str)}"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                raw = resp.read().decode("utf-8", errors="ignore")
+                # Format: window.google.ac.h(["query",[["sugg1",0,[...]], ...], ...])
+                match = re.search(r'\[.+\]', raw)
+                if match:
+                    parsed = json.loads(match.group(0))
+                    if len(parsed) > 1 and isinstance(parsed[1], list):
+                        for item in parsed[1]:
+                            s_text = item[0] if isinstance(item, list) and item else str(item)
+                            if s_text and s_text not in seen:
+                                seen.add(s_text)
+                                suggestions.append(s_text)
+        except Exception as e:
+            pass
+
+    fetch_suggestions(q)
+
+    # If depth == 2, expand with alphabet suffixes
+    if depth == 2:
+        for char in "abcdefghijklmnopqrstuvwxyz":
+            fetch_suggestions(f"{q} {char}")
+            time.sleep(0.04)
+
+    # 2. Cross-reference against tracked competitor titles
+    tracked_titles = []
+    try:
+        sb = get_sb()
+        r = sb.table("videos").select("title").execute()
+        tracked_titles = [row["title"] for row in (r.data or []) if row.get("title")]
+    except Exception:
+        # Fallback to in-memory cached channel video titles
+        for ch_data in _video_cache.values():
+            for v in ch_data.get("data", []):
+                if v.get("title"):
+                    tracked_titles.append(v["title"])
+
+    results = []
+    for sugg in suggestions[:50]:
+        max_sim = 0.0
+        match_count = 0
+        matched_title = ""
+        for title in tracked_titles:
+            sim = jaccard_similarity(sugg, title)
+            if sim > max_sim:
+                max_sim = sim
+                matched_title = title
+            if sim >= 0.4:
+                match_count += 1
+
+        coverage_ratio = min(1.0, match_count / 3.0)
+        void_score = round((1.0 - coverage_ratio) * 10.0, 1)
+        is_void = (match_count == 0)
+
+        results.append({
+            "query":               sugg,
+            "suggestion":          sugg,
+            "is_void":             is_void,
+            "void_score":          void_score,
+            "competitor_coverage": match_count,
+            "overlap":             round(max_sim, 2),
+            "max_similarity":      round(max_sim, 2),
+            "matched_title":       matched_title if match_count > 0 else "",
+            "level":               1
+        })
+
+    results.sort(key=lambda x: (x["is_void"], x["void_score"]), reverse=True)
+    voids = [r for r in results if r["is_void"]]
+    covered = [r for r in results if not r["is_void"]]
+
+    resp_data = {"seed": q, "voids": results, "unmet": voids, "covered": covered, "total": len(results)}
+    _void_cache[cache_key] = {"data": resp_data, "ts": now}
+    return jsonify(resp_data)
+
+
+@app.route("/api/mine-voids-batch", methods=["POST"])
+def mine_voids_batch():
+    """Auto-mine voids for top topics and persist into search_voids table."""
+    try:
+        sb = get_sb()
+        # Fetch top topics
+        r_top = sb.table("topic_metrics").select("topic_key").order("blue_ocean_score", desc=True).limit(8).execute()
+        topic_keys = [t["topic_key"] for t in (r_top.data or [])]
+        if not topic_keys:
+            topic_keys = ["ai video", "python tutorial", "workflow automation", "system design"]
+
+        mined_count = 0
+        now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        for seed in topic_keys:
+            with app.test_request_context(f"/api/autocomplete-voids?q={urllib.parse.quote(seed)}&depth=1"):
+                res = autocomplete_voids()
+                data = res.get_json() if hasattr(res, 'get_json') else {}
+                voids = data.get("unmet", data.get("voids", []))
+
+                rows = []
+                for item in voids[:6]:
+                    rows.append({
+                        "seed_keyword":        seed,
+                        "suggestion":          item.get("suggestion") or item.get("query"),
+                        "void_score":          item["void_score"],
+                        "competitor_coverage": item["competitor_coverage"],
+                        "last_seen":           now_iso,
+                        "status":              "active"
+                    })
+                if rows:
+                    sb.table("search_voids").upsert(rows, on_conflict="seed_keyword,suggestion").execute()
+                    mined_count += len(rows)
+
+        return jsonify({"success": True, "mined_voids": mined_count})
+    except Exception as ex:
+        return jsonify({"success": False, "error": str(ex)}), 500
+
+
+# ── Module 4: LLM Title Synthesizer ──────────────────────────────────────────
+
+@app.route("/api/llm/generate-titles", methods=["POST"])
+def generate_llm_titles():
+    """
+    Generate high-CTR title concepts and thumbnail concepts across 5 packaging archetypes.
+    Supports OpenAI, Gemini, Anthropic, or Groq API key, with resilient fallback.
+    """
+    body = request.get_json(silent=True) or {}
+    topics = body.get("topics", [])
+    voids = body.get("voids", [])
+    moats = body.get("moats", [])
+    topic_single = body.get("topic") or body.get("current_title")
+    archetype = body.get("archetype", "all")
+    count = min(int(body.get("count", 5)), 10)
+
+    # Primary topic to anchor
+    main_topic = "General Tech"
+    if topic_single and str(topic_single).strip():
+        main_topic = str(topic_single).strip()
+    elif voids and isinstance(voids, list) and voids[0]:
+        main_topic = voids[0].get("suggestion") or voids[0].get("query") if isinstance(voids[0], dict) else str(voids[0])
+    elif topics and isinstance(topics, list) and topics[0]:
+        main_topic = topics[0].get("topic") if isinstance(topics[0], dict) else str(topics[0])
+    elif moats and isinstance(moats, list) and moats[0]:
+        main_topic = moats[0].get("topic") if isinstance(moats[0], dict) else str(moats[0])
+
+    main_topic = main_topic.title()
+
+    # Master Archetype Meta Catalog
+    archetype_catalog = {
+        "impossible_feat": {
+            "label": "🏆 Impossible Feat",
+            "titles": [
+                f"The Impossible Engineering Behind {main_topic} (How It Works)",
+                f"Why Experts Said {main_topic} Was Physically Impossible",
+                f"How 1 Breakthrough Changed {main_topic} Forever",
+                f"The 100-Year Mystery of {main_topic} Finally Solved",
+                f"I Built a {main_topic} Setup That Breaks Normal Limits"
+            ],
+            "blueprint": {
+                "layout": "Split-screen contrast with macro cutaway",
+                "focal_element": f"Glowing neon heat-map over core {main_topic} mechanism",
+                "contrast_colors": "Deep dark slate background with neon cyan & yellow accents",
+                "text_overlay": "IMPOSSIBLE"
+            },
+            "explanation": "High curiosity gap leveraging cognitive dissonance and engineering intrigue."
+        },
+        "hidden_flaw": {
+            "label": "🚨 Hidden Flaw",
+            "titles": [
+                f"The Billion Dollar Flaw in {main_topic} Nobody Talks About",
+                f"Why You Need to Rethink {main_topic} in 2026",
+                f"The Fatal Mistake That Ruins Every {main_topic} Project",
+                f"The Dark Side of {main_topic} (What Companies Won't Tell You)",
+                f"The Secret Problem with {main_topic} You Must Avoid"
+            ],
+            "blueprint": {
+                "layout": "Warning badge callout with microscopic highlight",
+                "focal_element": f"Creator inspecting a highlighted micro-defect in {main_topic}",
+                "contrast_colors": "Matte carbon background with vibrant amber warning glow",
+                "text_overlay": "FATAL FLAW"
+            },
+            "explanation": "Loss-aversion hook warning against subtle, expensive pitfalls."
+        },
+        "head_to_head": {
+            "label": "⚔️ Head-to-Head",
+            "titles": [
+                f"{main_topic} vs The Entire Industry: The Brutal Truth",
+                f"I Tested {main_topic} Against the Market Leader (Shocking)",
+                f"{main_topic} Benchmark: Is It Actually Better or Just Hype?",
+                f"The $500 vs $5,000 {main_topic} Face-Off",
+                f"Why I Switched Everything to {main_topic}"
+            ],
+            "blueprint": {
+                "layout": "High-tension 50/50 split clash with lightning divider",
+                "focal_element": f"Side-by-side performance showdown of {main_topic}",
+                "contrast_colors": "Electric cyan left vs crimson red right",
+                "text_overlay": "VS"
+            },
+            "explanation": "Competitive polarization driving immediate click decision."
+        },
+        "zero_to_mastery": {
+            "label": "🎓 Zero-to-Mastery",
+            "titles": [
+                f"How to Master {main_topic} in 30 Days (Complete Roadmap)",
+                f"The {main_topic} Masterclass I Wish I Had as a Beginner",
+                f"10 {main_topic} Principles That Will 10x Your Results",
+                f"The Only 3 {main_topic} Techniques You Actually Need",
+                f"From Beginner to Pro: The Ultimate {main_topic} Guide"
+            ],
+            "blueprint": {
+                "layout": "Step 1 → Step 2 → Step 3 level-up roadmap chevron graphic",
+                "focal_element": f"Clean technical cheat sheet and tier-list for {main_topic}",
+                "contrast_colors": "Dark obsidian background with gold tier gradients",
+                "text_overlay": "0 TO 100"
+            },
+            "explanation": "High perceived utility and aspirational transformation hook."
+        },
+        "stress_test": {
+            "label": "💥 Stress Test",
+            "titles": [
+                f"I Tested {main_topic} for 100 Hours So You Don't Have To",
+                f"Pushing {main_topic} to the Absolute Breaking Point",
+                f"Can {main_topic} Survive Extreme Real-World Stress?",
+                f"I Replaced My Entire Workflow with {main_topic} for 7 Days",
+                f"What Happens When You Push {main_topic} Beyond Its Limits"
+            ],
+            "blueprint": {
+                "layout": "Extreme action torture test with digital timer display",
+                "focal_element": f"Stress meters or physical stress test maxed out in red",
+                "contrast_colors": "High-contrast industrial neon orange on smoke dark",
+                "text_overlay": "100 HOURS"
+            },
+            "explanation": "Extreme commitment proof hook verifying real-world durability."
+        }
+    }
+
+    # Check for external LLM API keys
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if gemini_key or openai_key:
+        system_prompt = (
+            f"You are a master YouTube strategist. Generate 5 high-CTR video title concepts for '{main_topic}' across "
+            f"archetypes (impossible_feat, hidden_flaw, head_to_head, zero_to_mastery, stress_test). "
+            f"Return ONLY valid JSON: {{\"titles\": [ {{\"title\": \"...\", \"archetype\": \"...\", \"archetype_label\": \"...\", \"explanation\": \"...\", \"thumbnail_concept\": {{\"layout\": \"...\", \"focal_element\": \"...\", \"contrast_colors\": \"...\", \"text_overlay\": \"...\"}} }} ]}}"
+        )
+        if gemini_key:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+                req_data = {
+                    "contents": [{"parts": [{"text": system_prompt}]}],
+                    "generationConfig": {"response_mime_type": "application/json"}
+                }
+                req = urllib.request.Request(url, data=json.dumps(req_data).encode("utf-8"),
+                                             headers={"Content-Type": "application/json"}, method="POST")
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    text_content = res_json["candidates"][0]["content"]["parts"][0]["text"]
+                    parsed = json.loads(text_content)
+                    if "titles" in parsed and isinstance(parsed["titles"], list) and parsed["titles"]:
+                        return jsonify(parsed)
+            except Exception as e:
+                print(f"[LLM] Gemini API call fallback: {e}")
+
+        elif openai_key:
+            try:
+                url = "https://api.openai.com/v1/chat/completions"
+                req_data = {
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "system", "content": system_prompt}],
+                    "response_format": {"type": "json_object"}
+                }
+                req = urllib.request.Request(url, data=json.dumps(req_data).encode("utf-8"),
+                                             headers={"Content-Type": "application/json", "Authorization": f"Bearer {openai_key}"},
+                                             method="POST")
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    parsed = json.loads(res_json["choices"][0]["message"]["content"])
+                    if "titles" in parsed and isinstance(parsed["titles"], list) and parsed["titles"]:
+                        return jsonify(parsed)
+            except Exception as e:
+                print(f"[LLM] OpenAI API call fallback: {e}")
+
+    # Fallback to high-signal structured archetype templates
+    structured_results = []
+    if archetype == "all":
+        for a_key, a_meta in archetype_catalog.items():
+            structured_results.append({
+                "title": a_meta["titles"][0],
+                "archetype": a_key,
+                "archetype_label": a_meta["label"],
+                "estimated_score": 93,
+                "explanation": a_meta["explanation"],
+                "thumbnail_concept": a_meta["blueprint"]
+            })
+    else:
+        a_meta = archetype_catalog.get(archetype, archetype_catalog["impossible_feat"])
+        for idx, t_str in enumerate(a_meta["titles"][:count]):
+            structured_results.append({
+                "title": t_str,
+                "archetype": archetype,
+                "archetype_label": a_meta["label"],
+                "estimated_score": 90 + (idx % 5),
+                "explanation": a_meta["explanation"],
+                "thumbnail_concept": a_meta["blueprint"]
+            })
+
+    return jsonify({
+        "titles": structured_results,
+        "archetype": archetype,
+        "main_topic": main_topic
+    })
+
+
+# ── Module 5: Velocity Acceleration Tracker ───────────────────────────────────
+
+@app.route("/api/cron/snapshot-velocity", methods=["POST", "GET"])
+def cron_snapshot_velocity():
+    """
+    Capture daily view velocity snapshots for videos published in last 14 days.
+    Missed-day resilient: queries closest prior date. Near-zero YouTube API quota (~1 unit per 50 vids).
+    """
+    try:
+        sb = get_sb()
+        now = time.time()
+        today_date = time.strftime("%Y-%m-%d", time.gmtime())
+        cut_14d = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 14 * 86400))
+
+        # 1. Fetch recent videos
+        r = sb.table("videos").select("video_id, channel_id, published_at, views").gte("published_at", cut_14d).execute()
+        recent_vids = r.data or []
+        if not recent_vids:
+            return jsonify({"success": True, "processed": 0, "message": "No recent videos in 14-day window"})
+
+        # 2. Issue batched YouTube API refresh for fresh view counts (1 unit per 50 IDs)
+        yt = build_yt()
+        vid_ids = [v["video_id"] for v in recent_vids]
+        live_views_map = {}
+        for i in range(0, len(vid_ids), 50):
+            batch_ids = vid_ids[i:i + 50]
+            vr = yt.videos().list(part="statistics", id=",".join(batch_ids)).execute()
+            for item in vr.get("items", []):
+                live_views_map[item["id"]] = int(item.get("statistics", {}).get("viewCount", 0))
+
+        # 3. Query historical velocity snapshots for prior dates
+        r_hist = sb.table("video_velocity").select("*").lt("snapshot_date", today_date).order("snapshot_date", desc=True).execute()
+        hist_rows = r_hist.data or []
+        hist_by_video = {}
+        for row in hist_rows:
+            vid = row["video_id"]
+            hist_by_video.setdefault(vid, []).append(row)
+
+        velocity_rows = []
+        accelerating_count = 0
+
+        for v in recent_vids:
+            vid_id = v["video_id"]
+            cid = v["channel_id"]
+            cur_views = live_views_map.get(vid_id, int(v.get("views") or 0))
+
+            # Find closest prior snapshot
+            prev_snapshots = hist_by_video.get(vid_id, [])
+            prev_snap = prev_snapshots[0] if prev_snapshots else None
+
+            if prev_snap:
+                prev_date_str = prev_snap["snapshot_date"]
+                prev_views = int(prev_snap.get("views") or 0)
+                try:
+                    t_today = time.mktime(time.strptime(today_date, "%Y-%m-%d"))
+                    t_prev = time.mktime(time.strptime(prev_date_str, "%Y-%m-%d"))
+                    days_elapsed = max(1.0, (t_today - t_prev) / 86400.0)
+                except Exception:
+                    days_elapsed = 1.0
+                daily_vel = max(0.0, (cur_views - prev_views) / days_elapsed)
+            else:
+                # First snapshot — estimate from published_at
+                pub_str = v.get("published_at", "")[:10]
+                try:
+                    t_pub = time.mktime(time.strptime(pub_str, "%Y-%m-%d"))
+                    t_today = time.mktime(time.strptime(today_date, "%Y-%m-%d"))
+                    days_pub = max(1.0, (t_today - t_pub) / 86400.0)
+                except Exception:
+                    days_pub = 1.0
+                daily_vel = cur_views / days_pub
+
+            # Find 7-day prior snapshot for acceleration math
+            seven_days_ago_snap = None
+            for snap in prev_snapshots:
+                try:
+                    t_snap = time.mktime(time.strptime(snap["snapshot_date"], "%Y-%m-%d"))
+                    t_today = time.mktime(time.strptime(today_date, "%Y-%m-%d"))
+                    diff_days = (t_today - t_snap) / 86400.0
+                    if diff_days >= 6:
+                        seven_days_ago_snap = snap
+                        break
+                except Exception:
+                    pass
+
+            if seven_days_ago_snap and float(seven_days_ago_snap.get("velocity") or 0) > 0:
+                vel_7d = float(seven_days_ago_snap["velocity"])
+                acceleration = round((daily_vel - vel_7d) / vel_7d, 3)
+            else:
+                acceleration = 0.0
+
+            if acceleration >= 0.5:
+                accelerating_count += 1
+
+            velocity_rows.append({
+                "video_id":      vid_id,
+                "channel_id":    cid,
+                "snapshot_date": today_date,
+                "views":         cur_views,
+                "velocity":      round(daily_vel, 2),
+                "acceleration":  acceleration
+            })
+
+        if velocity_rows:
+            sb.table("video_velocity").upsert(velocity_rows, on_conflict="video_id,snapshot_date").execute()
+
+        return jsonify({
+            "success": True,
+            "processed": len(velocity_rows),
+            "accelerating_count": accelerating_count,
+            "snapshot_date": today_date
+        })
+    except Exception as ex:
+        print(f"[Supabase] cron_snapshot_velocity error: {ex}")
+        return jsonify({"success": False, "error": str(ex), "processed": 0}), 200
+
+
+@app.route("/api/velocity/trending")
+def get_trending_velocity():
+    """Return top accelerating videos with recent velocity metrics."""
+    try:
+        sb = get_sb()
+        r = sb.table("video_velocity").select("*, videos(title, thumbnail_url, channel_id)").order("acceleration", desc=True).limit(10).execute()
+        rows = r.data or []
+        channels = {c["id"]: c["name"] for c in load_channels()}
+
+        trending = []
+        for row in rows:
+            v_info = row.get("videos") or {}
+            cid = row.get("channel_id") or v_info.get("channel_id")
+            trending.append({
+                "video_id":     row["video_id"],
+                "title":        v_info.get("title", "Video"),
+                "thumbnail":    v_info.get("thumbnail_url", ""),
+                "channel_name": channels.get(cid, "Channel"),
+                "velocity":     float(row.get("velocity") or 0),
+                "acceleration": float(row.get("acceleration") or 0),
+                "views":        int(row.get("views") or 0)
+            })
+        return jsonify({"trending": trending})
+    except Exception as ex:
+        return jsonify({"trending": []})
 
 
 @app.route("/ping")

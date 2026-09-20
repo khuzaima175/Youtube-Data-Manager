@@ -686,6 +686,7 @@ document.addEventListener('keydown', e => {
     closeShortcutsModal();
     closeSettingsModal();
     closeReportModal();
+    if (typeof closeAiSynthesizerModal === 'function') closeAiSynthesizerModal();
     closeSearchSuggestions();
     closeAddSuggestions();
     closeNavOverflow();

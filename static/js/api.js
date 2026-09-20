@@ -12,7 +12,19 @@ async function apiFetch(url, options = {}) {
     cost = 4; // deep scan
   } else if (u.includes('/refresh')) {
     cost = 2;
-  } else if (u.includes('/img-proxy') || u.includes('/snapshots') || u.includes('/export/')) {
+  } else if (
+    u.includes('/img-proxy') ||
+    u.includes('/snapshots') ||
+    u.includes('/export/') ||
+    u.includes('/videos/sync') ||
+    u.includes('/channel-baselines') ||
+    u.includes('/recalculate-topic-metrics') ||
+    u.includes('/autocomplete-voids') ||
+    u.includes('/mine-voids-batch') ||
+    u.includes('/llm/generate-titles') ||
+    u.includes('/velocity/trending') ||
+    u.includes('/cron/')
+  ) {
     cost = 0;
   }
 
@@ -21,6 +33,141 @@ async function apiFetch(url, options = {}) {
   }
 
   return fetch(url, options);
+}
+
+/* ── Supabase Video Persistence Sync (Module 0 / P0) ──────────────────────── */
+async function syncVideosToSupabase(channelId, videos) {
+  if (!channelId || !Array.isArray(videos) || !videos.length) return;
+  const BATCH_SIZE = 50;
+  for (let i = 0; i < videos.length; i += BATCH_SIZE) {
+    const chunk = videos.slice(i, i + BATCH_SIZE);
+    try {
+      await apiFetch('/api/videos/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel_id: channelId, videos: chunk })
+      });
+    } catch (err) {
+      console.warn('Video sync batch failed:', err);
+    }
+  }
+}
+
+/* ── Channel Baselines & Intelligence Engine API Calls ───────────────────── */
+async function fetchChannelBaselines(force = false) {
+  const now = Date.now();
+  if (!force && _channelBaselinesCache && (now - _channelBaselinesTs < 6 * 3600 * 1000)) {
+    return _channelBaselinesCache;
+  }
+  try {
+    const r = await apiFetch('/api/channel-baselines');
+    if (r.ok) {
+      const data = await r.json();
+      _channelBaselinesCache = data.baselines || {};
+      _channelBaselinesTs = now;
+      return _channelBaselinesCache;
+    }
+  } catch (err) {
+    console.warn('fetchChannelBaselines error:', err);
+  }
+  return _channelBaselinesCache || {};
+}
+
+async function recalculateTopicMetricsAPI(topics) {
+  try {
+    const r = await apiFetch('/api/recalculate-topic-metrics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topics: topics || [] })
+    });
+    if (r.ok) return await r.json();
+  } catch (err) {
+    console.warn('recalculateTopicMetrics error:', err);
+  }
+  return null;
+}
+
+async function fetchAutocompleteVoids(query, force = false) {
+  if (!query || !query.trim()) return { voids: [], query: '' };
+  try {
+    const r = await apiFetch(`/api/autocomplete-voids?q=${encodeURIComponent(query.trim())}${force ? '&force=1' : ''}`);
+    if (r.ok) {
+      const data = await r.json();
+      return {
+        query: data.seed || query,
+        voids: data.voids || [],
+        unmet: data.unmet || [],
+        covered: data.covered || []
+      };
+    }
+  } catch (err) {
+    console.warn('fetchAutocompleteVoids error:', err);
+  }
+  return { voids: [], query };
+}
+
+async function generateTitlesAI(topic, angle, currentTitle, archetype) {
+  try {
+    const r = await apiFetch('/api/llm/generate-titles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic: topic || '',
+        angle: angle || '',
+        current_title: currentTitle || '',
+        archetype: archetype || 'all'
+      })
+    });
+    if (r.ok) {
+      const data = await r.json();
+      const rawTitles = data.titles || [];
+      const normalizedTitles = rawTitles.map(item => {
+        if (typeof item === 'string') {
+          return {
+            title: item,
+            archetype: data.archetype || archetype || 'viral',
+            archetype_label: '✨ Viral Packaging',
+            estimated_score: 91,
+            explanation: 'Engineered for high CTR curiosity gap.',
+            thumbnail_concept: {
+              layout: 'Split-screen high contrast',
+              focal_element: 'Core mechanism in focus',
+              contrast_colors: 'Dark background with vibrant neon accent',
+              text_overlay: 'REVEALED'
+            }
+          };
+        }
+        return item;
+      });
+      return { ...data, titles: normalizedTitles };
+    }
+  } catch (err) {
+    console.warn('generateTitlesAI error:', err);
+  }
+  return { titles: [] };
+}
+
+async function fetchTrendingVelocity() {
+  try {
+    const r = await apiFetch('/api/velocity/trending');
+    if (r.ok) {
+      const data = await r.json();
+      return Array.isArray(data) ? data : (data.trending || []);
+    }
+  } catch (err) {
+    console.warn('fetchTrendingVelocity error:', err);
+  }
+  return [];
+}
+
+async function triggerVelocitySnapshot() {
+  try {
+    const r = await apiFetch('/api/cron/snapshot-velocity', { method: 'POST' });
+    if (r.ok) return await r.json();
+  } catch (err) {
+    console.warn('triggerVelocitySnapshot error:', err);
+  }
+  return null;
 }
 
 /* ── 07. Enrichment Pipeline with LocalStorage Cache ──────────────────────── */
@@ -111,6 +258,8 @@ async function processEnrichQueue() {
     _enrichCache[channelId] = data;
     try { localStorage.setItem('yt_enrich_' + channelId, JSON.stringify(data)); } catch { }
     if (typeof clearTimingCache === 'function') clearTimingCache();
+    // Non-blocking asynchronous sync to Supabase videos table (P0)
+    syncVideosToSupabase(channelId, vids).catch(e => console.warn('Supabase sync background warning:', e));
     // Rebuild topic intelligence from freshly cached videos
     setTimeout(() => {
       buildTopicCache();

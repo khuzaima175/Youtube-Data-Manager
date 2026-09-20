@@ -42,6 +42,20 @@ function topicFreqMap(videos) {
   return freq;
 }
 
+function getChannelMedianBaseline(chId) {
+  if (_channelBaselinesCache && _channelBaselinesCache[chId]) {
+    return _channelBaselinesCache[chId];
+  }
+  const en = _enrichCache[chId];
+  const longForm = en?.longForm || [];
+  if (longForm.length >= 3) {
+    const sorted = longForm.map(v => parseInt(v.view_count ?? v.views_raw ?? 0)).sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)] || 1;
+  }
+  const ch = all.find(c => c.id === chId);
+  return ch?.avg_views_raw || 1;
+}
+
 function buildTopicCache() {
   const now = Date.now();
 
@@ -59,21 +73,30 @@ function buildTopicCache() {
 
   // Global freq pass
   const globalFreq = topicFreqMap(allVids);
+  const minBigramCount = allVids.length > 25 ? 3 : 2;
   const validBigrams = new Set(
     [...globalFreq.entries()]
-      .filter(([t, n]) => t.includes(' ') && n >= 3)
+      .filter(([t, n]) => t.includes(' ') && n >= minBigramCount)
       .map(([t]) => t)
   );
 
+  const minUnigramFreq = allVids.length > 30 ? 2 : 1;
   function cleanTokens(title) {
     const raw = topicTokens(title);
     return raw.filter(t => {
       if (t.includes(' ')) return validBigrams.has(t);
-      return (globalFreq.get(t) || 0) >= 2;
+      return (globalFreq.get(t) || 0) >= minUnigramFreq;
     });
   }
 
+  // Precompute channel baselines for RPI calculation
+  const baselines = {};
+  all.forEach(ch => {
+    baselines[ch.id] = getChannelMedianBaseline(ch.id);
+  });
+
   const topicMap = new Map();
+  const cut14d = now - 14 * 864e5;
   const cutRecent = now - 90 * 864e5;
   const cutOld = now - 365 * 864e5;
 
@@ -82,17 +105,22 @@ function buildTopicCache() {
     const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
     const eng = calcEngagementRate(v.like_count, v.comment_count, vc);
     const pub = new Date(v.published_at || v.date || 0).getTime();
+    const chBase = Math.max(baselines[v._chId] || 1, 1);
+    const rpi = vc / chBase;
 
     toks.forEach(t => {
       if (!topicMap.has(t)) {
         topicMap.set(t, {
           topic: t, n: 0, totalViews: 0, totalEng: 0, engCount: 0,
+          totalRpi: 0, supply14d: 0,
           lastUsed: 0, recentViews: [], oldViews: [], channels: new Set()
         });
       }
       const s = topicMap.get(t);
       s.n++;
       s.totalViews += vc;
+      s.totalRpi += rpi;
+      if (pub >= cut14d) s.supply14d++;
       if (eng !== null) { s.totalEng += eng; s.engCount++; }
       if (pub > s.lastUsed) s.lastUsed = pub;
       s.channels.add(v._chId);
@@ -102,12 +130,37 @@ function buildTopicCache() {
   });
 
   const finalTopics = new Map();
+  const minOccurrences = allVids.length > 25 ? 2 : 1;
   for (const [t, s] of topicMap) {
-    if (s.n < 2) continue;
+    if (s.n < minOccurrences) continue;
     const avgViews = s.n > 0 ? Math.round(s.totalViews / s.n) : 0;
     const avgEng = s.engCount > 0 ? parseFloat((s.totalEng / s.engCount).toFixed(1)) : null;
     const recentAvg = s.recentViews.length > 0 ? s.recentViews.reduce((a, b) => a + b, 0) / s.recentViews.length : 0;
     const oldAvg = s.oldViews.length > 0 ? s.oldViews.reduce((a, b) => a + b, 0) / s.oldViews.length : 0;
+    
+    // Empirical Bayes Shrinkage for RPI (P1)
+    const rawRpi = s.n > 0 ? s.totalRpi / s.n : 1.0;
+    const w = s.n / (s.n + 5); // Weight formula w = n / (n + 5)
+    const shrunkenRpi = parseFloat((w * rawRpi + (1 - w) * 1.0).toFixed(2));
+    const confidenceTag = s.n >= 8 ? `High (n=${s.n})` : s.n >= 4 ? `Moderate (n=${s.n})` : `Shrunken (n=${s.n})`;
+    
+    // Supply / Demand Saturation Matrix Metrics (P2)
+    const supply14d = s.supply14d;
+    const blueOceanScore = parseFloat((shrunkenRpi / (1 + supply14d)).toFixed(2));
+    
+    // 2x2 Quadrant Assignment
+    // High Demand: shrunkenRpi >= 1.25 | High Supply: supply14d >= 2
+    let quadrant = 'emerging';
+    if (shrunkenRpi >= 1.25 && supply14d < 2) {
+      quadrant = 'blue_ocean'; // 🌊 High Demand, Low Supply
+    } else if (shrunkenRpi >= 1.25 && supply14d >= 2) {
+      quadrant = 'red_ocean'; // 🔥 High Demand, High Supply
+    } else if (shrunkenRpi < 1.25 && supply14d >= 2) {
+      quadrant = 'saturated'; // ⚠️ Low Demand, High Supply
+    } else {
+      quadrant = 'emerging'; // 🌱 Low Demand, Low Supply
+    }
+
     const hotScore = Math.round(recentAvg * Math.log2(s.n + 1));
     const momentum = (recentAvg > 0 && oldAvg > 0 && s.recentViews.length >= 2 && s.oldViews.length >= 2)
       ? parseFloat((recentAvg / oldAvg).toFixed(2)) : null;
@@ -124,6 +177,12 @@ function buildTopicCache() {
     finalTopics.set(t, {
       topic: t, n: s.n, avgViews, avgEng, lastUsed: s.lastUsed,
       recentAvg: Math.round(recentAvg), oldAvg: Math.round(oldAvg),
+      rawRpi: parseFloat(rawRpi.toFixed(2)),
+      shrunkenRpi,
+      confidenceTag,
+      supply14d,
+      blueOceanScore,
+      quadrant,
       hotScore, momentum, channels: [...s.channels], leadChannel
     });
   }
@@ -204,19 +263,33 @@ function computeTopicGaps(primaryId) {
   for (const [t, stat] of fieldTopics) {
     const myStat = myTopics.get(t);
     const myN = myStat?.n || 0;
-    if (myN === 0 && stat.avgViews >= medianFieldAvg && stat.n >= 3) {
-      gaps.push({ topic: t, fieldAvg: stat.avgViews, fieldN: stat.n, hotScore: stat.hotScore, momentum: stat.momentum });
+    if (myN === 0 && (stat.shrunkenRpi >= 1.1 || stat.avgViews >= medianFieldAvg) && stat.n >= 2) {
+      gaps.push({
+        topic: t,
+        fieldAvg: stat.avgViews,
+        fieldN: stat.n,
+        shrunkenRpi: stat.shrunkenRpi,
+        blueOceanScore: stat.blueOceanScore,
+        hotScore: stat.hotScore,
+        momentum: stat.momentum
+      });
     }
     if (myStat && myStat.n >= 2 && stat.leadChannel === primaryId) {
       const rivalCount = stat.channels.filter(id => id !== primaryId)
         .map(id => _topicCache.perChannel.get(id)?.get(t)?.n || 0)
         .filter(n => n > 0).length;
       if (rivalCount <= 1) {
-        moats.push({ topic: t, myN: myStat.n, myAvg: myStat.avgViews, rivalCount });
+        moats.push({
+          topic: t,
+          myN: myStat.n,
+          myAvg: myStat.avgViews,
+          shrunkenRpi: stat.shrunkenRpi,
+          rivalCount
+        });
       }
     }
   }
-  gaps.sort((a, b) => (b.hotScore || 0) - (a.hotScore || 0));
+  gaps.sort((a, b) => (b.shrunkenRpi || 0) - (a.shrunkenRpi || 0));
   moats.sort((a, b) => b.myAvg - a.myAvg);
   return { gaps: gaps.slice(0, 5), moats: moats.slice(0, 3) };
 }
@@ -243,6 +316,8 @@ async function topicDeepScan(chId) {
     try { localStorage.setItem(DEEP_KEY, JSON.stringify({ ts: Date.now(), vids })); } catch { }
     _enrichCache[chId] = { ..._enrichCache[chId], vids, deepScanned: true };
     if (typeof clearTimingCache === 'function') clearTimingCache();
+    // Non-blocking sync 200 videos to Supabase videos table (P0)
+    syncVideosToSupabase(chId, vids).catch(e => console.warn('Supabase deep scan sync warning:', e));
     buildTopicCache();
     toast('Deep scan complete!', 's');
     if (ddChannelId === chId) {
@@ -279,17 +354,54 @@ function setTopicRadarRange(r) {
   renderTopicRadar();
 }
 
+function setTopicRadarView(v) {
+  topicRadarView = v;
+  localStorage.setItem('topic.view', v);
+  renderTopicRadar();
+}
+
+function openAiTitleSynthesizer(topic = '', title = '') {
+  _aiSynthState.topic = topic || '';
+  _aiSynthState.title = title || '';
+  _aiSynthState.open = true;
+  if (typeof renderAiSynthesizerModal === 'function') {
+    renderAiSynthesizerModal();
+  }
+}
+
+function openTitleLabWithTopic(topic) {
+  if (!topic) return;
+  titleLabDraft = `The Ultimate Guide to ${capWords(topic)}`;
+  if (typeof sp === 'function') sp('studio');
+  setTimeout(() => {
+    if (typeof setStudioSubTab === 'function') setStudioSubTab('lab');
+    const input = document.getElementById('titleLabInput');
+    if (input) {
+      input.value = titleLabDraft;
+      if (typeof onTitleLabInput === 'function') onTitleLabInput(titleLabDraft);
+      input.focus();
+    }
+  }, 100);
+}
+
 function renderTopicRadar() {
   const el = document.getElementById('dashTopicRadar');
   if (!el) return;
+
+  // Auto-build topic cache if videos exist in cache
+  let totalCachedVids = 0;
+  all.forEach(c => { totalCachedVids += (_enrichCache[c.id]?.vids?.length || 0); });
+  if (totalCachedVids > 0 && !_topicCache.topics.size) {
+    buildTopicCache();
+  }
 
   if (!_topicCache.topics.size) {
     el.innerHTML = `
       <div class="topic-radar-card">
         <div class="topic-radar-hdr">
           <div class="topic-radar-title">
-            <span class="msi" style="color:var(--down);font-size:16px">local_fire_department</span>
-            TOPIC RADAR <span>· what's hot across your field</span>
+            <span class="msi" style="color:var(--down);font-size:16px">whatshot</span>
+            <span>TOPIC RADAR</span> <span style="font-size:11px;color:var(--t3);font-weight:400">· what's hot across your field</span>
           </div>
           <div class="race-seg" style="opacity:0.6">
             <div class="skel" style="width:110px;height:24px;border-radius:var(--r-full)"></div>
@@ -298,7 +410,7 @@ function renderTopicRadar() {
         <div class="topic-radar-body" style="min-height:220px">
           <!-- Hot Column Shimmer -->
           <div class="topic-hot-col" style="gap:10px">
-            <div class="topic-section-label">HOT NOW</div>
+            <div class="topic-section-label">HOT NOW (RPI)</div>
             <div style="display:flex;flex-direction:column;gap:8px">
               <div class="skel" style="height:32px;border-radius:var(--r-s)"></div>
               <div class="skel" style="height:32px;border-radius:var(--r-s)"></div>
@@ -323,16 +435,9 @@ function renderTopicRadar() {
               <div class="skel" style="height:28px"></div>
               <div class="skel" style="height:28px"></div>
             </div>
-            <div style="display:grid;grid-template-columns:100px repeat(4, 1fr);gap:8px">
-              <div class="skel" style="height:28px"></div>
-              <div class="skel" style="height:28px"></div>
-              <div class="skel" style="height:28px"></div>
-              <div class="skel" style="height:28px"></div>
-              <div class="skel" style="height:28px"></div>
-            </div>
             <div style="display:flex;align-items:center;gap:8px;margin-top:auto;font-size:11px;color:var(--t3)">
               <div class="spin" style="width:12px;height:12px"></div>
-              <span>Building topic intelligence index from catalog…</span>
+              <span>Building topic intelligence index & RPI baselines…</span>
             </div>
           </div>
         </div>
@@ -346,9 +451,10 @@ function renderTopicRadar() {
   const rangeMs = topicRadarRange === '6m' ? 180 * 864e5 : topicRadarRange === 'all' ? Infinity : 90 * 864e5;
   const cutTs = isFinite(rangeMs) ? Date.now() - rangeMs : 0;
 
+  // Sorted by Shrunken RPI (Empirical Bayes)
   const sortedTopics = [..._topicCache.topics.values()]
-    .filter(t => t.n >= 2 && (rangeMs === Infinity || t.lastUsed >= cutTs))
-    .sort((a, b) => (b.hotScore || 0) - (a.hotScore || 0));
+    .filter(t => t.n >= 1 && (rangeMs === Infinity || t.lastUsed >= cutTs))
+    .sort((a, b) => (b.shrunkenRpi || 0) - (a.shrunkenRpi || 0) || (b.hotScore || 0) - (a.hotScore || 0));
 
   const hotTopics = sortedTopics.slice(0, 10);
   const matrixTopics = hotTopics.slice(0, 8);
@@ -360,123 +466,149 @@ function renderTopicRadar() {
         filter: ${esc(raceTopicFilter)} ✕
        </span>` : '';
 
-  // Hot list
-  const hotListHtml = hotTopics.length ? hotTopics.map((t, i) => {
-    const leadCh = all.find(c => c.id === t.leadChannel);
-    const leadCol = leadCh ? colorOf(leadCh) : 'var(--t3)';
-    const isFiltered = raceTopicFilter === t.topic;
-    const mom = t.momentum;
-    const momHtml = mom !== null
-      ? `<span style="color:${mom >= 1.2 ? 'var(--up)' : mom <= 0.8 ? 'var(--down)' : 'var(--t3)'};">${mom >= 1 ? '▲' : '▼'}${mom.toFixed(1)}×</span>`
-      : `<span style="color:var(--t3)">•</span>`;
-    return `
-      <div class="topic-hot-row ${isFiltered ? 'filtered' : ''}" onclick="filterRaceByTopic('${esc(t.topic)}')" title="Click to filter race window">
-        <span class="topic-rank-chip">${i + 1}</span>
-        <div class="topic-hot-body">
-          <div class="topic-hot-name">${esc(t.topic)}</div>
-          <div class="topic-hot-meta">
-            <span style="color:var(--t3)">${t.n} vid${t.n !== 1 ? 's' : ''}</span>
-            ${leadCh ? ` · <span style="color:${leadCol}">●</span> ${esc(leadCh.name)}` : ''}
-          </div>
-        </div>
-        <div class="topic-hot-stats">
-          <span class="topic-score">🔥${fmtN(t.hotScore)}</span>
-          ${momHtml}
-        </div>
-      </div>`;
-  }).join('') : `<div style="color:var(--t3);font-size:11.5px;padding:12px 0">No topics in this range yet.</div>`;
-
-  // Gap + moat chips
-  const gapChips = gaps.slice(0, 3).map(g => `
-    <div class="topic-gap-chip" title="Field avg: ${fmtN(g.fieldAvg)} · ${g.fieldN} videos">
-      <span class="msi" style="font-size:13px;color:var(--acc)">search_off</span>
-      <span>${esc(g.topic)}</span>
-      <span class="topic-gap-stat">${fmtN(g.fieldAvg)} avg · you: 0</span>
-    </div>`).join('');
-
-  const moatChips = moats.slice(0, 2).map(m => `
-    <div class="topic-moat-chip" title="You lead on this topic (${m.myN} vids, ${m.rivalCount} rival)">
-      <span class="msi" style="font-size:13px;color:var(--me)">shield</span>
-      <span>${esc(m.topic)}</span>
-      <span class="topic-moat-stat">YOU #1 🛡</span>
-    </div>`).join('');
-
-  // Heat matrix
-  const matrixChannels = [...all]
-    .sort((a, b) => (b.subscribers_raw || 0) - (a.subscribers_raw || 0))
-    .slice(0, 8);
-
-  const matrixHeaderHtml = `<tr>
-    <th class="matrix-topic-col">Topic</th>
-    ${matrixChannels.map(ch => {
-    const col = colorOf(ch);
-    const isMe = ch.is_primary;
-    return `<th class="matrix-ch-col ${isMe ? 'matrix-me-col' : ''}">
-        <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
-          ${ch.logo_url
-        ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:22px;height:22px;border-radius:50%;border:1.5px solid ${col};object-fit:cover">`
-        : `<div style="width:22px;height:22px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff">${(ch.name || '?')[0]}</div>`}
-          <span style="font-size:9px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px">${esc(ch.name.length > 7 ? ch.name.slice(0, 7) + '…' : ch.name)}</span>
-        </div>
-      </th>`;
-  }).join('')}
-  </tr>`;
-
-  const globalMaxAvg = Math.max(...matrixTopics.map(t => t.avgViews), 1);
-  const matrixRowsHtml = matrixTopics.map(t => {
-    const cells = matrixChannels.map(ch => {
-      const chStat = _topicCache.perChannel.get(ch.id)?.get(t.topic);
-      if (!chStat || !chStat.n) {
-        return `<td class="matrix-cell empty" onclick="showTopicCellPopover(event,'${esc(ch.id)}','${esc(t.topic)}')"
-          title="${esc(ch.name)} · 0 videos on '${esc(t.topic)}'">
-          <span class="matrix-empty-dash">—</span>
-        </td>`;
-      }
-      const col = colorOf(ch);
-      // Parse hsl to build hsla
-      const opacity = 0.12 + (chStat.avgViews / globalMaxAvg) * 0.78;
-      const bgStyle = col.startsWith('hsl(')
-        ? col.replace('hsl(', 'hsla(').replace(')', `,${opacity.toFixed(2)})`)
-        : col;
-      return `<td class="matrix-cell ${ch.is_primary ? 'matrix-me-cell' : ''}"
-        style="background:${bgStyle}"
-        onclick="showTopicCellPopover(event,'${esc(ch.id)}','${esc(t.topic)}')"
-        title="${esc(ch.name)} · ${chStat.n} vid${chStat.n !== 1 ? 's' : ''} · avg ${fmtN(chStat.avgViews)}">
-        <span class="matrix-cell-val">${fmtN(chStat.avgViews)}</span>
-        <span class="matrix-cell-n">${chStat.n}v</span>
-      </td>`;
-    }).join('');
-    return `<tr>
-      <td class="matrix-topic-label" onclick="filterRaceByTopic('${esc(t.topic)}')" title="Filter race window by this topic">${esc(t.topic)}</td>
-      ${cells}
-    </tr>`;
-  }).join('');
-
-  el.innerHTML = `
-    <div class="topic-radar-card">
-      <div class="topic-radar-hdr">
-        <div class="topic-radar-title">
-          <span class="msi" style="color:var(--down);font-size:16px">whatshot</span>
-          TOPIC RADAR${filterChipHtml}
-          <span>· what's hot across your field</span>
-        </div>
-        <div class="race-seg">
-          ${['90d', '6m', 'all'].map(r => `
-            <button class="race-seg-btn ${topicRadarRange === r ? 'on' : ''}"
-              onclick="setTopicRadarRange('${r}')">${r}</button>`).join('')}
-        </div>
+  // View Selector Pills & Range
+  const controlsHtml = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="race-seg">
+        <button class="race-seg-btn ${topicRadarView === 'rpi' ? 'on' : ''}" onclick="setTopicRadarView('rpi')" title="View topics ranked by Empirical Bayes Shrunken RPI">
+          🔥 RPI View
+        </button>
+        <button class="race-seg-btn ${topicRadarView === 'matrix' ? 'on' : ''}" onclick="setTopicRadarView('matrix')" title="View 2×2 Supply / Demand Saturation Grid">
+          🗺️ Saturation Matrix
+        </button>
       </div>
+      <div class="race-seg">
+        ${['90d', '6m', 'all'].map(r => `
+          <button class="race-seg-btn ${topicRadarRange === r ? 'on' : ''}"
+            onclick="setTopicRadarRange('${r}')">${r}</button>`).join('')}
+      </div>
+    </div>`;
 
+  let mainBodyHtml = '';
+
+  if (topicRadarView === 'rpi') {
+    // ── RPI VIEW ────────────────────────────────────────────────────────────
+    const hotListHtml = hotTopics.length ? hotTopics.map((t, i) => {
+      const leadCh = all.find(c => c.id === t.leadChannel);
+      const leadCol = leadCh ? colorOf(leadCh) : 'var(--t3)';
+      const isFiltered = raceTopicFilter === t.topic;
+      const mom = t.momentum;
+      const momHtml = mom !== null
+        ? `<span style="color:${mom >= 1.2 ? 'var(--up)' : mom <= 0.8 ? 'var(--down)' : 'var(--t3)'};">${mom >= 1 ? '▲' : '▼'}${mom.toFixed(1)}×</span>`
+        : `<span style="color:var(--t3)">•</span>`;
+      
+      const rpiClass = t.shrunkenRpi >= 1.5 ? 'bdg-gr' : t.shrunkenRpi >= 1.1 ? 'bdg-pr' : 'bdg-dim';
+      const supplyText = t.supply14d > 0 ? `📦 ${t.supply14d} in 14d` : '📦 0 in 14d';
+
+      return `
+        <div class="topic-hot-row ${isFiltered ? 'filtered' : ''}" onclick="filterRaceByTopic('${esc(t.topic)}')" title="Click to filter race window by '${esc(t.topic)}'">
+          <span class="topic-rank-chip">${i + 1}</span>
+          <div class="topic-hot-body">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="topic-hot-name">${esc(t.topic)}</span>
+              <span class="badge ${rpiClass}" style="font-size:9.5px;padding:1px 6px" title="Empirical Bayes Shrunken RPI (${t.confidenceTag})">
+                ⚡ ${t.shrunkenRpi.toFixed(2)}× RPI
+              </span>
+            </div>
+            <div class="topic-hot-meta">
+              <span style="color:var(--t3)">${t.n} vids</span>
+              <span class="chip" style="font-size:9px;padding:1px 5px;background:var(--bg-3)">${supplyText}</span>
+              ${leadCh ? ` · <span style="color:${leadCol}">●</span> ${esc(leadCh.name)}` : ''}
+            </div>
+          </div>
+          <div class="topic-hot-stats">
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="icon-btn" style="width:24px;height:24px" onclick="event.stopPropagation();openAiTitleSynthesizer('${esc(t.topic)}')" title="Generate AI Titles for this topic">
+                <span class="msi" style="font-size:13px;color:var(--acc)">auto_awesome</span>
+              </button>
+              <button class="icon-btn" style="width:24px;height:24px" onclick="event.stopPropagation();openTitleLabWithTopic('${esc(t.topic)}')" title="Open in Title Lab">
+                <span class="msi" style="font-size:13px">science</span>
+              </button>
+            </div>
+            <div style="text-align:right">
+              <span class="topic-score" style="font-size:11px">🔥${fmtN(t.hotScore)}</span>
+              <span style="font-size:10px;margin-left:4px">${momHtml}</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('') : `<div style="color:var(--t3);font-size:11.5px;padding:12px 0">No topics in this range yet.</div>`;
+
+    // Gap + moat chips
+    const gapChips = gaps.slice(0, 3).map(g => `
+      <div class="topic-gap-chip" onclick="openAiTitleSynthesizer('${esc(g.topic)}')" title="Field avg: ${fmtN(g.fieldAvg)} · ${g.shrunkenRpi}x RPI · Click to Synthesize">
+        <span class="msi" style="font-size:13px;color:var(--acc)">search_off</span>
+        <span>${esc(g.topic)}</span>
+        <span class="topic-gap-stat">⚡ ${g.shrunkenRpi}× RPI · you: 0</span>
+      </div>`).join('');
+
+    const moatChips = moats.slice(0, 2).map(m => `
+      <div class="topic-moat-chip" onclick="filterRaceByTopic('${esc(m.topic)}')" title="You lead on this topic (${m.myN} vids, ${m.rivalCount} rival)">
+        <span class="msi" style="font-size:13px;color:var(--me)">shield</span>
+        <span>${esc(m.topic)}</span>
+        <span class="topic-moat-stat">YOU #1 🛡</span>
+      </div>`).join('');
+
+    // Heat matrix columns
+    const matrixChannels = [...all]
+      .sort((a, b) => (b.subscribers_raw || 0) - (a.subscribers_raw || 0))
+      .slice(0, 8);
+
+    const matrixHeaderHtml = `<tr>
+      <th class="matrix-topic-col">Topic</th>
+      ${matrixChannels.map(ch => {
+      const col = colorOf(ch);
+      const isMe = ch.is_primary;
+      return `<th class="matrix-ch-col ${isMe ? 'matrix-me-col' : ''}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            ${ch.logo_url
+          ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:22px;height:22px;border-radius:50%;border:1.5px solid ${col};object-fit:cover">`
+          : `<div style="width:22px;height:22px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff">${(ch.name || '?')[0]}</div>`}
+            <span style="font-size:9px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px">${esc(ch.name.length > 7 ? ch.name.slice(0, 7) + '…' : ch.name)}</span>
+          </div>
+        </th>`;
+    }).join('')}
+    </tr>`;
+
+    const globalMaxAvg = Math.max(...matrixTopics.map(t => t.avgViews), 1);
+    const matrixRowsHtml = matrixTopics.map(t => {
+      const cells = matrixChannels.map(ch => {
+        const chStat = _topicCache.perChannel.get(ch.id)?.get(t.topic);
+        if (!chStat || !chStat.n) {
+          return `<td class="matrix-cell empty" onclick="showTopicCellPopover(event,'${esc(ch.id)}','${esc(t.topic)}')"
+            title="${esc(ch.name)} · 0 videos on '${esc(t.topic)}'">
+            <span class="matrix-empty-dash">—</span>
+          </td>`;
+        }
+        const col = colorOf(ch);
+        const opacity = 0.12 + (chStat.avgViews / globalMaxAvg) * 0.78;
+        const bgStyle = col.startsWith('hsl(')
+          ? col.replace('hsl(', 'hsla(').replace(')', `,${opacity.toFixed(2)})`)
+          : col;
+        return `<td class="matrix-cell ${ch.is_primary ? 'matrix-me-cell' : ''}"
+          style="background:${bgStyle}"
+          onclick="showTopicCellPopover(event,'${esc(ch.id)}','${esc(t.topic)}')"
+          title="${esc(ch.name)} · ${chStat.n} vid${chStat.n !== 1 ? 's' : ''} · avg ${fmtN(chStat.avgViews)}">
+          <span class="matrix-cell-val">${fmtN(chStat.avgViews)}</span>
+          <span class="matrix-cell-n">${chStat.n}v</span>
+        </td>`;
+      }).join('');
+      return `<tr>
+        <td class="matrix-topic-label" onclick="filterRaceByTopic('${esc(t.topic)}')" title="Filter race window by this topic">${esc(t.topic)}</td>
+        ${cells}
+      </tr>`;
+    }).join('');
+
+    mainBodyHtml = `
       <div class="topic-radar-body">
         <div class="topic-hot-col">
-          <div class="topic-section-label">HOT NOW</div>
+          <div class="topic-section-label">TOP TOPICS BY RELATIVE PERFORMANCE (RPI)</div>
           <div class="topic-hot-list">${hotListHtml}</div>
           ${(gapChips || moatChips) ? `
-          <div class="topic-section-label" style="margin-top:12px">YOUR POSITION</div>
+          <div class="topic-section-label" style="margin-top:12px">STRATEGIC POSITION</div>
           <div class="topic-chips-row">${gapChips}${moatChips}</div>` : ''}
         </div>
         <div class="topic-matrix-col">
-          <div class="topic-section-label">HEAT MATRIX · who owns what topic</div>
+          <div class="topic-section-label">HEAT MATRIX · WHO OWNS WHAT TOPIC</div>
           <div style="overflow-x:auto">
             <table class="topic-matrix">
               <thead>${matrixHeaderHtml}</thead>
@@ -484,7 +616,118 @@ function renderTopicRadar() {
             </table>
           </div>
         </div>
+      </div>`;
+  } else {
+    // ── 2×2 SATURATION MATRIX VIEW ──────────────────────────────────────────
+    const blueOceanTopics = sortedTopics.filter(t => t.quadrant === 'blue_ocean');
+    const redOceanTopics = sortedTopics.filter(t => t.quadrant === 'red_ocean');
+    const emergingTopics = sortedTopics.filter(t => t.quadrant === 'emerging');
+    const saturatedTopics = sortedTopics.filter(t => t.quadrant === 'saturated');
+
+    function renderQuadrantList(list, isBlue = false) {
+      if (!list.length) return `<div style="font-size:11px;color:var(--t3);padding:10px 0">No topics in this quadrant.</div>`;
+      return list.slice(0, 6).map(t => `
+        <div class="sat-topic-item ${isBlue ? 'sat-item-blue' : ''}" onclick="filterRaceByTopic('${esc(t.topic)}')" title="Click to filter drops">
+          <div style="min-width:0;flex:1">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;font-weight:700;color:var(--t1)">${esc(t.topic)}</span>
+              ${isBlue ? '<span class="badge bdg-gr" style="font-size:9px">⭐ Prime</span>' : ''}
+            </div>
+            <div style="font-size:10px;color:var(--t3);display:flex;gap:6px;margin-top:2px">
+              <span>⚡ ${t.shrunkenRpi.toFixed(2)}× RPI</span>
+              <span>•</span>
+              <span>📦 ${t.supply14d} in 14d</span>
+              <span>•</span>
+              <span>🌊 Score: ${t.blueOceanScore}</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button class="icon-btn" style="width:24px;height:24px" onclick="event.stopPropagation();openAiTitleSynthesizer('${esc(t.topic)}')" title="Synthesize AI Titles">
+              <span class="msi" style="font-size:13px;color:var(--acc)">auto_awesome</span>
+            </button>
+            <button class="icon-btn" style="width:24px;height:24px" onclick="event.stopPropagation();openTitleLabWithTopic('${esc(t.topic)}')" title="Test in Title Lab">
+              <span class="msi" style="font-size:13px">science</span>
+            </button>
+          </div>
+        </div>`).join('');
+    }
+
+    mainBodyHtml = `
+      <div class="sat-matrix-container">
+        <!-- Matrix Legend Subtitle -->
+        <div style="font-size:11.5px;color:var(--t3);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span>Supply / Demand Saturation Grid: Compares 90-day demand multiplier (RPI) against 14-day competitor release saturation.</span>
+          <span class="badge bdg-dim" style="font-size:10.5px">Formula: BlueOceanScore = ShrunkenRPI / (1 + Supply₁₄d)</span>
+        </div>
+
+        <!-- 2x2 Grid -->
+        <div class="sat-2x2-grid">
+          <!-- Q1: Blue Ocean (Top Left) -->
+          <div class="sat-quadrant sat-q-blue">
+            <div class="sat-q-hdr">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="msi" style="color:var(--up);font-size:17px">waves</span>
+                <span class="sat-q-title" style="color:var(--up)">🌊 BLUE OCEAN</span>
+              </div>
+              <span class="badge bdg-gr" style="font-size:9.5px">High Demand · Low Supply</span>
+            </div>
+            <div class="sat-q-sub">Surging audience appetite with near-zero recent competitor uploads. Target immediately!</div>
+            <div class="sat-q-list">${renderQuadrantList(blueOceanTopics, true)}</div>
+          </div>
+
+          <!-- Q2: Red Ocean (Top Right) -->
+          <div class="sat-quadrant sat-q-red">
+            <div class="sat-q-hdr">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="msi" style="color:var(--warn);font-size:17px">whatshot</span>
+                <span class="sat-q-title" style="color:var(--warn)">🔥 RED OCEAN</span>
+              </div>
+              <span class="badge bdg-gd" style="font-size:9.5px">High Demand · High Supply</span>
+            </div>
+            <div class="sat-q-sub">High viewer interest, but heavy competitor saturation. Requires standout contrarian packaging.</div>
+            <div class="sat-q-list">${renderQuadrantList(redOceanTopics)}</div>
+          </div>
+
+          <!-- Q3: Emerging / Niche (Bottom Left) -->
+          <div class="sat-quadrant sat-q-emerging">
+            <div class="sat-q-hdr">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="msi" style="color:var(--acc);font-size:17px">spa</span>
+                <span class="sat-q-title" style="color:var(--acc)">🌱 NICHE / EMERGING</span>
+              </div>
+              <span class="badge bdg-pr" style="font-size:9.5px">Low Demand · Low Supply</span>
+            </div>
+            <div class="sat-q-sub">Untested or early-stage trends. Great for sleeper compounders and establishing first-mover moats.</div>
+            <div class="sat-q-list">${renderQuadrantList(emergingTopics)}</div>
+          </div>
+
+          <!-- Q4: Saturated (Bottom Right) -->
+          <div class="sat-quadrant sat-q-saturated">
+            <div class="sat-q-hdr">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="msi" style="color:var(--down);font-size:17px">warning</span>
+                <span class="sat-q-title" style="color:var(--down)">⚠️ SATURATED</span>
+              </div>
+              <span class="badge bdg-rd" style="font-size:9.5px">Low Demand · High Supply</span>
+            </div>
+            <div class="sat-q-sub">Overcrowded niche with below-average relative return. Avoid unless bringing a revolutionary hook.</div>
+            <div class="sat-q-list">${renderQuadrantList(saturatedTopics)}</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  el.innerHTML = `
+    <div class="topic-radar-card">
+      <div class="topic-radar-hdr">
+        <div class="topic-radar-title">
+          <span class="msi" style="color:var(--down)">whatshot</span>
+          <span>TOPIC RADAR</span>${filterChipHtml}
+          <span class="topic-radar-sub">· what's hot across your field</span>
+        </div>
+        ${controlsHtml}
       </div>
+      ${mainBodyHtml}
     </div>
     <div class="topic-cell-popover" id="topicCellPopover">
       <div class="topic-cell-popover-hdr" id="topicCellPopoverHdr"></div>

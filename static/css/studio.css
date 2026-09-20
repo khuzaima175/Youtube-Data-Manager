@@ -67,3 +67,25 @@
     font-size: 16px !important;
   }
 }
+
+/* ── Void Miner & AI Synthesizer Styles ───────────────────────────────────── */
+.ai-synth-modal {
+  padding: 0;
+  max-width: 780px !important;
+  width: 95vw;
+}
+
+.ai-synth-modal .card {
+  transition: all var(--d-1);
+}
+
+.ai-synth-modal .card:hover {
+  border-color: var(--line-3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 600px) {
+  .ai-synth-modal div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}

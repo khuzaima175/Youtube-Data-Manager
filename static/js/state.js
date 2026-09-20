@@ -132,7 +132,16 @@ const raceState = {
 const _topicCache = { topics: new Map(), perChannel: new Map(), ts: 0 };
 const TOPIC_ALIAS = {};
 let topicRadarRange = localStorage.getItem('topic.range') || '90d';
+let topicRadarView = localStorage.getItem('topic.view') || 'rpi'; // 'rpi' or 'matrix'
 let raceTopicFilter = null;  // string or null — cross-wire from radar
+let _channelBaselinesCache = null;
+let _channelBaselinesTs = 0;
+
+// Void Miner & AI Synthesizer State
+let _voidMinerQuery = '';
+let _voidMinerResults = [];
+let _voidMinerLoading = false;
+let _aiSynthState = { open: false, topic: '', title: '', angle: '', archetype: 'all', results: [], loading: false };
 
 // Phase 12: Output, Gamification & Sharing State
 let _snapshotsCache = null;
@@ -219,6 +228,7 @@ function proxyImg(url) {
 
 function isYouTubeShort(v) {
   if (!v) return false;
+  if (typeof v.is_short === 'boolean') return v.is_short;
   if (v.url && v.url.includes('/shorts/')) return true;
   let dur = 0;
   if (typeof v.duration_secs === 'number') dur = v.duration_secs;
@@ -228,9 +238,16 @@ function isYouTubeShort(v) {
     else if (p.length === 2) dur = p[0] * 60 + p[1];
     else dur = parseInt(v.duration, 10) || 0;
   }
-  if (dur > 0 && dur <= 62) return true;
   const title = (v.title || '').toLowerCase();
-  return title.includes('#shorts') || title.includes('#short');
+  const hasShortTag = title.includes('#shorts') || title.includes('#short');
+  if (hasShortTag) return true;
+  if (dur > 0 && dur <= 62) return true;
+  // YouTube 2024+ extended Shorts (up to 180s vertical)
+  if (dur > 62 && dur <= 183) {
+    if (v.thumb_height && v.thumb_width && v.thumb_height > v.thumb_width) return true;
+    if (hasShortTag) return true;
+  }
+  return false;
 }
 
 function calcEngagementRate(likeCount, commentCount, viewCount) {

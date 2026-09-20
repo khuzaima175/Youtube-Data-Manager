@@ -139,6 +139,17 @@ async function renderDash() {
   }
 
   const primaryEnrich = await enrich(primary.id) || {};
+  
+  // Background enrich competitor channels so topic radar and race window populate immediately
+  all.forEach(c => {
+    if (c.id !== primary.id && !_enrichCache[c.id]) {
+      enrich(c.id).then(() => {
+        buildTopicCache();
+        renderTopicRadar();
+      }).catch(() => {});
+    }
+  });
+
   const sp30Vals = primaryEnrich.sp30 && primaryEnrich.sp30.length ? primaryEnrich.sp30 : [10, 14, 12, 18, 22, 20, 26];
   const engRate = primaryEnrich.engagement ?? 0;
   const engGaugePct = Math.min(100, Math.round((engRate / 10) * 100));
@@ -359,6 +370,9 @@ async function renderDash() {
   // 4b. Topic Radar (under Drops)
   const radarHtml = `<div id="sec-radar" class="rev in" style="--i:4"><div id="dashTopicRadar"></div></div>`;
 
+  // 4c. Velocity Acceleration Radar (P5)
+  const accelHtml = renderAccelerationRadar();
+
   // 5. Velocity Card (now full-width, separate from face-off)
   const velHtml = `
     <div id="sec-vel" class="vel-card rev in" style="margin-top:var(--s5);--i:5">
@@ -408,13 +422,14 @@ async function renderDash() {
       <div class="dash-spy-item" data-sec="sec-yvf" onclick="scrollToSection('sec-yvf')" title="You vs Field"><span class="spy-dot"></span><span class="spy-label">Field</span></div>
       <div class="dash-spy-item" data-sec="sec-drops" onclick="scrollToSection('sec-drops')" title="Latest Drops"><span class="spy-dot"></span><span class="spy-label">Drops</span></div>
       <div class="dash-spy-item" data-sec="sec-radar" onclick="scrollToSection('sec-radar')" title="Topic Radar"><span class="spy-dot"></span><span class="spy-label">Radar</span></div>
+      <div class="dash-spy-item" data-sec="sec-accel" onclick="scrollToSection('sec-accel')" title="Acceleration"><span class="spy-dot"></span><span class="spy-label">Accel</span></div>
       <div class="dash-spy-item" data-sec="sec-lb" onclick="scrollToSection('sec-lb')" title="Leaderboard"><span class="spy-dot"></span><span class="spy-label">Board</span></div>
       <div class="dash-spy-item" data-sec="sec-vel" onclick="scrollToSection('sec-vel')" title="Velocity"><span class="spy-dot"></span><span class="spy-label">Velocity</span></div>
       <div class="dash-spy-item" data-sec="sec-timing" onclick="scrollToSection('sec-timing')" title="Timing Intelligence"><span class="spy-dot"></span><span class="spy-label">Timing</span></div>
       <div class="dash-spy-item" data-sec="sec-recent" onclick="scrollToSection('sec-recent')" title="Recent Uploads"><span class="spy-dot"></span><span class="spy-label">Recent</span></div>
     </div>`;
 
-  el.innerHTML = stripHtml + yvfHtml + raceHtml + radarHtml + lbHtml + velHtml + timingHtml + recentHtml + spyRailHtml;
+  el.innerHTML = stripHtml + yvfHtml + raceHtml + radarHtml + accelHtml + lbHtml + velHtml + timingHtml + recentHtml + spyRailHtml;
 
   document.querySelectorAll('.count-val').forEach(valEl => {
     countUp(valEl, valEl.dataset.val);
@@ -427,11 +442,151 @@ async function renderDash() {
 
   renderRaceWindow();
   renderTopicRadar();
+  loadAccelerationTrending();
   loadVelocityWithFit(all);
   attachTimingTooltips(el);
   loadDashboardRecentUploads(primary.id);
   setupScrollReveal();
   setupDashScrollSpy();
+}
+
+/* ── 04c. Velocity Acceleration Radar Implementation (P5) ─────────────────── */
+function renderAccelerationRadar() {
+  return `
+    <div id="sec-accel" class="card rev in" style="margin-top:var(--s5);padding:20px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="ic-tile cyan"><span class="msi" style="font-size:18px">rocket_launch</span></span>
+          <div>
+            <div style="font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--t1);display:flex;align-items:center;gap:6px">
+              <span>Velocity Acceleration Radar</span>
+              <span class="badge bdg-gr" style="font-size:10px">d²V/dt² > 0</span>
+            </div>
+            <div style="font-size:11px;color:var(--t3)">Surfaces competitor drops whose daily view accrual rate is actively accelerating (2nd derivative virality).</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn btn-gh btn-sm" onclick="snapshotDailyVelocityNow()">
+            <span class="msi">camera</span> Snapshot Velocity
+          </button>
+          <span class="card-prov" data-tip="Near-zero quota daily velocity delta" onclick="loadAccelerationTrending()">live acceleration</span>
+        </div>
+      </div>
+      <div id="accelRadarList" style="min-height:120px">
+        <div style="display:flex;align-items:center;gap:8px;color:var(--t3);padding:24px 0;justify-content:center">
+          <div class="spin"></div> Calculating velocity acceleration curves…
+        </div>
+      </div>
+    </div>`;
+}
+
+async function snapshotDailyVelocityNow() {
+  toast('Recording daily velocity snapshot…');
+  try {
+    const res = await triggerVelocitySnapshot();
+    if (res) {
+      toast(`Snapshot recorded for ${res.processed_videos || 'active'} videos!`, 's');
+      loadAccelerationTrending();
+    } else {
+      toast('Velocity snapshot completed', 's');
+    }
+  } catch (err) {
+    toast('Snapshot error', 'e');
+  }
+}
+
+async function loadAccelerationTrending() {
+  const container = document.getElementById('accelRadarList');
+  if (!container) return;
+
+  try {
+    let trending = await fetchTrendingVelocity();
+    
+    // Fallback: if backend table is empty or still backfilling, compute in-memory acceleration from enriched videos
+    if (!trending || !trending.length) {
+      const allVids = [];
+      all.forEach(ch => {
+        const en = _enrichCache[ch.id];
+        if (en && en.vids) {
+          en.vids.forEach(v => {
+            if (!isYouTubeShort(v)) {
+              allVids.push({ ...v, ch_name: ch.name, ch_logo: ch.logo_url, ch_id: ch.id });
+            }
+          });
+        }
+      });
+
+      trending = allVids.map(v => {
+        const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
+        const pub = new Date(v.published_at || v.date || 0).getTime();
+        const days = Math.max(1, (Date.now() - pub) / 864e5);
+        const vpd = vc / days;
+        const approxAccel = days <= 14 ? Math.round(vpd * (1.5 - days * 0.05)) : Math.round(vpd * 0.1);
+        return {
+          video_id: v.id || v.video_id,
+          title: v.title,
+          url: v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`,
+          thumbnail_url: v.thumb || v.thumbnail_url,
+          views: vc,
+          velocity_vpd: Math.round(vpd),
+          acceleration: approxAccel,
+          channel_name: v.ch_name,
+          channel_logo: v.ch_logo,
+          channel_id: v.ch_id,
+          published_at: v.published_at || v.date
+        };
+      }).filter(v => v.acceleration > 50).sort((a, b) => b.acceleration - a.acceleration).slice(0, 6);
+    }
+
+    if (!trending.length) {
+      container.innerHTML = `
+        <div style="padding:24px 0;text-align:center;color:var(--t3);font-size:12px;border:1px dashed var(--line-1);border-radius:var(--r-s)">
+          No videos with positive acceleration detected in the active window. Refresh channels to accumulate velocity logs.
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:12px">
+        ${trending.map(item => `
+          <div class="card" style="padding:12px;background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);display:flex;gap:12px;align-items:flex-start">
+            <div style="position:relative;flex-shrink:0">
+              <img src="${esc(proxyImg(item.thumbnail_url || ''))}" style="width:96px;height:54px;object-fit:cover;border-radius:var(--r-s);background:var(--bg-1)" onerror="this.style.opacity='.3'" />
+              <span class="badge bdg-gr" style="position:absolute;bottom:3px;right:3px;font-size:8.5px;padding:1px 4px;font-weight:700">
+                🚀 +${fmtN(item.acceleration)}/d²
+              </span>
+            </div>
+            <div style="min-width:0;flex:1;display:flex;flex-direction:column;justify-content:space-between;height:100%">
+              <div>
+                <a href="${esc(item.url)}" target="_blank" rel="noopener" style="font-size:12px;font-weight:700;color:var(--t1);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-decoration:none" title="${esc(item.title)}">
+                  ${esc(item.title)}
+                </a>
+                <div style="font-size:10px;color:var(--t3);margin-top:4px;display:flex;align-items:center;gap:4px">
+                  ${item.channel_logo ? `<img src="${esc(proxyImg(item.channel_logo))}" style="width:14px;height:14px;border-radius:50%;object-fit:cover">` : ''}
+                  <span>${esc(item.channel_name || '')}</span>
+                  <span>•</span>
+                  <span>${ago(item.published_at)}</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:6px;border-top:1px solid var(--line-1)">
+                <div style="font-size:10px;color:var(--t2)">
+                  <strong>${fmtN(item.views)}</strong> views <span style="color:var(--acc)">(~${fmtN(item.velocity_vpd)}/day)</span>
+                </div>
+                <div style="display:flex;gap:4px">
+                  <button class="icon-btn" style="width:22px;height:22px" onclick="openDeepDive('${esc(item.channel_id || '')}')" title="Analyze Channel in Deep Dive">
+                    <span class="msi" style="font-size:12px">analytics</span>
+                  </button>
+                  <a class="icon-btn" style="width:22px;height:22px;display:flex;align-items:center;justify-content:center" href="${esc(item.url)}" target="_blank" rel="noopener" title="Watch on YouTube">
+                    <span class="msi" style="font-size:12px">open_in_new</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  } catch (err) {
+    container.innerHTML = '<div style="color:var(--t3);font-size:11.5px;padding:16px 0">Could not calculate velocity acceleration.</div>';
+  }
 }
 
 function setYvfMetric(metric) {

@@ -341,14 +341,334 @@ function sendIdeaToPipeline(title, topic, score) {
   setStudioSubTab('pipeline');
 }
 
+/* ── S3. Unmet Demand Miner (Void Miner P3) ──────────────────────────────── */
+async function runVoidMiner(customQuery = null) {
+  const input = document.getElementById('voidMinerInput');
+  const q = customQuery !== null ? customQuery : (input ? input.value.trim() : _voidMinerQuery);
+  if (!q) {
+    toast('Please enter a seed query or topic', 'e');
+    return;
+  }
+  _voidMinerQuery = q;
+  _voidMinerLoading = true;
+  const container = document.getElementById('voidMinerResultsWrap');
+  if (container) {
+    container.innerHTML = `
+      <div style="padding:32px 16px;text-align:center;color:var(--t3);display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div class="spin" style="width:24px;height:24px"></div>
+        <div style="font-size:12.5px;font-weight:600;color:var(--t1)">Mining YouTube autocomplete search queries for "${esc(q)}"…</div>
+        <div style="font-size:11px">Scanning competitor catalogs to calculate Jaccard title coverage gaps</div>
+      </div>`;
+  }
+  const btn = document.getElementById('voidMinerBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin" style="width:14px;height:14px"></span> Mining…'; }
+
+  try {
+    const res = await fetchAutocompleteVoids(q);
+    _voidMinerResults = res.voids || [];
+  } catch (err) {
+    toast('Void miner failed', 'e');
+  } finally {
+    _voidMinerLoading = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="msi">search</span> Mine Autocomplete Voids'; }
+    const c = document.getElementById('voidMinerResultsWrap');
+    if (c) c.innerHTML = renderVoidMinerResultsHtml();
+  }
+}
+
+function renderVoidMinerResultsHtml() {
+  if (_voidMinerLoading) {
+    return `
+      <div style="padding:32px 16px;text-align:center;color:var(--t3);display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div class="spin" style="width:24px;height:24px"></div>
+        <div style="font-size:12.5px;font-weight:600;color:var(--t1)">Mining YouTube autocomplete search voids…</div>
+      </div>`;
+  }
+
+  if (!_voidMinerResults.length) {
+    return `
+      <div style="padding:28px 16px;text-align:center;color:var(--t3);font-size:12px;border:1.5px dashed var(--line-1);border-radius:var(--r-m)">
+        <span class="msi" style="font-size:28px;color:var(--t4);display:block;margin-bottom:6px">radar</span>
+        No search voids mined yet. Enter a seed keyword or click a recommended Blue Ocean topic above!
+      </div>`;
+  }
+
+  const voidsOnly = _voidMinerResults.filter(v => v.is_void);
+  const coveredOnly = _voidMinerResults.filter(v => !v.is_void);
+
+  return `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <!-- Voids Count Summary Banner -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px 14px;background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s)">
+        <div style="font-size:12px;color:var(--t1);font-weight:600">
+          Discovered <strong style="color:var(--up)">${voidsOnly.length} Unmet Search Voids</strong> and <strong style="color:var(--t3)">${coveredOnly.length} Competitor Covered Queries</strong> for "${esc(_voidMinerQuery)}"
+        </div>
+        <button class="btn btn-gh btn-sm" onclick="runVoidMiner('${esc(_voidMinerQuery)}')">
+          <span class="msi">refresh</span> Refresh Scraping
+        </button>
+      </div>
+
+      <!-- Results Grid -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:12px">
+        ${_voidMinerResults.map(item => {
+          const isVoid = item.is_void;
+          const simPct = Math.round((item.overlap || 0) * 100);
+          return `
+            <div class="card" style="padding:14px;background:var(--bg-3);border:1.5px solid ${isVoid ? 'rgba(0, 229, 255, 0.35)' : 'var(--line-1)'};border-radius:var(--r-m);display:flex;flex-direction:column;justify-content:space-between;box-shadow:${isVoid ? '0 0 16px rgba(0, 229, 255, 0.08)' : 'none'}">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <span class="badge ${isVoid ? 'bdg-gr' : 'bdg-dim'}" style="font-size:9.5px;padding:2px 8px">
+                    ${isVoid ? '💎 Unmet Search Void' : '⚔️ Covered by Rival'}
+                  </span>
+                  <span class="badge bdg-dim" style="font-size:9px">
+                    ${item.level === 0 ? 'Seed' : 'Deep L' + item.level}
+                  </span>
+                </div>
+                <div style="font-size:13.5px;font-weight:700;color:var(--t1);line-height:1.35;margin-bottom:6px">
+                  "${esc(item.query)}"
+                </div>
+                ${!isVoid && item.matched_title ? `
+                  <div style="font-size:10px;color:var(--t3);margin-bottom:10px;line-height:1.3">
+                    Rival Title: <span style="color:var(--t2)">"${esc(item.matched_title.length > 55 ? item.matched_title.slice(0, 55) + '…' : item.matched_title)}"</span> (${simPct}% overlap)
+                  </div>` : `
+                  <div style="font-size:10px;color:var(--up);margin-bottom:10px;line-height:1.3">
+                    ✨ High search autocomplete demand with &lt;40% competitor catalog coverage!
+                  </div>`}
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line-1)">
+                <button class="btn btn-acc btn-sm" style="flex:1" onclick="openAiTitleSynthesizer('${esc(item.query)}', '${esc(item.query)}')">
+                  <span class="msi" style="font-size:14px">auto_awesome</span> ✨ Synthesize Title
+                </button>
+                <button class="icon-btn" onclick="sendIdeaToPipeline('${esc(item.query)}', '${esc(_voidMinerQuery || 'search_void')}', 92)" title="Add to Content Pipeline">
+                  <span class="msi" style="font-size:14px">playlist_add</span>
+                </button>
+                <button class="icon-btn" onclick="useIdeaInTitleLab('${esc(item.query)}')" title="Test in Title Lab">
+                  <span class="msi" style="font-size:14px">science</span>
+                </button>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+/* ── S4. AI Title & Packaging Synthesizer Engine (P4) ─────────────────────── */
+function renderAiSynthesizerModal() {
+  const modal = document.getElementById('aiSynthModal');
+  const ovrl = document.getElementById('aiSynthOvrl');
+  const content = document.getElementById('aiSynthModalContent');
+  if (!modal || !ovrl || !content) return;
+
+  const archetypes = [
+    { id: 'all', label: '⚡ All 5 Archetypes' },
+    { id: 'impossible_feat', label: '🏆 Impossible Feat' },
+    { id: 'hidden_flaw', label: '🚨 Hidden Flaw' },
+    { id: 'head_to_head', label: '⚔️ Head-to-Head' },
+    { id: 'zero_to_mastery', label: '🎓 Zero-to-Mastery' },
+    { id: 'stress_test', label: '💥 Stress Test' }
+  ];
+
+  content.innerHTML = `
+    <div style="padding:22px">
+      <!-- Modal Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;border-bottom:1px solid var(--line-1);padding-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="ic-tile cyan"><span class="msi" style="font-size:18px">auto_awesome</span></span>
+          <div>
+            <div style="font-family:var(--f-disp);font-size:16px;font-weight:700;color:var(--t1)">AI Title & Packaging Synthesizer</div>
+            <div style="font-size:11px;color:var(--t3)">Generates 5 viral packaging archetypes with thumbnail concept blueprints. Zero quota consumption.</div>
+          </div>
+        </div>
+        <button class="icon-btn" onclick="closeAiSynthesizerModal()"><span class="msi">close</span></button>
+      </div>
+
+      <!-- Controls Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:block">Target Topic or Niche:</label>
+          <input type="text" id="aiSynthTopicInput" value="${esc(_aiSynthState.topic)}" placeholder="e.g. Next.js 15, DaVinci Resolve, EUV Lithography…"
+            style="width:100%;padding:8px 12px;font-size:13px;background:var(--bg-3);border:1px solid var(--line-2);border-radius:var(--r-s);color:var(--t1);outline:none"
+            onchange="_aiSynthState.topic = this.value" />
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:block">Modifier / Angle (Optional):</label>
+          <input type="text" id="aiSynthAngleInput" value="${esc(_aiSynthState.angle)}" placeholder="e.g. for beginners, after 100 days, $0 budget…"
+            style="width:100%;padding:8px 12px;font-size:13px;background:var(--bg-3);border:1px solid var(--line-2);border-radius:var(--r-s);color:var(--t1);outline:none"
+            onchange="_aiSynthState.angle = this.value" />
+        </div>
+      </div>
+
+      <!-- Archetype Segments & Generate Button -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+        <div class="race-seg" style="overflow-x:auto;max-width:100%">
+          ${archetypes.map(a => `
+            <button class="race-seg-btn ${_aiSynthState.archetype === a.id ? 'on' : ''}" onclick="setAiSynthArchetype('${a.id}')">
+              ${a.label}
+            </button>`).join('')}
+        </div>
+        <button class="btn btn-acc" id="aiSynthRunBtn" onclick="executeAiSynthesis()">
+          <span class="msi">auto_awesome</span> Synthesize Archetypes
+        </button>
+      </div>
+
+      <!-- Results Body -->
+      <div id="aiSynthResultsWrap" style="max-height:55vh;overflow-y:auto;padding-right:4px">
+        ${renderAiSynthResultsBodyHtml()}
+      </div>
+    </div>`;
+
+  ovrl.classList.add('open');
+  modal.classList.add('open');
+
+  if (!_aiSynthState.results.length && !_aiSynthState.loading && _aiSynthState.topic) {
+    executeAiSynthesis();
+  }
+}
+
+function setAiSynthArchetype(arch) {
+  _aiSynthState.archetype = arch;
+  const topicInp = document.getElementById('aiSynthTopicInput');
+  const angleInp = document.getElementById('aiSynthAngleInput');
+  if (topicInp) _aiSynthState.topic = topicInp.value;
+  if (angleInp) _aiSynthState.angle = angleInp.value;
+  renderAiSynthesizerModal();
+  executeAiSynthesis();
+}
+
+function closeAiSynthesizerModal() {
+  _aiSynthState.open = false;
+  document.getElementById('aiSynthOvrl')?.classList.remove('open');
+  document.getElementById('aiSynthModal')?.classList.remove('open');
+}
+
+async function executeAiSynthesis() {
+  const topicInp = document.getElementById('aiSynthTopicInput');
+  const angleInp = document.getElementById('aiSynthAngleInput');
+  if (topicInp) _aiSynthState.topic = topicInp.value.trim();
+  if (angleInp) _aiSynthState.angle = angleInp.value.trim();
+
+  const topic = _aiSynthState.topic || 'Video Engineering';
+  _aiSynthState.loading = true;
+
+  const resWrap = document.getElementById('aiSynthResultsWrap');
+  if (resWrap) {
+    resWrap.innerHTML = `
+      <div style="padding:48px 16px;text-align:center;color:var(--t3);display:flex;flex-direction:column;align-items:center;gap:12px">
+        <div class="spin" style="width:28px;height:28px"></div>
+        <div style="font-size:14px;font-weight:700;color:var(--t1)">Synthesizing viral packaging archetypes for "${esc(topic)}"…</div>
+        <div style="font-size:11.5px">Assembling curiosity hooks, CTR scoring, and thumbnail blueprints</div>
+      </div>`;
+  }
+
+  const btn = document.getElementById('aiSynthRunBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin" style="width:14px;height:14px"></span> Generating…'; }
+
+  try {
+    const res = await generateTitlesAI(topic, _aiSynthState.angle, _aiSynthState.title, _aiSynthState.archetype);
+    _aiSynthState.results = res.titles || [];
+  } catch (err) {
+    toast('Synthesis failed', 'e');
+  } finally {
+    _aiSynthState.loading = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="msi">auto_awesome</span> Synthesize Archetypes'; }
+    const w = document.getElementById('aiSynthResultsWrap');
+    if (w) w.innerHTML = renderAiSynthResultsBodyHtml();
+  }
+}
+
+function renderAiSynthResultsBodyHtml() {
+  if (_aiSynthState.loading) {
+    return `
+      <div style="padding:48px 16px;text-align:center;color:var(--t3);display:flex;flex-direction:column;align-items:center;gap:12px">
+        <div class="spin" style="width:28px;height:28px"></div>
+        <div style="font-size:14px;font-weight:700;color:var(--t1)">Synthesizing viral packaging archetypes…</div>
+      </div>`;
+  }
+
+  if (!_aiSynthState.results.length) {
+    return `
+      <div style="padding:36px 16px;text-align:center;color:var(--t3);font-size:12px;border:1.5px dashed var(--line-1);border-radius:var(--r-m)">
+        <span class="msi" style="font-size:32px;color:var(--t4);display:block;margin-bottom:8px">auto_awesome</span>
+        Enter a topic or niche above and click "Synthesize Archetypes" to generate packaging concepts!
+      </div>`;
+  }
+
+  return `
+    <div style="display:flex;flex-direction:column;gap:16px">
+      ${_aiSynthState.results.map((item, idx) => {
+        const sc = scoreTitle(item.title);
+        const score = Math.max(item.estimated_score || 85, sc.score);
+        const st = scoreTone(score);
+        const thumb = item.thumbnail_concept || {};
+        return `
+          <div class="card" style="padding:16px;background:var(--bg-3);border:1px solid var(--line-2);border-radius:var(--r-m);display:flex;flex-direction:column;gap:12px;box-shadow:var(--sh-1)">
+            <!-- Top Bar: Archetype and Score -->
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span class="badge bdg-pr" style="font-size:10.5px;font-weight:700;display:flex;align-items:center;gap:4px">
+                <span class="msi" style="font-size:14px">verified</span> ${esc(item.archetype_label || item.archetype)}
+              </span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="badge ${st.badge}" style="font-size:10px;font-weight:700">🔥 ${score}/100 Title Lab Score</span>
+                <span style="font-size:11px;color:var(--t3)">(${item.title.length} chars)</span>
+              </div>
+            </div>
+
+            <!-- Title Header -->
+            <div style="font-size:15px;font-weight:700;color:var(--t1);line-height:1.4">
+              "${esc(item.title)}"
+            </div>
+
+            <!-- Thumbnail Blueprint Concept Card -->
+            <div style="background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-s);padding:12px;display:grid;grid-template-columns:140px 1fr;gap:14px;align-items:center">
+              <!-- Visual Mockup Box -->
+              <div style="height:80px;background:linear-gradient(135deg, rgba(0,229,255,0.12), rgba(245,197,66,0.12));border:1.5px dashed var(--line-2);border-radius:var(--r-s);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;text-align:center">
+                <span class="msi" style="font-size:22px;color:var(--acc)">image</span>
+                <span style="font-size:9.5px;font-weight:800;color:var(--me);text-transform:uppercase;margin-top:2px;letter-spacing:0.04em">
+                  "${esc(thumb.text_overlay || 'REVEALED')}"
+                </span>
+                <span style="font-size:8px;color:var(--t3);margin-top:2px">16:9 Concept</span>
+              </div>
+
+              <!-- Blueprint Instructions -->
+              <div style="font-size:11px;line-height:1.45;color:var(--t2)">
+                <div><strong>🎨 Layout:</strong> ${esc(thumb.layout || 'Split-screen contrast')}</div>
+                <div><strong>🎯 Focal Subject:</strong> ${esc(thumb.focal_element || 'Extreme close-up with emotional expression')}</div>
+                <div><strong>🌈 Contrast:</strong> ${esc(thumb.contrast_colors || 'Deep dark slate background with neon cyan accents')}</div>
+              </div>
+            </div>
+
+            <!-- Card Action Buttons -->
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:8px;border-top:1px solid var(--line-1)">
+              <div style="font-size:11px;color:var(--t3)">${esc(item.explanation || '')}</div>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-gh btn-sm" onclick="navigator.clipboard.writeText('${esc(item.title)}');toast('Title copied!', 's')">
+                  <span class="msi" style="font-size:14px">content_copy</span> Copy
+                </button>
+                <button class="btn btn-gh btn-sm" onclick="closeAiSynthesizerModal();useIdeaInTitleLab('${esc(item.title)}')">
+                  <span class="msi" style="font-size:14px">science</span> Test in Lab
+                </button>
+                <button class="btn btn-acc btn-sm" onclick="closeAiSynthesizerModal();sendIdeaToPipeline('${esc(item.title)}', '${esc(_aiSynthState.topic || 'ai_synthesized')}', ${score})">
+                  <span class="msi" style="font-size:14px">add</span> + Pipeline
+                </button>
+              </div>
+            </div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
 /* ── Render Studio Lab HTML ───────────────────────────────────────────────── */
 function renderStudioLabHtml() {
   const res = scoreTitle(titleLabDraft);
   const ideas = generateStudioIdeas();
   const filteredIdeas = pipelineIdeaFilter === 'all' ? ideas : ideas.filter(i => i.type === pipelineIdeaFilter);
 
+  // Pre-fill seed topic from top blue ocean topic if available
+  const topTopics = [..._topicCache.topics.values()].sort((a, b) => (b.blueOceanScore || 0) - (a.blueOceanScore || 0));
+  const suggestedSeed = topTopics[0]?.topic || 'video editing';
+
   return `
-    <div style="display:grid;grid-template-columns:1fr;gap:20px">
+    <div style="display:grid;grid-template-columns:1fr;gap:22px">
       <!-- Title Lab Card -->
       <div class="card" style="padding:22px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
@@ -360,6 +680,9 @@ function renderStudioLabHtml() {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
+            <button class="btn btn-acc btn-sm" onclick="openAiTitleSynthesizer('', titleLabDraft)">
+              <span class="msi">auto_awesome</span> ✨ AI Synthesize
+            </button>
             <span id="tlScoreBadge" class="badge ${res.score >= 85 ? 'bdg-gr' : res.score >= 70 ? 'bdg-pr' : res.score >= 50 ? 'bdg-gd' : 'bdg-rd'}">
               ${res.score >= 85 ? '🔥 Elite Concept' : res.score >= 70 ? '🟢 Strong Title' : res.score >= 50 ? '🟡 Moderate' : '🔴 Needs Polish'}
             </span>
@@ -427,8 +750,11 @@ function renderStudioLabHtml() {
         </div>
 
         <!-- Actions -->
-        <div style="display:flex;gap:10px;padding-top:14px;border-top:1px solid var(--line-1)">
-          <button class="btn btn-acc" onclick="sendTitleLabToPipeline()">
+        <div style="display:flex;gap:10px;padding-top:14px;border-top:1px solid var(--line-1);flex-wrap:wrap">
+          <button class="btn btn-acc" onclick="openAiTitleSynthesizer('', titleLabDraft)">
+            <span class="msi">auto_awesome</span> ✨ Synthesize with AI
+          </button>
+          <button class="btn btn-gh" onclick="sendTitleLabToPipeline()">
             <span class="msi">playlist_add</span> Send to Content Pipeline
           </button>
           <button class="btn btn-gh" onclick="copyTitleLabText()">
@@ -437,7 +763,7 @@ function renderStudioLabHtml() {
         </div>
       </div>
 
-      <!-- Idea Generator Card -->
+      <!-- Algorithmic Idea Generator Card -->
       <div class="card" style="padding:22px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
           <div style="display:flex;align-items:center;gap:10px">
@@ -452,12 +778,12 @@ function renderStudioLabHtml() {
         <!-- Idea Grid -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:14px">
           ${filteredIdeas.map(idea => {
-    const st = scoreTone(idea.score);
-    const ringRadius = 11;
-    const ringCircum = 2 * Math.PI * ringRadius;
-    const ringDash = (idea.score / 100) * ringCircum;
-    const formulaIcon = idea.formula.includes('Collision') ? 'bolt' : idea.formula.includes('Moat') ? 'shield' : idea.formula.includes('Gap') ? 'radar' : idea.formula.includes('Breakout') ? 'trending_up' : 'lightbulb';
-    return `
+            const st = scoreTone(idea.score);
+            const ringRadius = 11;
+            const ringCircum = 2 * Math.PI * ringRadius;
+            const ringDash = (idea.score / 100) * ringCircum;
+            const formulaIcon = idea.formula.includes('Collision') ? 'bolt' : idea.formula.includes('Moat') ? 'shield' : idea.formula.includes('Gap') ? 'radar' : idea.formula.includes('Breakout') ? 'trending_up' : 'lightbulb';
+            return `
             <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m);padding:14px;display:flex;flex-direction:column;justify-content:space-between;transition:border-color var(--d-1)" onmouseenter="this.style.borderColor='var(--line-2)'" onmouseleave="this.style.borderColor='var(--line-1)'">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -479,7 +805,10 @@ function renderStudioLabHtml() {
                 <div style="font-size:10.5px;color:var(--t3);line-height:1.4;margin-bottom:12px">${esc(idea.reason)}</div>
               </div>
               <div style="display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line-1)">
-                <button class="btn btn-acc btn-sm" style="flex:1" onclick="sendIdeaToPipeline('${esc(idea.title)}', '${esc(idea.topic)}', ${idea.score})">
+                <button class="btn btn-acc btn-sm" style="flex:1" onclick="openAiTitleSynthesizer('${esc(idea.topic)}', '${esc(idea.title)}')">
+                  <span class="msi" style="font-size:14px">auto_awesome</span> ✨ AI Title
+                </button>
+                <button class="btn btn-gh btn-sm" onclick="sendIdeaToPipeline('${esc(idea.title)}', '${esc(idea.topic)}', ${idea.score})">
                   <span class="msi" style="font-size:14px">add</span> + Pipeline
                 </button>
                 <button class="icon-btn" onclick="useIdeaInTitleLab('${esc(idea.title)}')" title="Test this idea in Title Lab">
@@ -487,7 +816,47 @@ function renderStudioLabHtml() {
                 </button>
               </div>
             </div>`;
-  }).join('')}
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- S3. Unmet Demand Miner Card (Void Miner P3) -->
+      <div class="card" style="padding:22px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="ic-tile cyan"><span class="msi" style="font-size:16px">travel_explore</span></span>
+            <div>
+              <div style="font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--t1)">🔍 Unmet Demand Miner (Autocomplete Void Miner)</div>
+              <div style="font-size:11px;color:var(--t3)">Scrapes live YouTube search queries and filters out covered competitor videos to surface pure unmet viewer demand.</div>
+            </div>
+          </div>
+          <span class="badge bdg-pr" style="font-size:10.5px">Zero Quota · Jaccard Token Filter</span>
+        </div>
+
+        <!-- Search Bar and Quick Seeds -->
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+          <div style="position:relative;flex:1;min-width:260px">
+            <input type="text" id="voidMinerInput" value="${esc(_voidMinerQuery || suggestedSeed)}" placeholder="Enter a seed keyword or topic to mine…"
+              style="width:100%;padding:10px 14px;font-size:13.5px;font-weight:600;background:var(--bg-3);border:1.5px solid var(--line-2);border-radius:var(--r-m);color:var(--t1);outline:none"
+              onkeydown="if(event.key==='Enter') runVoidMiner(this.value)" />
+          </div>
+          <button class="btn btn-acc" id="voidMinerBtn" onclick="runVoidMiner()">
+            <span class="msi">search</span> Mine Autocomplete Voids
+          </button>
+        </div>
+
+        <!-- Quick Recommended Seed Chips from Radar -->
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+          <span style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--t3)">Quick Mine from Radar:</span>
+          ${topTopics.slice(0, 5).map(t => `
+            <button class="chip chip-btn" onclick="runVoidMiner('${esc(t.topic)}')">
+              🌊 ${esc(t.topic)} <span style="color:var(--acc);margin-left:4px">⚡${t.shrunkenRpi}×</span>
+            </button>`).join('')}
+        </div>
+
+        <!-- Results Container -->
+        <div id="voidMinerResultsWrap">
+          ${renderVoidMinerResultsHtml()}
         </div>
       </div>
     </div>`;
