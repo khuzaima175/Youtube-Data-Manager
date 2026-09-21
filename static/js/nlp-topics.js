@@ -604,12 +604,13 @@ function renderTopicRadar() {
             <span class="matrix-empty-dash">—</span>
           </td>`;
         }
-        const col = colorOf(ch);
         const intensity = Math.min(1, chStat.avgViews / globalMaxAvg);
-        const opacity = (0.10 + intensity * 0.48).toFixed(2);
-        const bgStyle = hexToRgba(col, opacity);
-        const borderStyle = hexToRgba(col, (0.20 + intensity * 0.35).toFixed(2));
-        return `<td class="matrix-cell ${ch.is_primary ? 'matrix-me-cell' : ''}"
+        const isMe = ch.is_primary;
+        const rgbBase = isMe ? '245, 158, 11' : '56, 189, 248';
+        const opacity = (0.08 + intensity * 0.40).toFixed(2);
+        const bgStyle = `rgba(${rgbBase}, ${opacity})`;
+        const borderStyle = `rgba(${rgbBase}, ${(0.15 + intensity * 0.30).toFixed(2)})`;
+        return `<td class="matrix-cell ${isMe ? 'matrix-me-cell' : ''}"
           style="background:${bgStyle}; border-color:${borderStyle};"
           onclick="showTopicCellPopover(event,'${esc(ch.id)}','${esc(t.topic)}')"
           title="${esc(ch.name)} · ${chStat.n} vid${chStat.n !== 1 ? 's' : ''} · avg ${fmtN(chStat.avgViews)}">
