@@ -1,91 +1,224 @@
 /* ══════════════════════════════════════════════════════════════════════════════
-   PHASE 9: STUDIO (TITLE LAB, IDEA GENERATOR, PIPELINE KANBAN) STYLES
+   YT TRACKER — CREATOR STUDIO & PIPELINE DESIGN SYSTEM
+   Linear-Grade Content Pipeline & Title Intelligence Lab
    ══════════════════════════════════════════════════════════════════════════════ */
 
+/* ── 01. Studio Container & Subheader ─────────────────────────────────────── */
+.studio-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── 02. Title Lab & Scorer ───────────────────────────────────────────────── */
+.title-lab-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.title-lab-input-card {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-l);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--sh-1);
+}
+
+.title-lab-score-card {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-l);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--sh-1);
+}
+
+.title-lab-textarea {
+  width: 100%;
+  min-height: 80px;
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-m);
+  padding: 14px 16px;
+  color: var(--t1);
+  font-family: var(--f-ui);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--d-1), box-shadow var(--d-1);
+}
+
+.title-lab-textarea:focus {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+}
+
+.tl-factors-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.tl-factor-tile {
+  background: var(--bg-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-m);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tl-factor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tl-factor-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--bg-1);
+  border-radius: var(--r-full);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.tl-factor-fill {
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--acc);
+  transition: width 0.4s var(--e-out);
+}
+
+/* ── 03. Kanban Content Pipeline ─────────────────────────────────────────── */
+.studio-kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  align-items: start;
+  min-height: 520px;
+}
+
+.studio-kanban-col {
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-l);
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 420px;
+  transition: background 0.2s;
+}
+
+.studio-kanban-col.drag-over {
+  background: var(--bg-hover);
+  border-color: var(--acc);
+}
+
+.studio-kanban-col-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 8px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.studio-col-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pipeline-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 200px;
+}
+
 .pipeline-card {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-m);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: grab;
   user-select: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition: transform 0.2s var(--e-out), border-color 0.2s, box-shadow 0.2s;
+}
+
+.pipeline-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
 }
 
 .pipeline-card:active {
   cursor: grabbing;
-  opacity: 0.7;
+  opacity: 0.8;
+  transform: scale(0.98);
 }
 
-.studio-kanban-board {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  align-items: start;
-  min-height: 500px;
+.pipeline-card.dragging {
+  opacity: 0.4;
+  border: 1px dashed var(--acc);
 }
 
-@media (max-width: 959px) {
+.pipeline-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+  line-height: 1.35;
+}
+
+.pipeline-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--t3);
+}
+
+/* ── 04. Responsive Overrides ────────────────────────────────────────────── */
+@media (max-width: 1050px) {
+  .title-lab-grid {
+    grid-template-columns: 1fr;
+  }
   .studio-kanban-board {
-    grid-auto-flow: column;
-    grid-auto-columns: 82vw;
-    grid-template-columns: none;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 14px;
-    scrollbar-width: none;
-  }
-
-  .studio-kanban-board::-webkit-scrollbar {
-    display: none;
-  }
-
-  .studio-kanban-col {
-    scroll-snap-align: center;
-    max-height: calc(100dvh - 200px);
-  }
-
-  .tl-factors-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 8px !important;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .studio-kanban-board {
-    grid-auto-columns: 86vw;
+    grid-template-columns: 1fr;
   }
-
   .tl-factors-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-@media (pointer: coarse),
-(max-width: 719px) {
-  .pipeline-card .icon-btn {
-    width: 32px !important;
-    height: 32px !important;
-  }
-
-  .pipeline-card .icon-btn .msi {
-    font-size: 16px !important;
-  }
-}
-
-/* ── Void Miner & AI Synthesizer Styles ───────────────────────────────────── */
-.ai-synth-modal {
-  padding: 0;
-  max-width: 780px !important;
-  width: 95vw;
-}
-
-.ai-synth-modal .card {
-  transition: all var(--d-1);
-}
-
-.ai-synth-modal .card:hover {
-  border-color: var(--line-3);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-}
-
-@media (max-width: 600px) {
-  .ai-synth-modal div[style*="grid-template-columns: 1fr 1fr"] {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr;
   }
 }
