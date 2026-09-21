@@ -38,6 +38,8 @@ function renderStudio() {
         ${studioSubTab === 'lab' ? renderStudioLabHtml() : renderStudioPipelineHtml()}
       </div>
     </div>`;
+
+  el.querySelectorAll('.rev').forEach(r => r.classList.add('in'));
 }
 
 function setStudioSubTab(tab) {

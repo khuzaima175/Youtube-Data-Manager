@@ -56,8 +56,11 @@ function getChannelMedianBaseline(chId) {
   return ch?.avg_views_raw || 1;
 }
 
-function buildTopicCache() {
+function buildTopicCache(force = false) {
   const now = Date.now();
+  if (!force && _topicCache.ts && (now - _topicCache.ts) < 5 * 60 * 1000 && _topicCache.topics && _topicCache.topics.size > 0) {
+    return;
+  }
 
   // Gather all enriched videos
   const allVids = [];

@@ -137,6 +137,23 @@ let raceTopicFilter = null;  // string or null — cross-wire from radar
 let _channelBaselinesCache = null;
 let _channelBaselinesTs = 0;
 
+// Studio & Content Pipeline State
+let studioSubTab = 'lab'; // 'lab' | 'pipeline'
+let titleLabDraft = 'How EUV Lithography Works: The Secret to 2nm Chips (Explained)';
+let pipelineCards = [];
+let pipelineIdeaFilter = 'all';
+
+try {
+  const stored = localStorage.getItem('yt_pipeline_cards');
+  pipelineCards = stored ? JSON.parse(stored) : [
+    { id: 'card-1', title: 'Why GD&T Tolerances Fail in High Volume Production', topic: 'gdt', stage: 'making', score: 94, targetDate: '2026-08-20', notes: 'Focus on CMM inspection pitfalls', createdAt: Date.now() - 3 * 864e5 },
+    { id: 'card-2', title: 'EUV Lithography Explained: The Physics of 2nm Chips', topic: 'euv', stage: 'scheduled', score: 98, targetDate: '2026-08-18', notes: 'ASML mirror optics teardown', createdAt: Date.now() - 5 * 864e5 },
+    { id: 'card-3', title: 'How Ray Tracing Shaders Really Work Under the Hood', topic: 'ray tracing', stage: 'idea', score: 88, notes: 'BVH traversal walkthrough', createdAt: Date.now() - 1 * 864e5 }
+  ];
+} catch {
+  pipelineCards = [];
+}
+
 // Void Miner & AI Synthesizer State
 let _voidMinerQuery = '';
 let _voidMinerResults = [];
@@ -221,6 +238,11 @@ function esc(s) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function capWords(str) {
+  if (!str) return '';
+  return String(str).split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 function proxyImg(url) {

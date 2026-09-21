@@ -107,9 +107,8 @@ async function renderDDOverview(ch) {
     </div>`;
 
   const en = await enrich(ch.id) || {};
-  if (ddChannelId !== ch.id || ddActiveTab !== 'overview') return; // Guard against rapid tab switching
-  const vids = en.vids || [];
-  const allVids = [...(en.longForm || vids)];
+  const vids = (en.vids && Array.isArray(en.vids) && en.vids.length) ? en.vids : (ch.video?.id ? [ch.video] : []);
+  const allVids = (en.longForm && Array.isArray(en.longForm) && en.longForm.length) ? en.longForm : vids;
   const top5 = [...allVids].sort((a, b) => (b.view_count ?? b.views_raw ?? 0) - (a.view_count ?? a.views_raw ?? 0)).slice(0, 5);
   const maxTopViews = top5.length ? Math.max(...top5.map(v => parseInt(v.view_count ?? v.views_raw ?? 0))) : 1;
 
@@ -293,6 +292,7 @@ async function renderDDOverview(ch) {
     </div>`;
 
   panel.querySelectorAll('.count-val').forEach(v => countUp(v, v.dataset.val));
+  panel.querySelectorAll('.rev').forEach(r => r.classList.add('in'));
 }
 
 function buildPulseChart(vids, col) {
@@ -357,21 +357,29 @@ async function renderDDVideos(ch) {
   ddVidPreset = localStorage.getItem('dd_vid_sort_' + ch.id) || 'recent';
   ddVidPage = 0;
 
-  panel.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;color:var(--t3);padding:40px 0">
-      <div class="spin"></div> Loading video catalog…
-    </div>`;
+  // Instantly use enrichCache if available for zero-lag rendering
+  let allVids = (_enrichCache[ch.id]?.vids && Array.isArray(_enrichCache[ch.id].vids) && _enrichCache[ch.id].vids.length)
+    ? _enrichCache[ch.id].vids
+    : (Array.isArray(ddFullVideos) ? ddFullVideos : []);
 
-  if (!ddFullVideos) {
+  if (!allVids.length) {
     try {
-      const r = await fetch(`/api/channels/${ch.id}/videos/full`);
-      ddFullVideos = await r.json();
+      const en = await enrich(ch.id);
+      if (en && Array.isArray(en.vids) && en.vids.length) {
+        allVids = en.vids;
+      } else {
+        const r = await fetch(`/api/channels/${ch.id}/videos?max=50`);
+        const res = await r.json();
+        if (Array.isArray(res)) allVids = res;
+      }
     } catch {
-      ddFullVideos = [];
+      allVids = [];
     }
   }
 
-  const allVids = ddFullVideos || [];
+  ddFullVideos = allVids;
+  if (ddChannelId !== ch.id || ddActiveTab !== 'videos') return; // Guard tab switch
+
   const longForm = allVids.filter(v => !isYouTubeShort(v));
   const shorts = allVids.filter(v => isYouTubeShort(v));
   const totalViews = allVids.reduce((s, v) => s + parseInt(v.view_count ?? v.views_raw ?? 0), 0);
@@ -432,6 +440,7 @@ async function renderDDVideos(ch) {
       <div id="ddVidLoadMore"></div>
     </div>`;
 
+  panel.querySelectorAll('.rev').forEach(r => r.classList.add('in'));
   updateDDLoadMore(ch.id, col);
 }
 
@@ -632,19 +641,24 @@ async function renderDDGrowth(ch) {
   if (!ddSnapshots) {
     try {
       const r = await fetch(`/api/snapshots/${ch.id}`);
-      ddSnapshots = await r.json();
+      const res = await r.json();
+      ddSnapshots = Array.isArray(res) ? res : [];
     } catch {
       ddSnapshots = [];
     }
   }
 
-  const snaps = ddSnapshots || [];
+  const snaps = Array.isArray(ddSnapshots) ? ddSnapshots : [];
   const snapsHtml = snaps.length >= 2
     ? renderSnapshotLineChart(snaps, colorOf(ch))
     : `<div style="padding:24px;text-align:center;color:var(--t3)">
          <div style="font-size:13px;color:var(--t1);margin-bottom:4px">Timeline Building</div>
          Record daily snapshots by refreshing this channel over time to see the growth trajectory.
        </div>`;
+
+  const heatmapVids = (Array.isArray(ddFullVideos) && ddFullVideos.length)
+    ? ddFullVideos
+    : (_enrichCache[ch.id]?.vids || []);
 
   panel.innerHTML = `
     <div class="rev" style="display:flex;flex-direction:column;gap:18px">
@@ -661,9 +675,11 @@ async function renderDDGrowth(ch) {
         <div class="sect-lbl" style="margin:0 0 10px 0">
           <span class="msi">calendar_month</span> Upload Activity Heatmap
         </div>
-        ${renderCalendarHeatmap(ddFullVideos || [])}
+        ${renderCalendarHeatmap(heatmapVids)}
       </div>
     </div>`;
+
+  panel.querySelectorAll('.rev').forEach(r => r.classList.add('in'));
 
   panel.querySelectorAll('.snap-dot').forEach(circle => {
     circle.addEventListener('mouseenter', e => {
@@ -835,26 +851,8 @@ function renderDDCompare(focusedCh) {
         </div>
       </div>
     </div>`;
-}
 
-/* ══════════════════════════════════════════════════════════════════════════════
-   PHASE 9: STUDIO (TITLE LAB, IDEA GENERATOR, PIPELINE KANBAN)
-   ══════════════════════════════════════════════════════════════════════════════ */
-
-let studioSubTab = 'lab'; // 'lab' | 'pipeline'
-let titleLabDraft = 'How EUV Lithography Works: The Secret to 2nm Chips (Explained)';
-let pipelineCards = [];
-let pipelineIdeaFilter = 'all';
-
-try {
-  const stored = localStorage.getItem('yt_pipeline_cards');
-  pipelineCards = stored ? JSON.parse(stored) : [
-    { id: 'card-1', title: 'Why GD&T Tolerances Fail in High Volume Production', topic: 'gdt', stage: 'making', score: 94, targetDate: '2026-08-20', notes: 'Focus on CMM inspection pitfalls', createdAt: Date.now() - 3 * 864e5 },
-    { id: 'card-2', title: 'EUV Lithography Explained: The Physics of 2nm Chips', topic: 'euv', stage: 'scheduled', score: 98, targetDate: '2026-08-18', notes: 'ASML mirror optics teardown', createdAt: Date.now() - 5 * 864e5 },
-    { id: 'card-3', title: 'How Ray Tracing Shaders Really Work Under the Hood', topic: 'ray tracing', stage: 'idea', score: 88, notes: 'BVH traversal walkthrough', createdAt: Date.now() - 1 * 864e5 }
-  ];
-} catch {
-  pipelineCards = [];
+  panel.querySelectorAll('.rev').forEach(r => r.classList.add('in'));
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
