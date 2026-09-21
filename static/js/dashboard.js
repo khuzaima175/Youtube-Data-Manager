@@ -408,8 +408,27 @@ async function renderDash() {
       </div>
       <div class="recent-rail-wrap">
         <div class="recent-uploads-scroll" id="dashRecentUploads">
-          <div style="display:flex;align-items:center;gap:8px;color:var(--t3);padding:20px 0">
-            <div class="spin"></div> Loading recent uploads…
+          <div style="display:flex;gap:14px;width:100%;padding:4px 0">
+            <div style="min-width:200px;width:200px;display:flex;flex-direction:column;gap:8px">
+              <div class="skel skel-thumb"></div>
+              <div class="skel skel-text" style="width:85%"></div>
+              <div class="skel skel-text sm" style="width:45%"></div>
+            </div>
+            <div style="min-width:200px;width:200px;display:flex;flex-direction:column;gap:8px">
+              <div class="skel skel-thumb"></div>
+              <div class="skel skel-text" style="width:75%"></div>
+              <div class="skel skel-text sm" style="width:50%"></div>
+            </div>
+            <div style="min-width:200px;width:200px;display:flex;flex-direction:column;gap:8px">
+              <div class="skel skel-thumb"></div>
+              <div class="skel skel-text" style="width:90%"></div>
+              <div class="skel skel-text sm" style="width:40%"></div>
+            </div>
+            <div style="min-width:200px;width:200px;display:flex;flex-direction:column;gap:8px">
+              <div class="skel skel-thumb"></div>
+              <div class="skel skel-text" style="width:80%"></div>
+              <div class="skel skel-text sm" style="width:60%"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -445,9 +464,9 @@ function renderAccelerationRadar() {
           <div>
             <div style="font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--t1);display:flex;align-items:center;gap:6px">
               <span>Velocity Acceleration Radar</span>
-              <span class="badge bdg-gr" style="font-size:10px">d²V/dt² > 0</span>
+              <span class="badge bdg-gr" style="font-size:10px">Virality Surge</span>
             </div>
-            <div style="font-size:11px;color:var(--t3)">Surfaces competitor drops whose daily view accrual rate is actively accelerating (2nd derivative virality).</div>
+            <div style="font-size:11px;color:var(--t3)">Surfaces competitor drops whose daily view accrual rate is actively accelerating.</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
@@ -458,8 +477,23 @@ function renderAccelerationRadar() {
         </div>
       </div>
       <div id="accelRadarList" style="min-height:120px">
-        <div style="display:flex;align-items:center;gap:8px;color:var(--t3);padding:24px 0;justify-content:center">
-          <div class="spin"></div> Calculating velocity acceleration curves…
+        <div style="display:flex;flex-direction:column;gap:10px;padding:8px 0">
+          <div class="skel-row" style="border-radius:var(--r-m);background:var(--bg-3)">
+            <div class="skel skel-avatar sm"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+              <div class="skel skel-text" style="width:45%"></div>
+              <div class="skel skel-text sm" style="width:25%"></div>
+            </div>
+            <div class="skel skel-badge"></div>
+          </div>
+          <div class="skel-row" style="border-radius:var(--r-m);background:var(--bg-3)">
+            <div class="skel skel-avatar sm"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+              <div class="skel skel-text" style="width:50%"></div>
+              <div class="skel skel-text sm" style="width:30%"></div>
+            </div>
+            <div class="skel skel-badge"></div>
+          </div>
         </div>
       </div>
     </div>`;

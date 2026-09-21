@@ -122,10 +122,36 @@
     <!-- PAGE 1: DASHBOARD (Comparison-First Command Center) -->
     <div class="page on" id="page-dash">
       <div id="dashMain">
-        <!-- Skeleton Shell for First Paint -->
-        <div class="skel" style="height:90px;margin-bottom:20px;border-radius:var(--r-m)"></div>
-        <div class="skel" style="height:260px;margin-bottom:20px;border-radius:var(--r-m)"></div>
-        <div class="skel" style="height:220px;border-radius:var(--r-m)"></div>
+        <!-- High-Fidelity Bento Skeleton Shell for Zero CLS -->
+        <div class="card" style="margin-bottom:24px;padding:22px 26px;display:grid;grid-template-columns:280px 1fr 280px;gap:20px;align-items:center">
+          <div style="display:flex;align-items:center;gap:14px;border-right:1px solid var(--line-1);padding-right:14px">
+            <div class="skel skel-avatar lg"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <div class="skel skel-title" style="width:70%;height:18px;margin:0"></div>
+              <div class="skel skel-text sm" style="width:50%"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
+            <div class="skel skel-tile"></div>
+            <div class="skel skel-tile"></div>
+            <div class="skel skel-tile"></div>
+            <div class="skel skel-tile"></div>
+            <div class="skel skel-tile"></div>
+          </div>
+          <div class="skel skel-tile" style="height:100%"></div>
+        </div>
+
+        <div class="card" style="margin-bottom:24px;padding:24px;display:grid;grid-template-columns:270px 1fr 310px;gap:16px">
+          <div class="skel skel-tile" style="height:220px"></div>
+          <div class="skel skel-tile" style="height:220px"></div>
+          <div class="skel skel-tile" style="height:220px"></div>
+        </div>
+
+        <div class="card" style="padding:24px;display:flex;flex-direction:column;gap:12px">
+          <div class="skel skel-row"></div>
+          <div class="skel skel-row"></div>
+          <div class="skel skel-row"></div>
+        </div>
       </div>
     </div>
 
