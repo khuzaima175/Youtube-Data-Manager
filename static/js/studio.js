@@ -18,17 +18,18 @@ function renderStudio() {
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
         <div>
           <div class="pg-title" style="display:flex;align-items:center;gap:10px">
-            <span>🎬 Creator Studio</span>
-            <span class="badge bdg-pr" style="font-size:11px">Intelligence-Driven</span>
+            <i data-lucide="clapperboard" style="width:20px;height:20px;color:var(--acc)"></i>
+            <span>Creator Studio</span>
+            <span class="badge bdg-pr" style="font-size:10px">Intelligence-Driven</span>
           </div>
           <div class="pg-sub">Turn competitive topic intelligence into high-performing video concepts & manage production.</div>
         </div>
         <div class="vid-seg">
           <button class="vid-seg-btn ${studioSubTab === 'lab' ? 'on' : ''}" onclick="setStudioSubTab('lab')">
-            🧪 Title Lab & Ideas
+            <i data-lucide="flask-conical" style="width:13px;height:13px"></i> Title Lab & Ideas
           </button>
           <button class="vid-seg-btn ${studioSubTab === 'pipeline' ? 'on' : ''}" onclick="setStudioSubTab('pipeline')">
-            📋 Content Pipeline (${pipelineCards.filter(c => c.stage !== 'published').length})
+            <i data-lucide="kanban" style="width:13px;height:13px"></i> Content Pipeline (${pipelineCards.filter(c => c.stage !== 'published').length})
           </button>
         </div>
       </div>
@@ -39,6 +40,7 @@ function renderStudio() {
       </div>
     </div>`;
 
+  if (window.lucide) window.lucide.createIcons();
   el.querySelectorAll('.rev').forEach(r => r.classList.add('in'));
 }
 
@@ -46,9 +48,8 @@ function setStudioSubTab(tab) {
   studioSubTab = tab;
   const p = document.getElementById('studioSubPanel');
   if (p) {
-    flip(p, () => {
-      p.innerHTML = tab === 'lab' ? renderStudioLabHtml() : renderStudioPipelineHtml();
-    });
+    p.innerHTML = tab === 'lab' ? renderStudioLabHtml() : renderStudioPipelineHtml();
+    if (window.lucide) window.lucide.createIcons();
   }
 }
 
@@ -675,7 +676,9 @@ function renderStudioLabHtml() {
       <div class="card" style="padding:22px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
           <div style="display:flex;align-items:center;gap:10px">
-            <span class="ic-tile cyan"><span class="msi" style="font-size:16px">science</span></span>
+            <div style="width:32px;height:32px;border-radius:var(--r-s);background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;color:var(--acc)">
+              <i data-lucide="flask-conical" style="width:16px;height:16px"></i>
+            </div>
             <div>
               <div style="font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--t1)">Title Lab Real-Time Scorer</div>
               <div style="font-size:11px;color:var(--t3)">Live algorithmic scoring based on your topic engine, CTR formulas, and length bounds.</div>
@@ -683,10 +686,10 @@ function renderStudioLabHtml() {
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <button class="btn btn-acc btn-sm" onclick="openAiTitleSynthesizer('', titleLabDraft)">
-              <span class="msi">auto_awesome</span> ✨ AI Synthesize
+              <i data-lucide="sparkles" style="width:13px;height:13px"></i> AI Synthesize
             </button>
             <span id="tlScoreBadge" class="badge ${res.score >= 85 ? 'bdg-gr' : res.score >= 70 ? 'bdg-pr' : res.score >= 50 ? 'bdg-gd' : 'bdg-rd'}">
-              ${res.score >= 85 ? '🔥 Elite Concept' : res.score >= 70 ? '🟢 Strong Title' : res.score >= 50 ? '🟡 Moderate' : '🔴 Needs Polish'}
+              ${res.score >= 85 ? 'Elite Concept' : res.score >= 70 ? 'Strong Title' : res.score >= 50 ? 'Moderate' : 'Needs Polish'}
             </span>
             <div style="font-family:var(--f-mono);font-size:24px;font-weight:800;color:var(--acc)" id="tlScoreNum">${res.score}</div>
             <span style="font-size:12px;color:var(--t3)">/100</span>
@@ -713,25 +716,33 @@ function renderStudioLabHtml() {
         <!-- 4 Factor Grid -->
         <div class="tl-factors-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
           <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">📏 Length (25 max)</div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+              <i data-lucide="ruler" style="width:11px;height:11px"></i> Length (25 max)
+            </div>
             <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
               <div id="tlMeterLen" style="height:100%;width:${Math.round((res.lenScore / 25) * 100)}%;background:var(--acc);transition:width .2s"></div>
             </div>
           </div>
           <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">🎯 Topic Match (35 max)</div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+              <i data-lucide="target" style="width:11px;height:11px"></i> Topic Match (35 max)
+            </div>
             <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
               <div id="tlMeterTopic" style="height:100%;width:${Math.round((res.topicScore / 35) * 100)}%;background:var(--up);transition:width .2s"></div>
             </div>
           </div>
           <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">⚡ Hook & Format (25 max)</div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+              <i data-lucide="zap" style="width:11px;height:11px"></i> Hook & Format (25 max)
+            </div>
             <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
               <div id="tlMeterHook" style="height:100%;width:${Math.round((res.hookScore / 25) * 100)}%;background:var(--warn);transition:width .2s"></div>
             </div>
           </div>
           <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px">📝 Structure (15 max)</div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+              <i data-lucide="layout" style="width:11px;height:11px"></i> Structure (15 max)
+            </div>
             <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
               <div id="tlMeterStruct" style="height:100%;width:${Math.round((res.structScore / 15) * 100)}%;background:var(--me);transition:width .2s"></div>
             </div>
@@ -741,7 +752,7 @@ function renderStudioLabHtml() {
         <!-- Missing High-Momentum Tokens -->
         <div style="margin-bottom:16px">
           <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:8px">
-            💡 Trending Tokens to Inject (Click to Append):
+            Trending Topic Tokens in Field (Click to Append):
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${res.missingHotTokens.length ? res.missingHotTokens.map(tok => `
@@ -754,13 +765,13 @@ function renderStudioLabHtml() {
         <!-- Actions -->
         <div style="display:flex;gap:10px;padding-top:14px;border-top:1px solid var(--line-1);flex-wrap:wrap">
           <button class="btn btn-acc" onclick="openAiTitleSynthesizer('', titleLabDraft)">
-            <span class="msi">auto_awesome</span> ✨ Synthesize with AI
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i> Synthesize with AI
           </button>
           <button class="btn btn-gh" onclick="sendTitleLabToPipeline()">
-            <span class="msi">playlist_add</span> Send to Content Pipeline
+            <i data-lucide="plus" style="width:14px;height:14px"></i> Send to Content Pipeline
           </button>
           <button class="btn btn-gh" onclick="copyTitleLabText()">
-            <span class="msi">content_copy</span> Copy Title
+            <i data-lucide="copy" style="width:14px;height:14px"></i> Copy Title
           </button>
         </div>
       </div>
@@ -769,9 +780,11 @@ function renderStudioLabHtml() {
       <div class="card" style="padding:22px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
           <div style="display:flex;align-items:center;gap:10px">
-            <span class="ic-tile gold"><span class="msi" style="font-size:16px">lightbulb</span></span>
+            <div style="width:32px;height:32px;border-radius:var(--r-s);background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;color:var(--warn)">
+              <i data-lucide="lightbulb" style="width:16px;height:16px"></i>
+            </div>
             <div>
-              <div style="font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--t1)">Algorithmic Idea Generator</div>
+              <div style="font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--t1)">Algorithmic Concept Generator</div>
               <div style="font-size:11px;color:var(--t3)">Pre-tested formulas synthesizing your moats, untapped field gaps, and trending velocity spikes.</div>
             </div>
           </div>
@@ -780,85 +793,34 @@ function renderStudioLabHtml() {
         <!-- Idea Grid -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:14px">
           ${filteredIdeas.map(idea => {
-    const st = scoreTone(idea.score);
-    const ringRadius = 11;
-    const ringCircum = 2 * Math.PI * ringRadius;
-    const ringDash = (idea.score / 100) * ringCircum;
-    const formulaIcon = idea.formula.includes('Collision') ? 'bolt' : idea.formula.includes('Moat') ? 'shield' : idea.formula.includes('Gap') ? 'radar' : idea.formula.includes('Breakout') ? 'trending_up' : 'lightbulb';
-    return `
-            <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m);padding:14px;display:flex;flex-direction:column;justify-content:space-between;transition:border-color var(--d-1)" onmouseenter="this.style.borderColor='var(--line-2)'" onmouseleave="this.style.borderColor='var(--line-1)'">
-              <div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-                  <span class="chip chip-acc" style="font-size:10px;padding:2px 8px">
-                    <span class="msi" style="font-size:13px">${formulaIcon}</span> ${idea.formula}
-                  </span>
-                  <div style="position:relative;width:28px;height:28px;display:flex;align-items:center;justify-content:center" title="${idea.score}% Potential Score">
-                    <svg viewBox="0 0 28 28" style="width:28px;height:28px;transform:rotate(-90deg)">
-                      <circle cx="14" cy="14" r="${ringRadius}" fill="none" stroke="var(--bg-1)" stroke-width="2.5"/>
-                      <circle cx="14" cy="14" r="${ringRadius}" fill="none" stroke="${st.col}" stroke-width="2.5"
-                        stroke-dasharray="${ringCircum.toFixed(1)}"
-                        stroke-dashoffset="${(ringCircum - ringDash).toFixed(1)}"
-                        stroke-linecap="round"/>
-                    </svg>
-                    <span style="position:absolute;font-family:var(--f-mono);font-size:8.5px;font-weight:800;color:${st.col}">${idea.score}</span>
+            const st = scoreTone(idea.score);
+            return `
+              <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m);padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;transition:border-color var(--d-1)">
+                <div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                    <span class="badge bdg-pr" style="font-size:9.5px;padding:2px 8px">
+                      ${idea.formula}
+                    </span>
+                    <span class="badge ${st.badge}" style="font-family:var(--f-mono);font-size:10px;font-weight:700">
+                      ${idea.score}% Score
+                    </span>
                   </div>
+                  <div style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.4;margin-bottom:6px">${esc(idea.title)}</div>
+                  <div style="font-size:10.5px;color:var(--t3);line-height:1.4">${esc(idea.reason)}</div>
                 </div>
-                <div style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.4;margin-bottom:6px">${esc(idea.title)}</div>
-                <div style="font-size:10.5px;color:var(--t3);line-height:1.4;margin-bottom:12px">${esc(idea.reason)}</div>
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line-1)">
-                <button class="btn btn-acc btn-sm" style="flex:1" onclick="openAiTitleSynthesizer('${esc(idea.topic)}', '${esc(idea.title)}')">
-                  <span class="msi" style="font-size:14px">auto_awesome</span> ✨ AI Title
-                </button>
-                <button class="btn btn-gh btn-sm" onclick="sendIdeaToPipeline('${esc(idea.title)}', '${esc(idea.topic)}', ${idea.score})">
-                  <span class="msi" style="font-size:14px">add</span> + Pipeline
-                </button>
-                <button class="icon-btn" onclick="useIdeaInTitleLab('${esc(idea.title)}')" title="Test this idea in Title Lab">
-                  <span class="msi" style="font-size:14px">science</span>
-                </button>
-              </div>
-            </div>`;
-  }).join('')}
-        </div>
-      </div>
-
-      <!-- S3. Unmet Demand Miner Card (Void Miner P3) -->
-      <div class="card" style="padding:22px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <span class="ic-tile cyan"><span class="msi" style="font-size:16px">travel_explore</span></span>
-            <div>
-              <div style="font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--t1)">🔍 Unmet Demand Miner (Autocomplete Void Miner)</div>
-              <div style="font-size:11px;color:var(--t3)">Scrapes live YouTube search queries and filters out covered competitor videos to surface pure unmet viewer demand.</div>
-            </div>
-          </div>
-          <span class="badge bdg-pr" style="font-size:10.5px">Zero Quota · Jaccard Token Filter</span>
-        </div>
-
-        <!-- Search Bar and Quick Seeds -->
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-          <div style="position:relative;flex:1;min-width:260px">
-            <input type="text" id="voidMinerInput" value="${esc(_voidMinerQuery || suggestedSeed)}" placeholder="Enter a seed keyword or topic to mine…"
-              style="width:100%;padding:10px 14px;font-size:13.5px;font-weight:600;background:var(--bg-3);border:1.5px solid var(--line-2);border-radius:var(--r-m);color:var(--t1);outline:none"
-              onkeydown="if(event.key==='Enter') runVoidMiner(this.value)" />
-          </div>
-          <button class="btn btn-acc" id="voidMinerBtn" onclick="runVoidMiner()">
-            <span class="msi">search</span> Mine Autocomplete Voids
-          </button>
-        </div>
-
-        <!-- Quick Recommended Seed Chips from Radar -->
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:16px">
-          <span style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--t3)">Quick Mine from Radar:</span>
-          ${topTopics.slice(0, 5).map(t => `
-            <button class="chip chip-btn" onclick="runVoidMiner('${esc(t.topic)}')">
-              🌊 ${esc(t.topic)} <span style="color:var(--acc);margin-left:4px">⚡${t.shrunkenRpi}×</span>
-            </button>`).join('')}
-        </div>
-
-        <!-- Results Container -->
-        <div id="voidMinerResultsWrap">
-          ${renderVoidMinerResultsHtml()}
+                <div style="display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line-1)">
+                  <button class="btn btn-acc btn-sm" style="flex:1" onclick="openAiTitleSynthesizer('${esc(idea.topic)}', '${esc(idea.title)}')">
+                    <i data-lucide="sparkles" style="width:12px;height:12px"></i> AI Title
+                  </button>
+                  <button class="btn btn-gh btn-sm" onclick="sendIdeaToPipeline('${esc(idea.title)}', '${esc(idea.topic)}', ${idea.score})">
+                    <i data-lucide="plus" style="width:12px;height:12px"></i> Pipeline
+                  </button>
+                  <button class="icon-btn" onclick="useIdeaInTitleLab('${esc(idea.title)}')" title="Test this idea in Title Lab">
+                    <i data-lucide="flask-conical" style="width:12px;height:12px"></i>
+                  </button>
+                </div>
+              </div>`;
+          }).join('')}
         </div>
       </div>
     </div>`;
@@ -867,10 +829,10 @@ function renderStudioLabHtml() {
 /* ── S3. Content Pipeline Kanban ─────────────────────────────────────────── */
 function renderStudioPipelineHtml() {
   const stages = [
-    { key: 'idea', label: '💡 Idea', hint: 'Raw concepts & research' },
-    { key: 'making', label: '🛠 In Production', hint: 'Scripting, recording & editing' },
-    { key: 'scheduled', label: '⏳ Scheduled', hint: 'Rendered & upload queued' },
-    { key: 'published', label: '🚀 Published', hint: 'Live & tracking telemetry' }
+    { key: 'idea', label: 'Ideas & Research', icon: 'lightbulb', hint: 'Raw concepts & gaps' },
+    { key: 'making', label: 'In Production', icon: 'hammer', hint: 'Scripting & filming' },
+    { key: 'scheduled', label: 'Scheduled', icon: 'clock', hint: 'Rendered & queued' },
+    { key: 'published', label: 'Published', icon: 'check-circle-2', hint: 'Live telemetry' }
   ];
 
   return `
@@ -881,36 +843,36 @@ function renderStudioPipelineHtml() {
           Drag & drop cards between stages, or use stage shift arrows. Published videos auto-sync upon refresh.
         </div>
         <button class="btn btn-acc btn-sm" onclick="openAddPipelineCardModal()">
-          <span class="msi">add</span> + Add New Card
+          <i data-lucide="plus" style="width:13px;height:13px"></i> Add New Idea
         </button>
       </div>
 
       <!-- 4-Column Board -->
       <div class="studio-kanban-board">
         ${stages.map(st => {
-    const cardsInStage = pipelineCards.filter(c => c.stage === st.key);
-    return `
-            <div class="studio-kanban-col" style="background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-m);display:flex;flex-direction:column;max-height:75vh;overflow:hidden"
+          const cardsInStage = pipelineCards.filter(c => c.stage === st.key);
+          return `
+            <div class="studio-kanban-col"
                  ondragover="event.preventDefault()"
                  ondrop="pipelineDrop(event, '${st.key}')">
               <!-- Column Header -->
-              <div style="padding:12px 14px;background:var(--bg-3);border-bottom:1px solid var(--line-1);display:flex;align-items:center;justify-content:space-between">
-                <div>
-                  <div style="font-size:12px;font-weight:700;color:var(--t1)">${st.label}</div>
-                  <div style="font-size:9.5px;color:var(--t3)">${st.hint}</div>
+              <div class="studio-kanban-col-hdr">
+                <div class="studio-col-title">
+                  <i data-lucide="${st.icon}" style="width:13px;height:13px"></i>
+                  <span>${st.label}</span>
                 </div>
                 <span class="badge bdg-dim" style="font-family:var(--f-mono);font-size:10px;font-weight:700">${cardsInStage.length}</span>
               </div>
 
               <!-- Column Body (Scrollable) -->
-              <div style="padding:10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex:1;min-height:120px">
+              <div class="pipeline-cards-list">
                 ${cardsInStage.length ? cardsInStage.map(card => renderPipelineCardHtml(card)).join('') : `
-                  <div style="padding:24px 10px;text-align:center;color:var(--t4);font-size:11px;border:1.5px dashed var(--line-1);border-radius:var(--r-s)">
+                  <div style="padding:32px 10px;text-align:center;color:var(--t4);font-size:11px;border:1.5px dashed var(--line-1);border-radius:var(--r-s)">
                     Drop cards here
                   </div>`}
               </div>
             </div>`;
-  }).join('')}
+        }).join('')}
       </div>
     </div>`;
 }
@@ -921,37 +883,35 @@ function renderPipelineCardHtml(card) {
   if (card.stage === 'scheduled') {
     const suggestedSlot = suggestSlotForCard(card);
     if (suggestedSlot) {
-      slotChip = `<div class="chip chip-acc" style="font-size:10px;margin-bottom:6px;display:inline-flex;align-items:center;gap:4px">⏰ Suggested: ${esc(suggestedSlot)} (your best slot)</div>`;
+      slotChip = `<div class="chip chip-acc" style="font-size:10px;margin-bottom:6px;display:inline-flex;align-items:center;gap:4px"><i data-lucide="clock" style="width:11px;height:11px"></i> Best Slot: ${esc(suggestedSlot)}</div>`;
     }
   }
 
   return `
     <div class="pipeline-card" draggable="true"
-         ondragstart="pipelineDragStart(event, '${card.id}')"
-         style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px;cursor:grab;transition:transform var(--d-1), border-color var(--d-1)"
-         onmouseenter="this.style.borderColor='var(--line-2)'" onmouseleave="this.style.borderColor='var(--line-1)'">
+         ondragstart="pipelineDragStart(event, '${card.id}')">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span class="badge bdg-pr" style="font-size:9px">${esc(card.topic || 'General')}</span>
-        <span class="badge ${card.score >= 90 ? 'bdg-gr' : 'bdg-gd'}" style="font-size:9px;font-weight:700">🔥 ${card.score || 85}</span>
+        <span class="badge bdg-pr" style="font-size:9.5px">${esc(card.topic || 'General')}</span>
+        <span class="badge ${card.score >= 90 ? 'bdg-gr' : 'bdg-gd'}" style="font-family:var(--f-mono);font-size:9.5px;font-weight:700">${card.score || 85}% Score</span>
       </div>
-      <div style="font-size:12px;font-weight:600;color:var(--t1);line-height:1.35;margin-bottom:6px">${esc(card.title)}</div>
-      ${card.notes ? `<div style="font-size:10px;color:var(--t3);margin-bottom:6px;line-height:1.3">${esc(card.notes)}</div>` : ''}
-      ${card.targetDate ? `<div style="font-size:9.5px;color:var(--acc);margin-bottom:6px">📅 Target: ${card.targetDate}</div>` : ''}
+      <div style="font-size:12.5px;font-weight:600;color:var(--t1);line-height:1.35;margin-bottom:6px">${esc(card.title)}</div>
+      ${card.notes ? `<div style="font-size:10.5px;color:var(--t3);margin-bottom:6px;line-height:1.3">${esc(card.notes)}</div>` : ''}
+      ${card.targetDate ? `<div style="font-size:10px;color:var(--acc);margin-bottom:6px"><i data-lucide="calendar" style="width:11px;height:11px"></i> Target: ${card.targetDate}</div>` : ''}
       ${slotChip}
-      ${isPublished && card.actualViews ? `<div style="font-size:10px;color:var(--up);font-weight:700;margin-bottom:6px">👁 ${fmtN(card.actualViews)} views logged</div>` : ''}
+      ${isPublished && card.actualViews ? `<div style="font-size:10.5px;color:var(--up);font-weight:700;margin-bottom:6px">${fmtN(card.actualViews)} views logged</div>` : ''}
 
       <!-- Shift and Delete Bar -->
-      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:6px;border-top:1px solid var(--line-1);margin-top:4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid var(--line-1);margin-top:4px">
         <div style="display:flex;gap:4px">
           <button class="icon-btn" style="width:22px;height:22px" onclick="shiftPipelineCard('${card.id}', -1)" title="Move Left">
-            <span class="msi" style="font-size:12px">chevron_left</span>
+            <i data-lucide="chevron-left" style="width:12px;height:12px"></i>
           </button>
           <button class="icon-btn" style="width:22px;height:22px" onclick="shiftPipelineCard('${card.id}', 1)" title="Move Right">
-            <span class="msi" style="font-size:12px">chevron_right</span>
+            <i data-lucide="chevron-right" style="width:12px;height:12px"></i>
           </button>
         </div>
         <button class="icon-btn" style="width:22px;height:22px;color:var(--down)" onclick="deletePipelineCard('${card.id}')" title="Delete Card">
-          <span class="msi" style="font-size:12px">delete</span>
+          <i data-lucide="trash-2" style="width:12px;height:12px"></i>
         </button>
       </div>
     </div>`;
