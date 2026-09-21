@@ -102,8 +102,22 @@ async function renderDDOverview(ch) {
   if (!panel) return;
 
   panel.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;color:var(--t3);padding:40px 0">
-      <div class="spin"></div> Loading overview…
+    <div class="dd-overview-bento" style="display:grid;grid-template-columns:1fr 320px;gap:20px">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          <div class="skel skel-tile"></div>
+          <div class="skel skel-tile"></div>
+          <div class="skel skel-tile"></div>
+          <div class="skel skel-tile"></div>
+        </div>
+        <div class="skel skel-card" style="height:180px"></div>
+        <div class="skel skel-card" style="height:220px"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="skel skel-card" style="height:140px"></div>
+        <div class="skel skel-card" style="height:160px"></div>
+        <div class="skel skel-card" style="height:160px"></div>
+      </div>
     </div>`;
 
   const en = await enrich(ch.id) || {};
