@@ -174,12 +174,12 @@ async function renderDDOverview(ch) {
           </div>
           <div class="tile">
             <span class="lbl">Avg Views</span>
-            <span class="val green count-val" data-val="${ch.avg_views_raw || 0}">${esc(ch.avg_views)}</span>
+            <span class="val count-val" data-val="${ch.avg_views_raw || 0}">${esc(ch.avg_views)}</span>
             <span class="foot"><span style="font-size:10px;color:var(--t3)">per video</span></span>
           </div>
           <div class="tile">
             <span class="lbl">Subs ÷ Views</span>
-            <span class="val cyan">${audienceRatio !== null ? audienceRatio + '%' : '—'}</span>
+            <span class="val">${audienceRatio !== null ? audienceRatio + '%' : '—'}</span>
             <span class="foot"><span style="font-size:10px;color:var(--t3)">audience ratio</span></span>
           </div>
         </div>

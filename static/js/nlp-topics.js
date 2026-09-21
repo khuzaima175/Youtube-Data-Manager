@@ -430,7 +430,7 @@ async function renderTopicRadarPage() {
         <div class="topic-gap-title">
           <i data-lucide="sparkles" style="width:18px;height:18px;color:var(--acc)"></i>
           <span>High-Impact Blue Ocean Gaps in Your Field</span>
-          <span class="badge bdg-gd" style="font-size:10px">Zero Competitor Defense</span>
+          <span class="badge bdg-dim" style="font-size:10px;color:var(--me)">Untapped Moats</span>
         </div>
         <span class="card-prov" onclick="buildTopicCache(true);renderTopicRadarPage();">Re-index Field</span>
       </div>
@@ -446,7 +446,7 @@ async function renderTopicRadarPage() {
                   <span>•</span>
                   <span>${g.fieldN} competitor drops</span>
                   <span>•</span>
-                  <span class="badge bdg-gr" style="font-size:9.5px">0 uploads by you</span>
+                  <span style="color:var(--me);font-weight:600">0 uploads by you</span>
                 </div>
               </div>
               <button class="btn btn-acc btn-sm" onclick="openTitleLabWithTopic('${esc(g.topic)}')">
@@ -483,7 +483,7 @@ async function renderTopicRadarPage() {
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <div class="race-seg">
           <button class="race-seg-btn ${radarFilterQuadrant === 'all' ? 'on' : ''}" onclick="setRadarQuadrantFilter('all')">All (${_topicCache.topics.size})</button>
-          <button class="race-seg-btn ${radarFilterQuadrant === 'blue_ocean' ? 'on' : ''}" onclick="setRadarQuadrantFilter('blue_ocean')">Blue Ocean Gaps</button>
+          <button class="race-seg-btn ${radarFilterQuadrant === 'blue_ocean' ? 'on' : ''}" onclick="setRadarQuadrantFilter('blue_ocean')">Blue Ocean</button>
           <button class="race-seg-btn ${radarFilterQuadrant === 'red_ocean' ? 'on' : ''}" onclick="setRadarQuadrantFilter('red_ocean')">High Demand</button>
           <button class="race-seg-btn ${radarFilterQuadrant === 'emerging' ? 'on' : ''}" onclick="setRadarQuadrantFilter('emerging')">Emerging</button>
         </div>
@@ -496,18 +496,21 @@ async function renderTopicRadarPage() {
       ${allTopicsList.map(t => {
         const isMine = t.channels.includes(primary?.id);
         const myUploads = _topicCache.perChannel.get(primary?.id)?.get(t.topic)?.n || 0;
-        let badgeColor = 'bdg-dim';
-        let badgeLabel = 'Emerging';
-        if (t.quadrant === 'blue_ocean') { badgeColor = 'bdg-gr'; badgeLabel = 'Blue Ocean Gap'; }
-        else if (t.quadrant === 'red_ocean') { badgeColor = 'bdg-re'; badgeLabel = 'High Demand'; }
-        else if (t.quadrant === 'saturated') { badgeColor = 'bdg-dim'; badgeLabel = 'Saturated'; }
+        let badgeHtml = '<span class="badge bdg-dim" style="font-size:9.5px">Emerging</span>';
+        if (t.quadrant === 'blue_ocean') {
+          badgeHtml = '<span class="badge bdg-gr" style="font-size:9.5px"><span style="display:inline-block;width:4.5px;height:4.5px;border-radius:50%;background:#34d399;margin-right:2px"></span>Opportunity</span>';
+        } else if (t.quadrant === 'red_ocean') {
+          badgeHtml = '<span class="badge bdg-gd" style="font-size:9.5px">High Demand</span>';
+        } else if (t.quadrant === 'saturated') {
+          badgeHtml = '<span class="badge bdg-dim" style="font-size:9.5px">Saturated</span>';
+        }
 
         return `
           <div class="topic-opp-card">
             <div>
               <div class="topic-opp-hdr">
                 <div class="topic-opp-name">${capWords(t.topic)}</div>
-                <span class="badge ${badgeColor}" style="font-size:10px;flex-shrink:0">${badgeLabel}</span>
+                ${badgeHtml}
               </div>
               <div class="topic-opp-stats">
                 <div><strong>${fmtN(t.avgViews)}</strong> avg views</div>

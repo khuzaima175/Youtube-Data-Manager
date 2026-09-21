@@ -20,7 +20,7 @@ function renderStudio() {
           <div class="pg-title" style="display:flex;align-items:center;gap:10px">
             <i data-lucide="clapperboard" style="width:20px;height:20px;color:var(--acc)"></i>
             <span>Creator Studio</span>
-            <span class="badge bdg-pr" style="font-size:10px">Intelligence-Driven</span>
+            <span class="badge bdg-dim" style="font-size:10px">Intelligence-Driven</span>
           </div>
           <div class="pg-sub">Turn competitive topic intelligence into high-performing video concepts & manage production.</div>
         </div>
@@ -691,7 +691,7 @@ function renderStudioLabHtml() {
             <span id="tlScoreBadge" class="badge ${res.score >= 85 ? 'bdg-gr' : res.score >= 70 ? 'bdg-pr' : res.score >= 50 ? 'bdg-gd' : 'bdg-rd'}">
               ${res.score >= 85 ? 'Elite Concept' : res.score >= 70 ? 'Strong Title' : res.score >= 50 ? 'Moderate' : 'Needs Polish'}
             </span>
-            <div style="font-family:var(--f-mono);font-size:24px;font-weight:800;color:var(--acc)" id="tlScoreNum">${res.score}</div>
+            <div style="font-family:var(--f-mono);font-size:24px;font-weight:800;color:var(--t1)" id="tlScoreNum">${res.score}</div>
             <span style="font-size:12px;color:var(--t3)">/100</span>
           </div>
         </div>
@@ -798,7 +798,7 @@ function renderStudioLabHtml() {
               <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m);padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;transition:border-color var(--d-1)">
                 <div>
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-                    <span class="badge bdg-pr" style="font-size:9.5px;padding:2px 8px">
+                    <span class="badge bdg-dim" style="font-size:9.5px;padding:2px 8px">
                       ${idea.formula}
                     </span>
                     <span class="badge ${st.badge}" style="font-family:var(--f-mono);font-size:10px;font-weight:700">
@@ -891,7 +891,7 @@ function renderPipelineCardHtml(card) {
     <div class="pipeline-card" draggable="true"
          ondragstart="pipelineDragStart(event, '${card.id}')">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span class="badge bdg-pr" style="font-size:9.5px">${esc(card.topic || 'General')}</span>
+        <span class="badge bdg-dim" style="font-size:9.5px">${esc(card.topic || 'General')}</span>
         <span class="badge ${card.score >= 90 ? 'bdg-gr' : 'bdg-gd'}" style="font-family:var(--f-mono);font-size:9.5px;font-weight:700">${card.score || 85}% Score</span>
       </div>
       <div style="font-size:12.5px;font-weight:600;color:var(--t1);line-height:1.35;margin-bottom:6px">${esc(card.title)}</div>

@@ -35,10 +35,10 @@ async function renderChannels() {
     const myShare = (primary && totSubs > 0) ? (((primary.subscribers_raw || 0) / totSubs) * 100).toFixed(1) + '%' : '—';
 
     summaryStrip.innerHTML = `
-      <div class="tile"><span class="lbl">Tracked Cohort</span><span class="val cyan count-val" data-val="${all.length}">${all.length}</span></div>
-      <div class="tile"><span class="lbl">Total Audience Reach</span><span class="val gold count-val" data-val="${totSubs}">${fmtN(totSubs)}</span></div>
+      <div class="tile"><span class="lbl">Tracked Cohort</span><span class="val count-val" data-val="${all.length}">${all.length}</span></div>
+      <div class="tile"><span class="lbl">Total Audience Reach</span><span class="val count-val" data-val="${totSubs}">${fmtN(totSubs)}</span></div>
       <div class="tile"><span class="lbl">Combined Video Views</span><span class="val count-val" data-val="${totViews}">${fmtN(totViews)}</span></div>
-      <div class="tile"><span class="lbl">Your Audience Share</span><span class="val green">${myShare}</span></div>`;
+      <div class="tile"><span class="lbl">Your Audience Share</span><span class="val">${myShare}</span></div>`;
   }
 
   const primary = all.find(c => c.is_primary);
@@ -159,7 +159,7 @@ function renderBenchmarkRow(ch, i, primary, maxSubs) {
         </div>
       </td>
       <td>
-        <div style="font-family:var(--f-mono);font-size:13px;font-weight:700;color:var(--up)">${esc(ch.avg_views)}</div>
+        <div style="font-family:var(--f-mono);font-size:13px;font-weight:700;color:var(--t1)">${esc(ch.avg_views)}</div>
       </td>
       <td style="font-family:var(--f-mono);font-size:12.5px;color:var(--t2)">${esc(ch.total_views)}</td>
       <td style="font-family:var(--f-mono);font-size:12.5px;color:var(--t3)">${esc(ch.total_videos)}</td>
@@ -308,10 +308,10 @@ function renderSearchResult(d) {
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-        <div class="tile"><span class="lbl">Subscribers</span><span class="val gold">${esc(d.subscribers)}</span></div>
+        <div class="tile"><span class="lbl">Subscribers</span><span class="val">${esc(d.subscribers)}</span></div>
         <div class="tile"><span class="lbl">Total Views</span><span class="val">${esc(d.total_views)}</span></div>
-        <div class="tile"><span class="lbl">Videos</span><span class="val cyan">${esc(d.total_videos)}</span></div>
-        <div class="tile"><span class="lbl">Avg Views</span><span class="val green">${esc(d.avg_views)}</span></div>
+        <div class="tile"><span class="lbl">Videos</span><span class="val">${esc(d.total_videos)}</span></div>
+        <div class="tile"><span class="lbl">Avg Views</span><span class="val">${esc(d.avg_views)}</span></div>
       </div>
 
       ${vid.title ? `

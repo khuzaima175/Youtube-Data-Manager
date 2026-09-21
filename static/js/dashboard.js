@@ -255,12 +255,12 @@ async function renderDash() {
           <span>Audience Engagement</span>
           <i data-lucide="zap" style="width:14px;height:14px;color:var(--t3)"></i>
         </div>
-        <div class="kpi-val" style="color:var(--acc)">${engRate}%</div>
+        <div class="kpi-val">${engRate}%</div>
         <div class="kpi-foot">
           <div style="flex:1;margin-right:10px">
             <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-bottom:3px">
               <span>Active Response</span>
-              <span>${engRate >= 4 ? 'High' : 'Healthy'}</span>
+              <span class="badge bdg-dim">${engRate >= 4 ? 'High' : 'Healthy'}</span>
             </div>
             <div class="gauge-bar" style="height:4px"><div class="gauge-fill" style="width:${engGaugePct}%;background:var(--acc)"></div></div>
           </div>
@@ -350,11 +350,18 @@ async function renderDash() {
 function toggleDashChartMetric(metric) {
   currentChartMetric = metric;
   const primary = all.find(c => c.is_primary) || all[0];
-  const primaryEnrich = _enrichCache[primary?.id] || {};
-  renderOverviewGrowthChart(primaryEnrich, primary);
-  document.querySelectorAll('.dash-chart-hdr .race-seg-btn').forEach(b => {
-    b.classList.toggle('on', b.textContent.toLowerCase().includes(metric === 'views' ? 'view' : 'cadence'));
+  if (!primary) return;
+  const primaryEnrich = _enrichCache[primary.id] || {};
+  
+  document.querySelectorAll('.dash-chart-hdr .race-seg-btn').forEach((btn, idx) => {
+    if ((idx === 0 && metric === 'views') || (idx === 1 && metric === 'cadence')) {
+      btn.classList.add('on');
+    } else {
+      btn.classList.remove('on');
+    }
   });
+
+  renderOverviewGrowthChart(primaryEnrich, primary);
 }
 
 function renderOverviewGrowthChart(enrichData, primary) {
@@ -395,8 +402,8 @@ function renderOverviewGrowthChart(enrichData, primary) {
   }
 
   const gradient = ctx.createLinearGradient(0, 0, 0, 220);
-  gradient.addColorStop(0, 'rgba(59, 130, 246, 0.22)');
-  gradient.addColorStop(1, 'rgba(59, 130, 246, 0.00)');
+  gradient.addColorStop(0, 'rgba(99, 102, 241, 0.16)');
+  gradient.addColorStop(1, 'rgba(99, 102, 241, 0.00)');
 
   dashChartInstance = new Chart(ctx, {
     type: 'line',
@@ -405,13 +412,13 @@ function renderOverviewGrowthChart(enrichData, primary) {
       datasets: [{
         label: currentChartMetric === 'views' ? 'Views' : 'Uploads',
         data: dataPoints,
-        borderColor: '#3b82f6',
+        borderColor: '#6366f1',
         borderWidth: 2,
         backgroundColor: gradient,
         fill: true,
         tension: 0.35,
-        pointBackgroundColor: '#3b82f6',
-        pointBorderColor: '#0d0f13',
+        pointBackgroundColor: '#6366f1',
+        pointBorderColor: '#0e1015',
         pointBorderWidth: 2,
         pointRadius: 3,
         pointHoverRadius: 5
@@ -423,12 +430,12 @@ function renderOverviewGrowthChart(enrichData, primary) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: 'rgba(13, 15, 19, 0.95)',
+          backgroundColor: 'rgba(14, 16, 21, 0.95)',
           borderColor: 'rgba(255, 255, 255, 0.12)',
           borderWidth: 1,
-          titleColor: '#f3f4f6',
-          bodyColor: '#9ca3af',
-          titleFont: { family: 'DM Sans', size: 12, weight: '600' },
+          titleColor: '#f8fafc',
+          bodyColor: '#94a3b8',
+          titleFont: { family: 'Inter', size: 12, weight: '600' },
           bodyFont: { family: 'JetBrains Mono', size: 12 },
           padding: 10,
           displayColors: false,
@@ -440,7 +447,7 @@ function renderOverviewGrowthChart(enrichData, primary) {
       scales: {
         x: {
           grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false },
-          ticks: { color: 'rgba(255, 255, 255, 0.45)', font: { family: 'DM Sans', size: 10.5 }, maxRotation: 0 }
+          ticks: { color: 'rgba(255, 255, 255, 0.45)', font: { family: 'Inter', size: 10.5 }, maxRotation: 0 }
         },
         y: {
           grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false },

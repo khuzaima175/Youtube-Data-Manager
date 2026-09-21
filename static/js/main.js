@@ -26,6 +26,127 @@
 })();
 
 /* ── 04. Navigation & Workspace Controller ────────────────────────────────── */
+function renderTabSkeleton(p) {
+  if (p === 'dash') {
+    const el = document.getElementById('dashMain');
+    if (!el || el.children.length > 0) return;
+    el.innerHTML = `
+      <div class="tab-skeleton-grid">
+        <!-- Hero Skeleton -->
+        <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:76px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div class="skel" style="width:44px;height:44px;border-radius:50%"></div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div class="skel" style="width:140px;height:16px"></div>
+              <div class="skel" style="width:220px;height:11px"></div>
+            </div>
+          </div>
+          <div class="skel" style="width:280px;height:38px;border-radius:var(--r-m)"></div>
+        </div>
+
+        <!-- 4 KPI Tiles Skeleton -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px">
+          <div class="tile" style="min-height:92px"><div class="skel" style="width:70px;height:12px"></div><div class="skel" style="width:110px;height:24px;margin:4px 0"></div><div class="skel" style="width:100%;height:4px"></div></div>
+          <div class="tile" style="min-height:92px"><div class="skel" style="width:80px;height:12px"></div><div class="skel" style="width:90px;height:24px;margin:4px 0"></div><div class="skel" style="width:80%;height:10px"></div></div>
+          <div class="tile" style="min-height:92px"><div class="skel" style="width:90px;height:12px"></div><div class="skel" style="width:80px;height:24px;margin:4px 0"></div><div class="skel" style="width:60%;height:10px"></div></div>
+          <div class="tile" style="min-height:92px"><div class="skel" style="width:100px;height:12px"></div><div class="skel" style="width:70px;height:24px;margin:4px 0"></div><div class="skel" style="width:100%;height:4px"></div></div>
+        </div>
+
+        <!-- Chart Skeleton -->
+        <div class="card" style="padding:22px;height:340px;display:flex;flex-direction:column;justify-content:space-between">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="skel" style="width:200px;height:18px"></div>
+            <div class="skel" style="width:180px;height:28px;border-radius:var(--r-full)"></div>
+          </div>
+          <div class="skel" style="width:100%;height:230px;border-radius:var(--r-m)"></div>
+        </div>
+
+        <!-- Activity 2-Col Skeleton -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(360px, 1fr));gap:20px">
+          <div class="card" style="padding:20px;gap:12px">
+            <div class="skel" style="width:140px;height:16px;margin-bottom:4px"></div>
+            <div class="skel" style="height:48px;border-radius:var(--r-m)"></div>
+            <div class="skel" style="height:48px;border-radius:var(--r-m)"></div>
+          </div>
+          <div class="card" style="padding:20px;gap:12px">
+            <div class="skel" style="width:160px;height:16px;margin-bottom:4px"></div>
+            <div class="skel" style="height:48px;border-radius:var(--r-m)"></div>
+            <div class="skel" style="height:48px;border-radius:var(--r-m)"></div>
+          </div>
+        </div>
+      </div>`;
+  } else if (p === 'channels') {
+    const el = document.getElementById('chTbl');
+    const strip = document.getElementById('channelsSummaryStrip');
+    if (strip && !strip.children.length) {
+      strip.innerHTML = `
+        <div class="tile" style="min-height:74px"><div class="skel" style="width:70px;height:11px"></div><div class="skel" style="width:50px;height:20px;margin-top:4px"></div></div>
+        <div class="tile" style="min-height:74px"><div class="skel" style="width:90px;height:11px"></div><div class="skel" style="width:80px;height:20px;margin-top:4px"></div></div>
+        <div class="tile" style="min-height:74px"><div class="skel" style="width:90px;height:11px"></div><div class="skel" style="width:80px;height:20px;margin-top:4px"></div></div>
+        <div class="tile" style="min-height:74px"><div class="skel" style="width:90px;height:11px"></div><div class="skel" style="width:60px;height:20px;margin-top:4px"></div></div>`;
+    }
+    if (el && !el.children.length) {
+      el.innerHTML = `
+        <div class="tab-skeleton-grid">
+          <div class="skel" style="height:44px;border-radius:var(--r-m);width:100%"></div>
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="padding:14px;border-bottom:1px solid var(--line-1);display:flex;gap:16px">
+              <div class="skel" style="width:40px;height:14px"></div>
+              <div class="skel" style="width:160px;height:14px"></div>
+              <div class="skel" style="width:120px;height:14px"></div>
+              <div class="skel" style="width:100px;height:14px"></div>
+            </div>
+            <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
+              <div class="skel" style="height:36px;border-radius:var(--r-s)"></div>
+              <div class="skel" style="height:36px;border-radius:var(--r-s)"></div>
+              <div class="skel" style="height:36px;border-radius:var(--r-s)"></div>
+              <div class="skel" style="height:36px;border-radius:var(--r-s)"></div>
+            </div>
+          </div>
+        </div>`;
+    }
+  } else if (p === 'radar') {
+    const el = document.getElementById('radarMain');
+    if (el && !el.children.length) {
+      el.innerHTML = `
+        <div class="tab-skeleton-grid">
+          <div class="card" style="padding:20px;gap:14px">
+            <div class="skel" style="width:240px;height:18px"></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:12px">
+              <div class="skel" style="height:80px;border-radius:var(--r-m)"></div>
+              <div class="skel" style="height:80px;border-radius:var(--r-m)"></div>
+              <div class="skel" style="height:80px;border-radius:var(--r-m)"></div>
+            </div>
+          </div>
+          <div class="skel" style="height:44px;border-radius:var(--r-m);width:100%"></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:14px">
+            <div class="skel" style="height:110px;border-radius:var(--r-l)"></div>
+            <div class="skel" style="height:110px;border-radius:var(--r-l)"></div>
+            <div class="skel" style="height:110px;border-radius:var(--r-l)"></div>
+            <div class="skel" style="height:110px;border-radius:var(--r-l)"></div>
+          </div>
+        </div>`;
+    }
+  } else if (p === 'studio') {
+    const el = document.getElementById('studioMain');
+    if (el && !el.children.length) {
+      el.innerHTML = `
+        <div class="tab-skeleton-grid">
+          <div class="card" style="padding:22px;gap:14px">
+            <div style="display:flex;justify-content:space-between"><div class="skel" style="width:200px;height:18px"></div><div class="skel" style="width:80px;height:24px"></div></div>
+            <div class="skel" style="width:100%;height:44px;border-radius:var(--r-m)"></div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+              <div class="skel" style="height:40px;border-radius:var(--r-s)"></div>
+              <div class="skel" style="height:40px;border-radius:var(--r-s)"></div>
+              <div class="skel" style="height:40px;border-radius:var(--r-s)"></div>
+              <div class="skel" style="height:40px;border-radius:var(--r-s)"></div>
+            </div>
+          </div>
+        </div>`;
+    }
+  }
+}
+
 function sp(p) {
   closeDeepDive();
   document.querySelectorAll('.page').forEach(x => x.classList.remove('on'));
@@ -50,13 +171,36 @@ function sp(p) {
   };
   if (crumbEl) crumbEl.textContent = titles[p] || 'Overview';
 
-  if (p === 'dash') renderDash();
-  if (p === 'channels') renderChannels();
-  if (p === 'radar') {
-    if (typeof renderTopicRadarPage === 'function') renderTopicRadarPage();
-    else if (typeof renderTopicRadar === 'function') renderTopicRadar('radarMain');
+  renderTabSkeleton(p);
+
+  if (p === 'dash') {
+    renderDash().then(() => {
+      const el = document.getElementById('dashMain');
+      if (el) el.classList.add('view-content-ready');
+    }).catch(() => {});
   }
-  if (p === 'studio') renderStudio();
+  if (p === 'channels') {
+    renderChannels().then(() => {
+      const el = document.getElementById('chTbl');
+      if (el) el.classList.add('view-content-ready');
+    }).catch(() => {});
+  }
+  if (p === 'radar') {
+    if (typeof renderTopicRadarPage === 'function') {
+      renderTopicRadarPage();
+      const el = document.getElementById('radarMain');
+      if (el) el.classList.add('view-content-ready');
+    } else if (typeof renderTopicRadar === 'function') {
+      renderTopicRadar('radarMain');
+      const el = document.getElementById('radarMain');
+      if (el) el.classList.add('view-content-ready');
+    }
+  }
+  if (p === 'studio') {
+    renderStudio();
+    const el = document.getElementById('studioMain');
+    if (el) el.classList.add('view-content-ready');
+  }
   if (p === 'search') {
     setTimeout(() => document.getElementById('srInput')?.focus(), 50);
   }

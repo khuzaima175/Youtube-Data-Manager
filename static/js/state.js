@@ -81,9 +81,9 @@ function setNBALastActed(id) {
 function scoreTone(score) {
   const s = Number(score) || 0;
   if (s >= 85) return { tone: 'up', col: 'var(--up)', badge: 'bdg-gr', label: '🔥 Elite Concept' };
-  if (s >= 70) return { tone: 'cyan', col: 'var(--acc)', badge: 'bdg-pr', label: '🟢 Strong Title' };
-  if (s >= 50) return { tone: 'warn', col: 'var(--warn)', badge: 'bdg-gd', label: '🟡 Moderate' };
-  return { tone: 'down', col: 'var(--down)', badge: 'bdg-rd', label: '🔴 Needs Polish' };
+  if (s >= 70) return { tone: 'indigo', col: 'var(--acc)', badge: 'bdg-pr', label: 'Strong Title' };
+  if (s >= 50) return { tone: 'warn', col: 'var(--warn)', badge: 'bdg-gd', label: 'Moderate' };
+  return { tone: 'down', col: 'var(--down)', badge: 'bdg-rd', label: 'Needs Polish' };
 }
 
 // Compare Tray State (localStorage)

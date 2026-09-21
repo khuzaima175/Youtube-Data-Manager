@@ -17,16 +17,16 @@
   --max-canvas-w: 1440px;
 
   /* Surfaces & Hierarchy (Deep Graphite / Obsidian Workspace) */
-  --bg-0: #08090b;       /* True Canvas */
-  --bg-1: #0d0f13;       /* Sidebar & Top Header */
-  --bg-2: #12151b;       /* Primary Panels, Cards, Tables */
-  --bg-3: #181c24;       /* Interactive Inputs, Sub-rows, Chips */
-  --bg-hover: #1f2530;   /* Hover & Active States */
-  --bg-elevated: #242b38;/* Popovers & Tooltips */
+  --bg-0: #090a0c;       /* True Canvas */
+  --bg-1: #0e1015;       /* Sidebar & Top Header */
+  --bg-2: #14171f;       /* Primary Panels, Cards, Tables */
+  --bg-3: #1a1e28;       /* Interactive Inputs, Sub-rows, Chips */
+  --bg-hover: #222734;   /* Hover & Active States */
+  --bg-elevated: #282e3d;/* Popovers & Tooltips */
 
   /* Hairline Borders */
-  --line-1: rgba(255, 255, 255, 0.065);
-  --line-2: rgba(255, 255, 255, 0.12);
+  --line-1: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.13);
   --line-3: rgba(255, 255, 255, 0.22);
 
   /* High-Contrast Typography */
@@ -35,11 +35,12 @@
   --t3: #64748b;         /* Subdued tertiary / captions */
   --t4: #475569;         /* Dividers / disabled */
 
-  /* Cohesive Accents (No Emojis or Multi-Color AI Gradients) */
-  --acc: #3b82f6;        /* Electric Blue Interactive Action */
-  --acc-glow: rgba(59, 130, 246, 0.16);
+  /* Cohesive Accents (Linear Indigo & Purposeful Semantic Hues) */
+  --acc: #6366f1;        /* Linear Indigo Interactive Action */
+  --acc-glow: rgba(99, 102, 241, 0.14);
+  --acc-hover: #4f46e5;
   --me: #f59e0b;         /* Warm Amber for Primary Channel */
-  --me-glow: rgba(245, 158, 11, 0.16);
+  --me-glow: rgba(245, 158, 11, 0.14);
   --up: #10b981;         /* Emerald Green positive delta */
   --down: #f43f5e;       /* Rose Red negative delta */
   --warn: #f59e0b;       /* Amber warning */
@@ -83,8 +84,8 @@
   --d-2: 0.2s;
   --d-3: 0.35s;
 
-  /* Subtle Hairline Shadows */
-  --sh-1: 0 2px 8px -2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  --sh-2: 0 12px 32px -4px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --sh-hover: 0 8px 24px -2px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  /* Multi-Layered Tactile Shadows */
+  --sh-1: 0 1px 3px rgba(0, 0, 0, 0.45), 0 4px 12px -2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --sh-2: 0 16px 40px -8px rgba(0, 0, 0, 0.8), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --sh-hover: 0 8px 24px -2px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }

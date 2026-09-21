@@ -381,28 +381,28 @@ body.icons-fallback .msi {
   flex-shrink: 0;
 }
 
-.ic-tile.cyan {
-  background: rgba(56, 189, 248, 0.1);
+.ic-tile.acc {
+  background: rgba(99, 102, 241, 0.1);
   color: var(--acc);
-  border-color: rgba(56, 189, 248, 0.25);
+  border-color: rgba(99, 102, 241, 0.25);
 }
 
 .ic-tile.gold {
-  background: rgba(245, 158, 11, 0.1);
+  background: rgba(245, 158, 11, 0.08);
   color: var(--me);
-  border-color: rgba(245, 158, 11, 0.25);
+  border-color: rgba(245, 158, 11, 0.2);
 }
 
 .ic-tile.green {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.08);
   color: var(--up);
-  border-color: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.2);
 }
 
 .ic-tile.red {
-  background: rgba(244, 63, 94, 0.1);
+  background: rgba(244, 63, 94, 0.08);
   color: var(--down);
-  border-color: rgba(244, 63, 94, 0.25);
+  border-color: rgba(244, 63, 94, 0.2);
 }
 
 .sect-lbl {
@@ -480,7 +480,7 @@ body.icons-fallback .msi {
 }
 
 .card:hover {
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: var(--line-2);
   box-shadow: var(--sh-hover);
 }
 
@@ -489,20 +489,20 @@ body.icons-fallback .msi {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 100%), var(--bg-3);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 100%), var(--bg-2);
   border: 1px solid var(--line-1);
   border-radius: var(--r-m);
-  padding: 14px 18px;
+  padding: 16px 20px;
   min-width: 120px;
   flex: 1;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: var(--sh-1);
   transition: transform 0.2s var(--e-out), border-color 0.2s, box-shadow 0.2s;
 }
 
 .tile:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.16);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  border-color: var(--line-2);
+  box-shadow: var(--sh-hover);
 }
 
 .tile .lbl {
@@ -523,22 +523,6 @@ body.icons-fallback .msi {
   color: var(--t1);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
-}
-
-.tile .val.gold {
-  color: var(--me);
-}
-
-.tile .val.cyan {
-  color: var(--acc);
-}
-
-.tile .val.green {
-  color: var(--up);
-}
-
-.tile .val.red {
-  color: var(--down);
 }
 
 .tile .foot {
@@ -603,38 +587,37 @@ body.icons-fallback .msi {
   box-shadow: 0 2px 8px rgba(255, 255, 255, 0.15);
 }
 
-.chip-acc,
-.chip-cyan {
-  background: rgba(56, 189, 248, 0.1);
-  color: var(--acc);
-  border-color: rgba(56, 189, 248, 0.3);
+.chip-acc {
+  background: rgba(99, 102, 241, 0.08);
+  color: #818cf8;
+  border-color: rgba(99, 102, 241, 0.22);
 }
 
 .chip-me,
 .chip-gold {
-  background: rgba(245, 158, 11, 0.1);
+  background: rgba(245, 158, 11, 0.08);
   color: var(--me);
-  border-color: rgba(245, 158, 11, 0.3);
+  border-color: rgba(245, 158, 11, 0.2);
 }
 
 .chip-up,
 .chip-green {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.08);
   color: var(--up);
-  border-color: rgba(16, 185, 129, 0.3);
+  border-color: rgba(16, 185, 129, 0.2);
 }
 
 .chip-down,
 .chip-red {
-  background: rgba(244, 63, 94, 0.1);
+  background: rgba(244, 63, 94, 0.08);
   color: var(--down);
-  border-color: rgba(244, 63, 94, 0.3);
+  border-color: rgba(244, 63, 94, 0.2);
 }
 
 .chip-warn {
-  background: rgba(245, 158, 11, 0.1);
+  background: rgba(245, 158, 11, 0.08);
   color: var(--warn);
-  border-color: rgba(245, 158, 11, 0.3);
+  border-color: rgba(245, 158, 11, 0.2);
 }
 
 .chip-dim {
@@ -651,40 +634,41 @@ body.icons-fallback .msi {
   border-radius: var(--r-s);
   font-family: var(--f-mono);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
 }
 
 .bdg-gd {
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--me);
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.08);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.2);
 }
 
 .bdg-pr {
-  background: rgba(56, 189, 248, 0.1);
-  color: var(--acc);
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  background: rgba(99, 102, 241, 0.08);
+  color: #818cf8;
+  border-color: rgba(99, 102, 241, 0.22);
 }
 
 .bdg-gr {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--up);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.08);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.2);
 }
 
 .bdg-rd {
-  background: rgba(244, 63, 94, 0.1);
-  color: var(--down);
-  border: 1px solid rgba(244, 63, 94, 0.25);
+  background: rgba(244, 63, 94, 0.08);
+  color: #fb7185;
+  border-color: rgba(244, 63, 94, 0.2);
 }
 
 .bdg-dim {
-  background: var(--bg-3);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--t3);
-  border: 1px solid var(--line-1);
+  border-color: var(--line-1);
 }
 
 /* Buttons & Interactive Micro-states */
@@ -1146,15 +1130,16 @@ body.icons-fallback .msi {
 
 .sb-nav-item.active,
 .sb-nav-item.on {
-  background: rgba(59, 130, 246, 0.12);
-  color: var(--acc);
+  background: var(--bg-hover);
+  color: #ffffff;
   font-weight: 600;
+  box-shadow: inset 2.5px 0 0 0 var(--acc);
 }
 
 .sb-nav-item.active svg,
 .sb-nav-item.active [data-lucide],
 .sb-nav-item.active .msi {
-  color: var(--acc);
+  color: #ffffff;
 }
 
 .sb-badge {
@@ -1722,3 +1707,26 @@ body.density-compact .pipeline-card {
     transform: none !important;
   }
 }
+
+/* ── 09. View Switching Transitions & Skeleton Shimmer ─────────────────────── */
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.view-content-ready {
+  animation: viewFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.tab-skeleton-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: viewFadeIn 0.15s ease-out;
+}
