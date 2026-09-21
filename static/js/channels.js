@@ -2,6 +2,8 @@
    YT TRACKER — CHANNELS & SEARCH MANAGEMENT ENGINE
    ══════════════════════════════════════════════════════════════════════════════ */
 
+let chFilterQuery = '';
+
 async function renderChannels() {
   const el = document.getElementById('chTbl');
   const cnt = document.getElementById('chCntLbl');
@@ -14,12 +16,15 @@ async function renderChannels() {
   if (!all.length) {
     if (summaryStrip) summaryStrip.innerHTML = '';
     el.innerHTML = `
-      <div class="empty card rev in">
-        <div class="empty-ico"><span class="msi" style="font-size:24px">subscriptions</span></div>
-        <h3 style="font-family:var(--f-disp);font-size:18px;color:var(--t1)">No Channels Tracked</h3>
-        <p style="max-width:360px">Add channels to start tracking performance metrics and comparisons.</p>
-        <button class="btn btn-acc" onclick="toggleAdd()">+ Add Channel</button>
+      <div class="empty card rev in" style="padding:48px 24px;text-align:center;max-width:540px;margin:40px auto">
+        <div class="empty-ico" style="width:48px;height:48px;border-radius:50%;background:var(--bg-3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+          <i data-lucide="users" style="width:24px;height:24px;color:var(--t2)"></i>
+        </div>
+        <h3 style="font-family:var(--f-disp);font-size:18px;font-weight:700;color:var(--t1);margin-bottom:8px">No Competitors Tracked</h3>
+        <p style="color:var(--t3);font-size:13px;line-height:1.5;margin-bottom:20px">Add channels in your niche to benchmark your performance and detect audience overlap.</p>
+        <button class="btn btn-acc" onclick="toggleAdd()"><i data-lucide="plus" style="width:14px;height:14px"></i> Add Competitor Channel</button>
       </div>`;
+    if (window.lucide) window.lucide.createIcons();
     return;
   }
 
@@ -30,128 +35,170 @@ async function renderChannels() {
     const myShare = (primary && totSubs > 0) ? (((primary.subscribers_raw || 0) / totSubs) * 100).toFixed(1) + '%' : '—';
 
     summaryStrip.innerHTML = `
-      <div class="tile"><span class="lbl">Tracked</span><span class="val cyan count-val" data-val="${all.length}">${all.length}</span></div>
-      <div class="tile"><span class="lbl">Combined Subs</span><span class="val gold count-val" data-val="${totSubs}">${fmtN(totSubs)}</span></div>
-      <div class="tile"><span class="lbl">Combined Views</span><span class="val count-val" data-val="${totViews}">${fmtN(totViews)}</span></div>
-      <div class="tile"><span class="lbl">Your Share</span><span class="val green">${myShare}</span></div>`;
+      <div class="tile"><span class="lbl">Tracked Cohort</span><span class="val cyan count-val" data-val="${all.length}">${all.length}</span></div>
+      <div class="tile"><span class="lbl">Total Audience Reach</span><span class="val gold count-val" data-val="${totSubs}">${fmtN(totSubs)}</span></div>
+      <div class="tile"><span class="lbl">Combined Video Views</span><span class="val count-val" data-val="${totViews}">${fmtN(totViews)}</span></div>
+      <div class="tile"><span class="lbl">Your Audience Share</span><span class="val green">${myShare}</span></div>`;
   }
 
   const primary = all.find(c => c.is_primary);
-  const rivals = all.filter(c => !c.is_primary).sort((a, b) => (b[chSort] || 0) - (a[chSort] || 0));
-  const sortedAll = primary ? [primary, ...rivals] : rivals;
+  const sorted = [...all].sort((a, b) => {
+    if (chSort === 'threat_score') {
+      const tA = calcThreatScore(a.id, primary?.id).score;
+      const tB = calcThreatScore(b.id, primary?.id).score;
+      return tB - tA;
+    }
+    return (b[chSort] || 0) - (a[chSort] || 0);
+  });
+
+  const maxSubs = Math.max(...all.map(c => c.subscribers_raw || 0), 1);
+
+  const filtered = chFilterQuery
+    ? sorted.filter(c => (c.name || '').toLowerCase().includes(chFilterQuery.toLowerCase()) || (c.handle || '').toLowerCase().includes(chFilterQuery.toLowerCase()))
+    : sorted;
 
   el.innerHTML = `
-    <div class="ch-list-dense" id="chListContainer">
-      ${sortedAll.map(ch => renderDenseChannelRow(ch)).join('')}
+    <!-- Toolbar with instant search filter -->
+    <div class="bench-toolbar">
+      <div class="bench-search-box">
+        <i data-lucide="search" style="width:14px;height:14px;color:var(--t3)"></i>
+        <input type="text" placeholder="Filter tracked channels…" value="${esc(chFilterQuery)}" oninput="filterCompetitorGrid(this.value)">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="race-seg">
+          <button class="race-seg-btn ${chSort === 'subscribers_raw' ? 'on' : ''}" onclick="setChSort('subscribers_raw')">Subs</button>
+          <button class="race-seg-btn ${chSort === 'avg_views_raw' ? 'on' : ''}" onclick="setChSort('avg_views_raw')">Avg Views</button>
+          <button class="race-seg-btn ${chSort === 'total_views_raw' ? 'on' : ''}" onclick="setChSort('total_views_raw')">Total Views</button>
+          <button class="race-seg-btn ${chSort === 'threat_score' ? 'on' : ''}" onclick="setChSort('threat_score')">Threat</button>
+        </div>
+        <button class="btn btn-gh btn-sm" onclick="exportCSV()"><i data-lucide="download" style="width:13px;height:13px"></i> CSV</button>
+        <button class="btn btn-gh btn-sm" onclick="refreshAll()"><i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Refresh</button>
+        <button class="btn btn-acc btn-sm" onclick="toggleAdd()"><i data-lucide="plus" style="width:13px;height:13px"></i> Track Channel</button>
+      </div>
     </div>
-    <div class="ghost-add-card" onclick="toggleAdd()">
-      <span class="msi">add</span> + Track another channel
+
+    <!-- Linear-grade Benchmark Table -->
+    <div class="bench-table-wrap">
+      <table class="bench-table">
+        <thead>
+          <tr>
+            <th style="width:40px;text-align:center">#</th>
+            <th style="min-width:200px">Channel</th>
+            <th onclick="setChSort('subscribers_raw')" style="min-width:140px">Subscribers ▾</th>
+            <th onclick="setChSort('avg_views_raw')">Avg Views ▾</th>
+            <th onclick="setChSort('total_views_raw')">Total Views ▾</th>
+            <th onclick="setChSort('total_videos_raw')">Videos ▾</th>
+            <th>30-Day Trend</th>
+            <th onclick="setChSort('threat_score')" style="text-align:center">Threat Index ▾</th>
+            <th style="text-align:center;width:140px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="benchTableBody">
+          ${filtered.map((ch, i) => renderBenchmarkRow(ch, i, primary, maxSubs)).join('')}
+        </tbody>
+      </table>
     </div>
     ${renderFieldPulseRow()}`;
 
+  if (window.lucide) window.lucide.createIcons();
   summaryStrip?.querySelectorAll('.count-val').forEach(v => countUp(v, v.dataset.val));
 
-  sortedAll.forEach(async ch => {
+  // Async load sparklines
+  filtered.forEach(async ch => {
     const en = await enrich(ch.id);
-    const spEl = document.getElementById(`row-spark-${ch.id}`);
-    const engEl = document.getElementById(`row-eng-${ch.id}`);
+    const spEl = document.getElementById(`bench-spark-${ch.id}`);
     if (spEl) {
       if (en && en.sp30 && en.sp30.length) {
         spEl.innerHTML = sparkSVG(en.sp30, 80, 18, colorOf(ch));
       } else {
-        spEl.innerHTML = '<span style="color:var(--t3)">—</span>';
-      }
-    }
-    if (engEl) {
-      if (en && en.engagement > 0) {
-        engEl.textContent = `${en.engagement}%`;
-        engEl.style.color = en.engagement >= 4 ? 'var(--up)' : en.engagement >= 2 ? 'var(--warn)' : 'var(--t2)';
-      } else {
-        engEl.textContent = '—';
-        engEl.style.color = 'var(--t3)';
+        spEl.innerHTML = '<span style="color:var(--t3);font-size:11px">—</span>';
       }
     }
   });
 }
 
-function renderDenseChannelRow(ch) {
+function filterCompetitorGrid(val) {
+  chFilterQuery = (val || '').trim();
+  renderChannels();
+}
+
+function renderBenchmarkRow(ch, i, primary, maxSubs) {
   const isMine = ch.is_primary;
   const col = colorOf(ch);
   const inCompare = compareSet.includes(ch.id) || isMine;
+  const subPct = Math.max(4, Math.round(((ch.subscribers_raw || 0) / maxSubs) * 100));
+  
+  const threat = calcThreatScore(ch.id, primary?.id);
+  const threatScore = threat.score;
+  const threatCol = threatScore >= 50 ? 'var(--down)' : threatScore >= 25 ? 'var(--warn)' : 'var(--t3)';
 
   return `
-    <div class="ch-row ${isMine ? 'me' : ''}" onclick="openDeepDive('${esc(ch.id)}')">
-      <!-- 1. Avatar -->
-      <div class="ch-avatar">
-        ${ch.logo_url
-      ? `<img class="ch-row-av" src="${esc(proxyImg(ch.logo_url))}" style="border:2px solid ${col}" alt="">`
-      : `<div class="ch-row-av" style="background:var(--bg-3);border:2px solid ${col};display:flex;align-items:center;justify-content:center;font-weight:700">${(ch.name || '?')[0]}</div>`}
-      </div>
-
-      <!-- 2. Identity -->
-      <div class="ch-row-ident ch-id">
-        <div class="ch-row-name name">
-          ${esc(ch.name)}
-          ${isMine ? '<span class="badge bdg-gd">⭐ Mine</span>' : ''}
-        </div>
-        <div class="ch-row-sub handle">
-          <span>${esc(ch.handle || '')}</span>
-          ${ch.country ? `<span class="country"> • ${esc(ch.country)}</span>` : ''}
-        </div>
-      </div>
-
-      <!-- 3. Sparkline (30-day views) -->
-      <div class="ch-spark" id="row-spark-${esc(ch.id)}" style="display:flex;align-items:center;justify-content:center">
-        <div class="skel" style="width:75px;height:16px"></div>
-      </div>
-
-      <!-- 4. Stats Container -->
-      <div class="ch-stats">
-        <div class="ch-stat">
-          <div class="val" style="font-family:var(--f-mono);font-weight:700;color:var(--t1);display:flex;align-items:center;gap:4px">
-            ${esc(ch.subscribers)} ${renderRankDeltaChip(ch.id)}
+    <tr class="bench-row ${isMine ? 'me' : ''}" onclick="openDeepDive('${esc(ch.id)}')">
+      <td style="font-family:var(--f-mono);font-size:11.5px;font-weight:700;color:var(--t3);text-align:center">
+        ${i < 3 ? (i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉') : `#${i + 1}`}
+      </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          ${ch.logo_url
+            ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;border:1.5px solid ${col};flex-shrink:0" alt="">`
+            : `<div style="width:30px;height:30px;border-radius:50%;background:var(--bg-3);border:1.5px solid ${col};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${(ch.name || '?')[0]}</div>`}
+          <div style="min-width:0">
+            <div style="font-weight:600;font-size:13px;color:${isMine ? 'var(--me)' : 'var(--t1)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              ${esc(ch.name)} ${isMine ? '<span class="badge bdg-gd" style="font-size:9px;margin-left:4px">Primary</span>' : ''}
+            </div>
+            <div style="font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              ${esc(ch.handle || '')} ${ch.country ? `• ${esc(ch.country)}` : ''}
+            </div>
           </div>
-          <div class="lbl" style="font-size:10px;color:var(--t3)">subscribers</div>
         </div>
-
-        <div class="ch-stat">
-          <div class="val" style="font-family:var(--f-mono);font-weight:700;color:var(--up)">${esc(ch.avg_views)}</div>
-          <div class="lbl" style="font-size:10px;color:var(--t3)">avg views</div>
+      </td>
+      <td class="bench-bar-cell">
+        <div style="font-family:var(--f-mono);font-size:13px;font-weight:700;color:var(--t1)">${esc(ch.subscribers)}</div>
+        <div class="bench-bar-bg">
+          <div class="bench-bar-fill" style="width:${subPct}%;background:${col}"></div>
         </div>
-
-        <div class="ch-stat">
-          <div class="val" style="font-family:var(--f-mono);font-weight:700;color:var(--t3)" id="row-eng-${esc(ch.id)}">—</div>
-          <div class="lbl" style="font-size:10px;color:var(--t3)">engagement</div>
+      </td>
+      <td>
+        <div style="font-family:var(--f-mono);font-size:13px;font-weight:700;color:var(--up)">${esc(ch.avg_views)}</div>
+      </td>
+      <td style="font-family:var(--f-mono);font-size:12.5px;color:var(--t2)">${esc(ch.total_views)}</td>
+      <td style="font-family:var(--f-mono);font-size:12.5px;color:var(--t3)">${esc(ch.total_videos)}</td>
+      <td>
+        <div id="bench-spark-${esc(ch.id)}" style="display:flex;align-items:center;justify-content:center;min-width:80px">
+          <div class="skel" style="width:75px;height:16px"></div>
         </div>
-
-        <div class="ch-stat">
-          <div class="val" style="font-size:11px;color:var(--t2)">${ch.video?.date || '—'}</div>
-          <div class="lbl" style="font-size:10px;color:var(--t3)">last upload</div>
+      </td>
+      <td style="text-align:center" onclick="event.stopPropagation()">
+        ${isMine
+          ? `<span class="badge bdg-gd" style="font-size:10px">YOU</span>`
+          : !_topicCache.topics.size
+            ? `<span class="badge bdg-dim" style="font-size:10px">—</span>`
+            : `<span class="badge" style="font-size:10px;background:${threatScore >= 50 ? 'rgba(244,63,94,0.12)' : threatScore >= 25 ? 'rgba(245,158,11,0.12)' : 'var(--bg-3)'};color:${threatCol}" title="Shared topics: ${(threat.sharedTopics || []).join(', ') || 'none'}">${threatScore}% overlap</span>`}
+      </td>
+      <td style="text-align:center" onclick="event.stopPropagation()">
+        <div style="display:inline-flex;align-items:center;gap:4px">
+          ${!isMine ? `
+            <button class="icon-btn" title="Set as Primary Channel" onclick="setPrimary('${esc(ch.id)}')">
+              <i data-lucide="star" style="width:13px;height:13px"></i>
+            </button>` : ''}
+          <button class="icon-btn ${inCompare ? 'active' : ''}" title="Toggle compare tray" onclick="toggleCompare('${esc(ch.id)}')">
+            <i data-lucide="git-compare" style="width:13px;height:13px"></i>
+          </button>
+          <button class="icon-btn" title="Inspect Channel" onclick="openDeepDive('${esc(ch.id)}')">
+            <i data-lucide="scan-eye" style="width:13px;height:13px"></i>
+          </button>
+          ${!isMine ? `
+            <button class="icon-btn" title="Delete Channel" style="color:var(--down)" onclick="deleteChannel('${esc(ch.id)}')">
+              <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+            </button>` : ''}
         </div>
-      </div>
-
-      <!-- 5. Actions -->
-      <div class="ch-row-acts ch-actions" onclick="event.stopPropagation()">
-        ${!isMine ? `<button class="icon-btn" title="Set as My Channel" onclick="setPrimary('${esc(ch.id)}')"><span class="msi" style="font-size:14px">star</span></button>` : ''}
-        <button class="icon-btn ${inCompare ? 'active' : ''}" title="Toggle compare" onclick="toggleCompare('${esc(ch.id)}')"><span class="msi" style="font-size:14px">compare_arrows</span></button>
-        <button class="icon-btn" title="Refresh" onclick="refreshOne('${esc(ch.id)}')"><span class="msi" style="font-size:14px">refresh</span></button>
-        <button class="icon-btn" title="Delete" style="color:var(--down)" onclick="deleteChannel('${esc(ch.id)}')"><span class="msi" style="font-size:14px">delete</span></button>
-      </div>
-    </div>`;
+      </td>
+    </tr>`;
 }
 
 function setChSort(field) {
   chSort = field;
-  const container = document.getElementById('chListContainer');
-  const primary = all.find(c => c.is_primary);
-  const rivals = all.filter(c => !c.is_primary).sort((a, b) => (b[chSort] || 0) - (a[chSort] || 0));
-  const sortedAll = primary ? [primary, ...rivals] : rivals;
-
-  if (container) {
-    flip(container, () => {
-      container.innerHTML = sortedAll.map(ch => renderDenseChannelRow(ch)).join('');
-    });
-  }
+  renderChannels();
 }
 
 function toggleAdd() {
