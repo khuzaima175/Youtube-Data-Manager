@@ -25,29 +25,83 @@
   }
 })();
 
-/* ── 04. Navigation & Density Controller ──────────────────────────────────── */
+/* ── 04. Navigation & Workspace Controller ────────────────────────────────── */
 function sp(p) {
   closeDeepDive();
   document.querySelectorAll('.page').forEach(x => x.classList.remove('on'));
-  document.querySelectorAll('.nav-link').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('.sb-nav-item').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.m-nav-item').forEach(x => x.classList.remove('on'));
 
   const pageEl = document.getElementById('page-' + p);
-  const linkEl = document.getElementById('nav-' + p);
+  const sbItem = document.getElementById('sb-nav-' + p);
   const mLinkEl = document.getElementById('m-nav-' + p);
+  const crumbEl = document.getElementById('crumbCurrent');
 
   if (pageEl) pageEl.classList.add('on');
-  if (linkEl) linkEl.classList.add('on');
+  if (sbItem) sbItem.classList.add('active');
   if (mLinkEl) mLinkEl.classList.add('on');
+
+  const titles = {
+    dash: 'Overview',
+    channels: 'Competitors',
+    radar: 'Topic Opportunities',
+    studio: 'Creator Studio',
+    search: 'Channel Search'
+  };
+  if (crumbEl) crumbEl.textContent = titles[p] || 'Overview';
 
   if (p === 'dash') renderDash();
   if (p === 'channels') renderChannels();
+  if (p === 'radar') {
+    if (typeof renderTopicRadarPage === 'function') renderTopicRadarPage();
+    else if (typeof renderTopicRadar === 'function') renderTopicRadar('radarMain');
+  }
   if (p === 'studio') renderStudio();
   if (p === 'search') {
     setTimeout(() => document.getElementById('srInput')?.focus(), 50);
   }
+
+  if (typeof updateSidebarChannelPill === 'function') updateSidebarChannelPill();
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    setTimeout(() => lucide.createIcons(), 20);
+  }
   serializeStateToHash();
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  const canvasBody = document.getElementById('canvasBody');
+  if (canvasBody) canvasBody.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function updateSidebarChannelPill() {
+  const primary = all.find(c => c.is_primary) || all[0];
+  const avatarEl = document.getElementById('sbChAvatar');
+  const nameEl = document.getElementById('sbChName');
+  const subsEl = document.getElementById('sbChSubs');
+  const badgeEl = document.getElementById('sbBadge');
+
+  if (badgeEl) badgeEl.textContent = all.length;
+
+  if (!primary) {
+    if (nameEl) nameEl.textContent = 'No Channel Tracked';
+    if (subsEl) subsEl.textContent = 'Click to add';
+    return;
+  }
+
+  if (avatarEl) {
+    avatarEl.innerHTML = primary.logo_url
+      ? `<img src="${esc(proxyImg(primary.logo_url))}" alt="">`
+      : (primary.name || '?')[0].toUpperCase();
+  }
+  if (nameEl) nameEl.textContent = primary.name || 'Primary Channel';
+  if (subsEl) subsEl.textContent = (primary.subscribers || '0') + ' subs';
+}
+
+function toggleChannelPicker(e) {
+  if (e) e.stopPropagation();
+  const primary = all.find(c => c.is_primary) || all[0];
+  if (primary) {
+    openDeepDive(primary.id, 'overview');
+  } else {
+    sp('channels');
+  }
 }
 
 function setDensity(mode) {

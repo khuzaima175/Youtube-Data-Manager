@@ -4,270 +4,264 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>YT Tracker — YouTube Channel Analytics & Management Suite</title>
+  <title>YT Tracker — YouTube Intelligence & Competitor Benchmark</title>
   <meta name="description"
-    content="Compare your YouTube channel against competitors, track upload velocity, and inspect deep growth trends." />
+    content="Linear-calibre intelligence dashboard to benchmark your YouTube channel, track real upload velocity, and uncover topic opportunities." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
   <link
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0&display=block"
     rel="stylesheet" />
   <link rel="stylesheet" href="static/style.css" />
+
+  <!-- Lucide Vector Icons & Chart.js -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
   <div id="toast"></div>
 
   <!-- ══════════════════════════════════════════════════════════════════════════
-       PERSISTENT TOP BAR & COMPARE TRAY
+       APP WORKSPACE (2-PANE SIDEBAR & CANVAS)
        ══════════════════════════════════════════════════════════════════════════ -->
-  <nav class="topnav">
-    <div class="topnav-inner">
-      <div style="display:flex;align-items:center">
-        <div class="nav-brand" onclick="sp('dash')">
-          <span class="nav-brand-icon">▶</span> YT<span class="nav-brand-sub">Tracker</span>
-        </div>
-        <div class="nav-links" id="navLinksContainer">
-          <div class="nav-glider" id="navGlider"></div>
-          <button class="nav-link on" id="nav-dash" onclick="sp('dash')">Dashboard</button>
-          <button class="nav-link" id="nav-channels" onclick="sp('channels')">
-            My Channels <span class="nav-cnt" id="sbBadge"></span>
-          </button>
-          <button class="nav-link" id="nav-studio" onclick="sp('studio')">Studio</button>
-          <button class="nav-link" id="nav-search" onclick="sp('search')">Search</button>
+  <div class="app-layout">
+    <!-- ── Left Sidebar ─────────────────────────────────────────────────────── -->
+    <aside class="sidebar">
+      <!-- Brand & Version -->
+      <div class="sidebar-brand-block">
+        <div class="sidebar-brand" onclick="sp('dash')">
+          <div class="brand-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+          <span class="brand-text">YT Tracker</span>
+          <span class="brand-ver">v2.0</span>
         </div>
       </div>
 
-      <div class="nav-right">
-        <!-- Persistent Compare Tray -->
-        <div class="compare-tray-wrap" id="compareTray">
-          <span class="compare-tray-label">Compare</span>
-          <div class="compare-tray-chips" id="compareTrayChips"></div>
-          <button class="compare-add-btn" id="compareAddBtn" onclick="toggleComparePopover(event)" title="Add / Remove channels to compare set">+</button>
-
-          <!-- Compare Channel Picker Popover -->
-          <div class="compare-popover" id="comparePopover">
-            <div class="compare-popover-hdr">
-              <span>Select Channels (Max 5)</span>
-              <span style="cursor:pointer;color:var(--t3)" onclick="toggleComparePopover(event)">✕</span>
-            </div>
-            <div style="margin-bottom:8px">
-              <input type="text" id="compareFilterInput" placeholder="Filter channels…"
-                style="width:100%;padding:4px 8px;font-size:11px;background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);color:var(--t1);outline:none"
-                oninput="filterComparePopover(this.value)" />
-            </div>
-            <div class="compare-popover-list" id="comparePopoverList"></div>
-            <div id="compareNowWrap" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line-1);display:none">
-              <button class="btn btn-acc btn-sm" style="width:100%" onclick="openCompareSet()">
-                Compare Selected Now →
-              </button>
-            </div>
-          </div>
+      <!-- Active Channel Selector Pill -->
+      <div class="sidebar-channel-selector" id="sidebarChannelPill" onclick="toggleChannelPicker(event)" title="Click to inspect primary channel">
+        <div class="sb-ch-avatar" id="sbChAvatar">C</div>
+        <div class="sb-ch-details">
+          <div class="sb-ch-name" id="sbChName">Primary Channel</div>
+          <div class="sb-ch-sub" id="sbChSubs">Loading…</div>
         </div>
+        <i data-lucide="chevrons-up-down" class="sb-ch-chevron"></i>
+      </div>
 
-        <span class="nav-v-div"></span>
-
-        <!-- Primary Utility Cluster (Max 4 Visible Items) -->
-        <div class="nav-utility-cluster">
-          <!-- 1. Combined Refresh Pill -->
-          <button class="topbar-refresh-pill" id="refAllBtn" onclick="refreshAll()" title="Refresh all channels and telemetry">
-            <span class="msi">refresh</span>
-            <span class="refresh-pill-text">updated <span id="lastUpdatedAgo" class="mono">just now</span></span>
-          </button>
-
-          <!-- 2. Bell Inbox Button -->
-          <button class="icon-btn" id="bellBtn" style="position:relative" onclick="toggleBellInbox(event)" title="Alert Inbox & Field Feed">
-            <span class="msi" style="font-size:16px">notifications</span>
-            <span id="bellBadge" class="nav-cnt" style="position:absolute;top:-4px;right:-4px;background:var(--down);color:#fff;display:none">0</span>
-          </button>
-
-          <!-- 3. My Pulse Button -->
-          <button class="icon-btn" id="myPulseBtn" onclick="toggleMyPulse(event)" title="My Channel Pulse & Health">
-            <span class="msi" style="font-size:16px">person</span>
-          </button>
-
-          <!-- 4. Overflow Menu Button (⋯) -->
-          <button class="icon-btn" id="navOverflowBtn" onclick="toggleNavOverflow(event)" title="More options & tools" aria-haspopup="menu" aria-expanded="false">
-            <span class="msi" style="font-size:16px">more_horiz</span>
-          </button>
-        </div>
-
-        <span class="nav-v-div"></span>
-
-        <!-- Right-Edge Command Palette Button (⌘K / Ctrl+K) -->
-        <button class="topbar-kbd-chip" id="topbarKbdChip" onclick="openCommandPalette()" title="Command Palette">
-          <span class="msi" style="font-size:13px">terminal</span>
-          <span id="topbarKbdLabel" class="mono">⌘K</span>
+      <!-- Navigation Links -->
+      <nav class="sidebar-nav">
+        <div class="sb-nav-section-title">INTELLIGENCE</div>
+        <button class="sb-nav-item active" id="sb-nav-dash" onclick="sp('dash')">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Overview</span>
+        </button>
+        <button class="sb-nav-item" id="sb-nav-channels" onclick="sp('channels')">
+          <i data-lucide="users"></i>
+          <span>Competitors</span>
+          <span class="sb-badge" id="sbBadge">0</span>
+        </button>
+        <button class="sb-nav-item" id="sb-nav-radar" onclick="sp('radar')">
+          <i data-lucide="radar"></i>
+          <span>Topic Radar</span>
         </button>
 
-        <!-- Popovers -->
-        <div class="my-pulse-popover" id="myPulsePopover"></div>
-        <div class="bell-inbox-popover" id="bellPopover"></div>
-        <div class="nav-overflow-popover" id="navOverflowPopover" role="menu" aria-label="More Options"></div>
+        <div class="sb-nav-section-title" style="margin-top:16px">WORKFLOW</div>
+        <button class="sb-nav-item" id="sb-nav-studio" onclick="sp('studio')">
+          <i data-lucide="clapperboard"></i>
+          <span>Creator Studio</span>
+        </button>
+        <button class="sb-nav-item" id="sb-nav-search" onclick="sp('search')">
+          <i data-lucide="search"></i>
+          <span>Channel Search</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer Utility -->
+      <div class="sidebar-footer">
+        <!-- Persistent Compare Tray Pill -->
+        <div class="sb-compare-pill" id="sidebarComparePill" onclick="toggleComparePopover(event)" title="Manage channels in compare set">
+          <i data-lucide="git-compare"></i>
+          <span id="sbCompareText">Compare Set (0)</span>
+        </div>
+
+        <!-- Refresh Data Button -->
+        <button class="sb-footer-btn" id="sbRefAllBtn" onclick="refreshAll()" title="Refresh telemetry and channels">
+          <i data-lucide="refresh-cw" id="sbRefreshIcon"></i>
+          <span id="sbLastUpdated">Sync: Just now</span>
+        </button>
+
+        <!-- Command Menu Key Trigger -->
+        <button class="sb-footer-btn" onclick="openCommandPalette()" title="Command Palette">
+          <i data-lucide="terminal"></i>
+          <span>Command Menu</span>
+          <kbd class="sb-kbd">⌘K</kbd>
+        </button>
       </div>
-    </div>
-  </nav>
+    </aside>
 
-  <!-- ══════════════════════════════════════════════════════════════════════════
-       MAIN CONTENT CONTAINER
-       ══════════════════════════════════════════════════════════════════════════ -->
-  <div class="main">
+    <!-- ── Main Canvas ──────────────────────────────────────────────────────── -->
+    <div class="main-canvas">
+      <!-- Top Canvas Header -->
+      <header class="canvas-header">
+        <div class="canvas-breadcrumbs" id="canvasBreadcrumbs">
+          <span class="crumb-root">YT Tracker</span>
+          <span class="crumb-slash">/</span>
+          <span class="crumb-current" id="crumbCurrent">Overview</span>
+        </div>
 
-    <!-- Staleness / Offline Banner -->
-    <div id="stalenessBanner" style="display:none" class="staleness-banner"></div>
-
-    <!-- PAGE 1: DASHBOARD (Comparison-First Command Center) -->
-    <div class="page on" id="page-dash">
-      <div id="dashMain">
-        <!-- High-Fidelity Bento Skeleton Shell for Zero CLS -->
-        <div class="card" style="margin-bottom:24px;padding:22px 26px;display:grid;grid-template-columns:280px 1fr 280px;gap:20px;align-items:center">
-          <div style="display:flex;align-items:center;gap:14px;border-right:1px solid var(--line-1);padding-right:14px">
-            <div class="skel skel-avatar lg"></div>
-            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
-              <div class="skel skel-title" style="width:70%;height:18px;margin:0"></div>
-              <div class="skel skel-text sm" style="width:50%"></div>
-            </div>
+        <div class="canvas-header-actions">
+          <!-- Quick Search Bar Trigger -->
+          <div class="header-search-trigger" onclick="sp('search')">
+            <i data-lucide="search"></i>
+            <span>Search channels…</span>
+            <kbd>/</kbd>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
-            <div class="skel skel-tile"></div>
-            <div class="skel skel-tile"></div>
-            <div class="skel skel-tile"></div>
-            <div class="skel skel-tile"></div>
-            <div class="skel skel-tile"></div>
-          </div>
-          <div class="skel skel-tile" style="height:100%"></div>
-        </div>
 
-        <div class="card" style="margin-bottom:24px;padding:24px;display:grid;grid-template-columns:270px 1fr 310px;gap:16px">
-          <div class="skel skel-tile" style="height:220px"></div>
-          <div class="skel skel-tile" style="height:220px"></div>
-          <div class="skel skel-tile" style="height:220px"></div>
-        </div>
-
-        <div class="card" style="padding:24px;display:flex;flex-direction:column;gap:12px">
-          <div class="skel skel-row"></div>
-          <div class="skel skel-row"></div>
-          <div class="skel skel-row"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- PAGE 2: MY CHANNELS (Dense Rows Management) -->
-    <div class="page" id="page-channels">
-      <div class="pg-head">
-        <div>
-          <div class="pg-title">My Channels</div>
-          <div class="pg-sub"><span class="mono" id="chCntLbl"></span> channels tracked</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <div class="sel-wrap">
-            <select class="sel" id="chSortSel" onchange="setChSort(this.value)">
-              <option value="subscribers_raw">Sort: Subscribers</option>
-              <option value="total_views_raw">Sort: Total Views</option>
-              <option value="avg_views_raw">Sort: Avg Views</option>
-            </select>
-          </div>
-          <button class="btn btn-gh" onclick="exportCSV()">
-            <span class="msi">download</span> Export CSV
-          </button>
-          <button class="btn btn-gh" onclick="refreshAll()">
-            <span class="msi">refresh</span> Refresh All
-          </button>
-          <button class="btn btn-acc" id="addTgl" onclick="toggleAdd()">
-            <span class="msi">add</span> Add Channel
+          <!-- Add Channel Button -->
+          <button class="btn btn-acc btn-sm" onclick="toggleAdd()">
+            <i data-lucide="plus" style="width:14px;height:14px"></i>
+            <span>Add Channel</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      <!-- Add Channel Expandable Panel -->
-      <div class="card" id="addPanel" style="display:none;margin-bottom:20px;padding:16px">
-        <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:10px">
-          Search and add a YouTube channel to track
-        </div>
-        <div style="display:flex;gap:10px;align-items:center;position:relative">
-          <div style="flex:1;position:relative">
-            <input class="sr-inp" id="addInput" type="text"
-              style="width:100%;background:var(--bg-3);border:1px solid var(--line-2);border-radius:var(--r-s);padding:8px 12px;color:var(--t1)"
-              placeholder="Channel name or @handle…" autocomplete="off"
-              onkeydown="if(event.key==='Enter'){closeAddSuggestions();addCh();}" />
-            <div id="addDropdown" class="sr-dropdown" style="display:none"></div>
+      <!-- Canvas Scrollable Body -->
+      <main class="canvas-body" id="canvasBody">
+        <div class="canvas-body-inner">
+          <!-- Staleness Banner -->
+          <div id="stalenessBanner" style="display:none" class="staleness-banner"></div>
+
+          <!-- PAGE 1: OVERVIEW DASHBOARD -->
+          <div class="page on" id="page-dash">
+            <div id="dashMain"></div>
           </div>
-          <button class="btn btn-acc" id="addBtn" onclick="addCh()">Add</button>
-          <button class="btn btn-gh" onclick="toggleAdd()">Cancel</button>
-        </div>
-        <div class="err" id="addErr" style="margin-top:10px;margin-bottom:0"></div>
-      </div>
 
-      <!-- Channels Summary Strip -->
-      <div class="channels-summary-strip" id="channelsSummaryStrip"></div>
-
-      <!-- Channel Rows Container -->
-      <div id="chTbl"></div>
-    </div>
-
-    <!-- PAGE 3: SEARCH -->
-    <div class="page" id="page-search">
-      <div class="pg-head">
-        <div>
-          <div class="pg-title">Search Channels</div>
-          <div class="pg-sub">Inspect any channel on YouTube or add it to your tracking list</div>
-        </div>
-      </div>
-      <div class="sr-wrap">
-        <div style="position:relative">
-          <div class="sr-bar">
-            <span class="msi" style="color:var(--t3)">search</span>
-            <input class="sr-inp" id="srInput" type="text"
-              placeholder="Search for a YouTube channel or @handle… (Press / from anywhere)" autocomplete="off" />
-            <button class="btn btn-acc" id="srBtn" onclick="doSearch()">Search</button>
-          </div>
-          <div id="srDropdown" class="sr-dropdown" style="display:none"></div>
-        </div>
-        <div class="err" id="srErr" style="margin-top:14px"></div>
-
-        <!-- Skeleton loader -->
-        <div id="srSkel" style="display:none;margin-top:20px">
-          <div class="card" style="gap:16px;padding:24px">
-            <div style="display:flex;gap:16px;align-items:center">
-              <div class="skel" style="width:56px;height:56px;border-radius:50%"></div>
-              <div style="flex:1;display:flex;flex-direction:column;gap:8px">
-                <div class="skel" style="height:18px;width:40%"></div>
-                <div class="skel" style="height:12px;width:25%"></div>
+          <!-- PAGE 2: COMPETITORS BENCHMARKING -->
+          <div class="page" id="page-channels">
+            <div class="pg-head">
+              <div>
+                <div class="pg-title">Competitor Benchmark</div>
+                <div class="pg-sub"><span class="mono" id="chCntLbl"></span> channels tracked in your cohort</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <div class="sel-wrap">
+                  <select class="sel" id="chSortSel" onchange="setChSort(this.value)">
+                    <option value="subscribers_raw">Sort: Subscribers</option>
+                    <option value="total_views_raw">Sort: Total Views</option>
+                    <option value="avg_views_raw">Sort: Avg Views</option>
+                  </select>
+                </div>
+                <button class="btn btn-gh" onclick="exportCSV()">
+                  <i data-lucide="download" style="width:14px;height:14px"></i> Export CSV
+                </button>
+                <button class="btn btn-gh" onclick="refreshAll()">
+                  <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Refresh
+                </button>
+                <button class="btn btn-acc" id="addTgl" onclick="toggleAdd()">
+                  <i data-lucide="plus" style="width:14px;height:14px"></i> Add Channel
+                </button>
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
-              <div class="skel" style="height:50px"></div>
-              <div class="skel" style="height:50px"></div>
-              <div class="skel" style="height:50px"></div>
-              <div class="skel" style="height:50px"></div>
+
+            <!-- Add Channel Panel -->
+            <div class="card" id="addPanel" style="display:none;margin-bottom:20px;padding:16px">
+              <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:10px">
+                Search and track a YouTube channel
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;position:relative">
+                <div style="flex:1;position:relative">
+                  <input class="sr-inp" id="addInput" type="text"
+                    style="width:100%;background:var(--bg-3);border:1px solid var(--line-2);border-radius:var(--r-s);padding:8px 12px;color:var(--t1)"
+                    placeholder="Channel name or @handle…" autocomplete="off"
+                    onkeydown="if(event.key==='Enter'){closeAddSuggestions();addCh();}" />
+                  <div id="addDropdown" class="sr-dropdown" style="display:none"></div>
+                </div>
+                <button class="btn btn-acc" id="addBtn" onclick="addCh()">Add</button>
+                <button class="btn btn-gh" onclick="toggleAdd()">Cancel</button>
+              </div>
+              <div class="err" id="addErr" style="margin-top:10px;margin-bottom:0"></div>
+            </div>
+
+            <div class="channels-summary-strip" id="channelsSummaryStrip"></div>
+            <div id="chTbl"></div>
+          </div>
+
+          <!-- PAGE 3: TOPIC OPPORTUNITY RADAR -->
+          <div class="page" id="page-radar">
+            <div class="pg-head">
+              <div>
+                <div class="pg-title">Topic Opportunities & Radar</div>
+                <div class="pg-sub">Uncover high-demand, low-competition topic gaps across your competitor cohort.</div>
+              </div>
+            </div>
+            <div id="radarMain"></div>
+          </div>
+
+          <!-- PAGE 4: CREATOR STUDIO -->
+          <div class="page" id="page-studio">
+            <div id="studioMain"></div>
+          </div>
+
+          <!-- PAGE 5: SEARCH CHANNELS -->
+          <div class="page" id="page-search">
+            <div class="pg-head">
+              <div>
+                <div class="pg-title">Search Channels</div>
+                <div class="pg-sub">Inspect any channel on YouTube or add it to your tracking cohort</div>
+              </div>
+            </div>
+            <div class="sr-wrap">
+              <div style="position:relative">
+                <div class="sr-bar">
+                  <i data-lucide="search" style="width:16px;height:16px;color:var(--t3)"></i>
+                  <input class="sr-inp" id="srInput" type="text"
+                    placeholder="Search for a YouTube channel or @handle… (Press / from anywhere)" autocomplete="off" />
+                  <button class="btn btn-acc" id="srBtn" onclick="doSearch()">Search</button>
+                </div>
+                <div id="srDropdown" class="sr-dropdown" style="display:none"></div>
+              </div>
+              <div class="err" id="srErr" style="margin-top:14px"></div>
+
+              <div id="srSkel" style="display:none;margin-top:20px">
+                <div class="card" style="gap:16px;padding:24px">
+                  <div style="display:flex;gap:16px;align-items:center">
+                    <div class="skel" style="width:56px;height:56px;border-radius:50%"></div>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+                      <div class="skel" style="height:18px;width:40%"></div>
+                      <div class="skel" style="height:12px;width:25%"></div>
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+                    <div class="skel" style="height:50px"></div>
+                    <div class="skel" style="height:50px"></div>
+                    <div class="skel" style="height:50px"></div>
+                    <div class="skel" style="height:50px"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="srRes" style="display:none;margin-top:20px"></div>
             </div>
           </div>
+
         </div>
-
-        <div id="srRes" style="display:none;margin-top:20px"></div>
-      </div>
+      </main>
     </div>
-
-    <!-- PAGE 4: STUDIO (Title Lab, Idea Generator, Pipeline Kanban) -->
-    <div class="page" id="page-studio">
-      <div id="studioMain"></div>
-    </div>
-
-  </div><!-- /main -->
+  </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════════
        PAGE 4: DEEP DIVE FULL-VIEWPORT OVERLAY ROUTE (#page-channel)
        ══════════════════════════════════════════════════════════════════════════ -->
   <div id="page-channel">
-    <!-- Sticky Header -->
     <div class="dd-sticky-hdr">
       <div class="dd-hdr-inner">
         <div class="dd-hdr-left">
           <button class="dd-back-btn" onclick="closeDeepDive()">
-            <span class="msi">arrow_back</span> Back
+            <i data-lucide="arrow-left" style="width:14px;height:14px"></i> Back
           </button>
           <div class="dd-ch-summary">
             <div id="ddLogoWrap"></div>
@@ -277,34 +271,19 @@
             </div>
           </div>
         </div>
-
         <div class="dd-hdr-acts" id="ddActions"></div>
       </div>
-
-      <!-- Tab Navigation with Glider -->
-      <div class="dd-tabs-bar">
-        <div class="tabs" id="ddTabsWrap">
-          <div class="tab-glider" id="ddTabGlider"></div>
-          <button class="tab on" id="ddTab-overview" onclick="switchDDTab('overview')">
-            <span class="msi">dashboard</span> Overview
-          </button>
-          <button class="tab" id="ddTab-videos" onclick="switchDDTab('videos')">
-            <span class="msi">play_circle</span> Videos
-          </button>
-          <button class="tab" id="ddTab-growth" onclick="switchDDTab('growth')">
-            <span class="msi">show_chart</span> Growth
-          </button>
-          <button class="tab" id="ddTab-compare" onclick="switchDDTab('compare')">
-            <span class="msi">compare_arrows</span> Compare
-          </button>
-          <button class="tab" id="ddTab-topics" onclick="switchDDTab('topics')">
-            <span class="msi">local_fire_department</span> Topics
-          </button>
+      <div class="dd-tabs-bar" id="ddTabsWrap">
+        <div class="tabs">
+          <button class="tab on" id="ddTab-overview" onclick="switchDDTab('overview')">Overview</button>
+          <button class="tab" id="ddTab-videos" onclick="switchDDTab('videos')">Videos</button>
+          <button class="tab" id="ddTab-growth" onclick="switchDDTab('growth')">Growth</button>
+          <button class="tab" id="ddTab-compare" onclick="switchDDTab('compare')">Compare</button>
+          <button class="tab" id="ddTab-topics" onclick="switchDDTab('topics')">Topics</button>
         </div>
       </div>
     </div>
 
-    <!-- Deep Dive Tab Panels -->
     <div class="dd-body">
       <div class="dd-panel on" id="ddPanel-overview"></div>
       <div class="dd-panel" id="ddPanel-videos"></div>
@@ -320,7 +299,7 @@
   <div class="cmd-ovrl" id="cmdOvrl" onclick="closeCommandPalette()"></div>
   <div class="cmd-pal" id="cmdPal">
     <div class="cmd-inp-wrap">
-      <span class="msi" style="color:var(--t3)">terminal</span>
+      <i data-lucide="terminal" style="width:16px;height:16px;color:var(--t3)"></i>
       <input class="cmd-inp" id="cmdInp" type="text" placeholder="Type a channel name or command…" autocomplete="off" />
       <span class="badge bdg-dim">ESC to close</span>
     </div>
@@ -338,10 +317,10 @@
   <div class="sc-modal" id="scModal">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div class="vid-seg" id="helpModalSeg">
-        <button class="vid-seg-btn on" id="helpTabShortcuts" onclick="switchHelpTab('shortcuts')">⌨️ Shortcuts</button>
-        <button class="vid-seg-btn" id="helpTabGlossary" onclick="switchHelpTab('glossary')">📖 Metric Glossary</button>
+        <button class="vid-seg-btn on" id="helpTabShortcuts" onclick="switchHelpTab('shortcuts')">Shortcuts</button>
+        <button class="vid-seg-btn" id="helpTabGlossary" onclick="switchHelpTab('glossary')">Metric Glossary</button>
       </div>
-      <button class="icon-btn" onclick="closeShortcutsModal()"><span class="msi">close</span></button>
+      <button class="icon-btn" onclick="closeShortcutsModal()"><i data-lucide="x" style="width:14px;height:14px"></i></button>
     </div>
 
     <!-- Panel 1: Shortcuts -->
@@ -350,136 +329,53 @@
       <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--t2)">Command Palette</span><span class="badge bdg-dim">Ctrl + K / ⌘ + K</span></div>
       <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--t2)">Close Overlays / Modals</span><span class="badge bdg-dim">Esc</span></div>
       <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--t2)">Shortcuts & Glossary</span><span class="badge bdg-dim">?</span></div>
-      <div style="padding-top:10px;border-top:1px solid var(--line-1);display:flex;justify-content:space-between;align-items:center">
-        <span style="color:var(--t2)">Onboarding Tour</span>
-        <button class="btn btn-gh btn-sm" onclick="closeShortcutsModal();startSpotlightTour()">Replay Tour 🚀</button>
-      </div>
     </div>
 
     <!-- Panel 2: Metric Glossary -->
     <div id="helpPanelGlossary" style="display:none;flex-direction:column;gap:12px;max-height:60vh;overflow-y:auto;font-size:12px">
       <div class="glossary-item">
-        <div style="font-weight:700;color:var(--acc);margin-bottom:2px">⚡ Velocity (/day)</div>
+        <div style="font-weight:700;color:var(--acc);margin-bottom:2px">Velocity (/day)</div>
         <div style="color:var(--t2);line-height:1.4">Views accrued per day ($views / age$). Measures current virality velocity rather than lifetime cumulative total.</div>
       </div>
       <div class="glossary-item">
-        <div style="font-weight:700;color:var(--down);margin-bottom:2px">🔥 hotScore</div>
-        <div style="color:var(--t2);line-height:1.4">Formula $recentAvg \times \log_2(n+1)$ measuring niche interest and current viewer appetite for a specific topic.</div>
-      </div>
-      <div class="glossary-item">
-        <div style="font-weight:700;color:var(--up);margin-bottom:2px">📈 Topic Momentum</div>
+        <div style="font-weight:700;color:var(--up);margin-bottom:2px">Topic Momentum</div>
         <div style="color:var(--t2);line-height:1.4">Ratio of recent average views to older historical views for a topic ($>1.2\times$ = surging trend).</div>
       </div>
       <div class="glossary-item">
-        <div style="font-weight:700;color:var(--warn);margin-bottom:2px">⚔️ Threat Overlap (Jaccard Index)</div>
-        <div style="color:var(--t2);line-height:1.4">Mathematical topic overlap percentage ($|A \cap B| / |A \cup B|$) comparing your top-20 topics against a rival's catalog.</div>
-      </div>
-      <div class="glossary-item">
-        <div style="font-weight:700;color:var(--up);margin-bottom:2px">🌲 Evergreen Fingerprint</div>
-        <div style="color:var(--t2);line-height:1.4">Percentage of a channel's top-10 videos that are $>1\text{ year old}$. Distinguishes long-tail compounders from hype chasers.</div>
-      </div>
-      <div class="glossary-item">
-        <div style="font-weight:700;color:var(--down);margin-bottom:2px">⚡ Collision Shadow</div>
-        <div style="color:var(--t2);line-height:1.4">Flags your underperforming drops that were published within $\pm 24\text{h}$ of a competitor $\ge 1.8\times$ your size on a shared topic.</div>
-      </div>
-      <div class="glossary-item">
-        <div style="font-weight:700;color:var(--me);margin-bottom:2px">▲/▼ Health Multipliers</div>
-        <div style="color:var(--t2);line-height:1.4">Ratio of a video's view performance against your long-form 30-video average ($▲ \ge 1.3\times$ = Overperformer, $▼ \le 0.7\times$ = Underperformer).</div>
-      </div>
-      <div class="glossary-item">
-        <div style="font-weight:700;color:var(--acc);margin-bottom:2px">⏰ Timing Intelligence (Best-Time Heatmap)</div>
-        <div style="color:var(--t2);line-height:1.4">Slot velocity = mean views/day of videos aged 3–180d in that 2-hour day/time bucket. Hatched cells = fewer than 3 videos (low confidence).</div>
+        <div style="font-weight:700;color:var(--warn);margin-bottom:2px">Topic Overlap (Affinity)</div>
+        <div style="color:var(--t2);line-height:1.4">Shared topic percentage comparing your catalog against a competitor's uploads.</div>
       </div>
     </div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════════
-       SPOTLIGHT ONBOARDING TOUR
+       COMPARE CHANNEL POPOVER
        ══════════════════════════════════════════════════════════════════════════ -->
-  <div id="spotlightOverlay" class="spotlight-overlay" style="display:none" onclick="nextTourStep()"></div>
-  <div id="spotlightCard" class="spotlight-card" style="display:none">
-    <div id="spotlightStepLbl" style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--acc);margin-bottom:4px">Step 1 of 6</div>
-    <div id="spotlightTitle" style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:6px">Welcome to YT Tracker</div>
-    <div id="spotlightBody" style="font-size:12px;color:var(--t2);line-height:1.45;margin-bottom:12px">Tour explanation...</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <button class="btn btn-gh btn-sm" onclick="skipTour()">Skip Tour</button>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-gh btn-sm" id="tourPrevBtn" onclick="prevTourStep()">← Back</button>
-        <button class="btn btn-acc btn-sm" id="tourNextBtn" onclick="nextTourStep()">Next →</button>
-      </div>
+  <div class="compare-popover" id="comparePopover">
+    <div class="compare-popover-hdr">
+      <span>Select Channels (Max 5)</span>
+      <span style="cursor:pointer;color:var(--t3)" onclick="toggleComparePopover(event)">✕</span>
+    </div>
+    <div style="margin-bottom:8px">
+      <input type="text" id="compareFilterInput" placeholder="Filter channels…"
+        style="width:100%;padding:6px 10px;font-size:11px;background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);color:var(--t1);outline:none"
+        oninput="filterComparePopover(this.value)" />
+    </div>
+    <div class="compare-popover-list" id="comparePopoverList"></div>
+    <div id="compareNowWrap" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line-1);display:none">
+      <button class="btn btn-acc btn-sm" style="width:100%" onclick="openCompareSet()">
+        Compare Selected Now →
+      </button>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════════════
-       SETTINGS & CONTROL ROOM MODAL
-       ══════════════════════════════════════════════════════════════════════════ -->
-  <div class="cmd-ovrl" id="settingsOvrl" onclick="closeSettingsModal()"></div>
-  <div class="sc-modal" id="settingsModal" style="max-width:580px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div class="vid-seg" id="settingsModalSeg">
-        <button class="vid-seg-btn on" id="setTabTopics" onclick="switchSettingsTab('topics')">🏷️ Topics</button>
-        <button class="vid-seg-btn" id="setTabAlerts" onclick="switchSettingsTab('alerts')">🔔 Alerts</button>
-        <button class="vid-seg-btn" id="setTabTiming" onclick="switchSettingsTab('timing')">⏰ Timing</button>
-        <button class="vid-seg-btn" id="setTabData" onclick="switchSettingsTab('data')">💾 Data & Backup</button>
-        <button class="vid-seg-btn" id="setTabTheme" onclick="switchSettingsTab('theme')">🎨 Appearance</button>
-      </div>
-      <button class="icon-btn" onclick="closeSettingsModal()"><span class="msi">close</span></button>
-    </div>
-    <div id="settingsPanelBody" style="max-height:65vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px"></div>
-  </div>
+  <!-- Popovers -->
+  <div class="my-pulse-popover" id="myPulsePopover"></div>
+  <div class="bell-inbox-popover" id="bellPopover"></div>
+  <div class="nav-overflow-popover" id="navOverflowPopover" role="menu" aria-label="More Options"></div>
 
   <!-- ══════════════════════════════════════════════════════════════════════════
-       REPORT CENTER MODAL (Monthly / Custom Intelligence Brief)
-       ══════════════════════════════════════════════════════════════════════════ -->
-  <div class="cmd-ovrl" id="reportOvrl" onclick="closeReportModal()"></div>
-  <div class="report-modal" id="reportModal">
-    <!-- Header -->
-    <div class="report-modal-hdr">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span class="ic-tile cyan"><span class="msi" style="font-size:18px">description</span></span>
-        <div>
-          <div style="font-size:15px;font-weight:700;color:var(--t1);font-family:var(--f-disp)">Competitor Intelligence Report Center</div>
-          <div style="font-size:11px;color:var(--t3)">Generate executive briefs, export printable PDF dossiers & shareable markdown.</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-gh btn-sm" onclick="copyReportMarkdown()"><span class="msi">content_copy</span> Copy MD</button>
-        <button class="btn btn-gh btn-sm" onclick="downloadReportHtml()"><span class="msi">download</span> Save HTML</button>
-        <button class="btn btn-acc btn-sm" onclick="printReport()"><span class="msi">print</span> Print / Save PDF</button>
-        <button class="icon-btn" onclick="closeReportModal()"><span class="msi">close</span></button>
-      </div>
-    </div>
-
-    <!-- Generator Control Toolbar -->
-    <div class="report-controls-bar">
-      <div class="report-ctrl-group">
-        <span class="report-ctrl-lbl">Period:</span>
-        <div class="vid-seg" id="reportPeriodSeg">
-          <button class="vid-seg-btn on" id="repPeriod-30d" onclick="setReportPeriod('30d')">Last 30 Days</button>
-          <button class="vid-seg-btn" id="repPeriod-90d" onclick="setReportPeriod('90d')">Last 90 Days</button>
-          <button class="vid-seg-btn" id="repPeriod-all" onclick="setReportPeriod('all')">All-Time (6M)</button>
-        </div>
-      </div>
-
-      <div class="report-ctrl-group">
-        <span class="report-ctrl-lbl">Scope:</span>
-        <div class="vid-seg" id="reportScopeSeg">
-          <button class="vid-seg-btn on" id="repScope-all" onclick="setReportScope('all')">All Tracked</button>
-          <button class="vid-seg-btn" id="repScope-compare" onclick="setReportScope('compare')">Compare Set</button>
-        </div>
-      </div>
-
-      <div class="report-ctrl-group" style="margin-left:auto">
-        <button class="btn btn-gh btn-sm" onclick="copyShareLink()"><span class="msi">share</span> Copy Share Link</button>
-      </div>
-    </div>
-
-    <!-- Scrollable Printable Report Container -->
-    <div class="report-preview-wrap" id="reportPreviewContainer"></div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════════════════════
-       AI TITLE & PACKAGING SYNTHESIZER MODAL (P4)
+       AI TITLE & PACKAGING SYNTHESIZER MODAL
        ══════════════════════════════════════════════════════════════════════════ -->
   <div class="cmd-ovrl" id="aiSynthOvrl" onclick="closeAiSynthesizerModal()"></div>
   <div class="sc-modal ai-synth-modal" id="aiSynthModal" style="max-width:760px;width:95vw">
@@ -488,72 +384,6 @@
 
   <!-- Achievement Celebration Pop-up Banner -->
   <div id="achievementToast" class="achievement-toast"></div>
-
-  <!-- ══════════════════════════════════════════════════════════════════════════
-       FIXED STATUS FOOTER BAR (Operations & Quota Telemetry)
-       ══════════════════════════════════════════════════════════════════════════ -->
-  <footer class="status-footer" id="statusFooter">
-    <div class="status-footer-inner">
-      <div class="sf-left">
-        <span class="sf-item"><span class="sf-dot"></span> local · v1.3.0</span>
-        <span class="sf-divider"></span>
-        <div class="sf-quota" id="sfQuotaWrap" title="YouTube Data API v3 daily client quota consumption (10,000u daily limit)">
-          <span>API quota</span>
-          <div class="sf-quota-bar"><div class="sf-quota-fill" id="sfQuotaFill"></div></div>
-          <span id="sfQuotaVal" class="mono">0 / 10,000u</span>
-        </div>
-      </div>
-      <div class="sf-center">
-        <div class="sf-cache-chip" id="sfCacheChip" onclick="toggleDataHealthPopover(event)" title="Click to open Data Health Inspector">
-          <span class="sf-cache-dot" id="sfCacheDot"></span>
-          <span id="sfCacheText">cache 5/5 fresh · ⟳ just now</span>
-        </div>
-      </div>
-      <div class="sf-right">
-        <span class="sf-shortcuts-hint">
-          <kbd>/</kbd> search · <kbd>?</kbd> glossary · <kbd id="sfKbdHint">Ctrl K</kbd> palette · <kbd>[</kbd> <kbd>]</kbd> density
-        </span>
-      </div>
-    </div>
-  </footer>
-
-  <!-- Data Health Popover -->
-  <div class="data-health-popover" id="dataHealthPopover">
-    <div class="dh-hdr">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span class="msi" style="font-size:16px;color:var(--acc)">monitor_heart</span>
-        <span style="font-size:12px;font-weight:700;color:var(--t1)">Data Health & Cache Inspector</span>
-      </div>
-      <button class="icon-btn" style="width:20px;height:20px" onclick="toggleDataHealthPopover(event)"><span class="msi" style="font-size:13px">close</span></button>
-    </div>
-    <div class="dh-body" id="dhPopoverList"></div>
-    <div class="dh-footer">
-      <button class="btn btn-gh btn-sm" onclick="refreshStaleChannels()"><span class="msi">refresh</span> Refresh All Stale (>4h)</button>
-      <button class="btn btn-acc btn-sm" onclick="toggleDataHealthPopover();openSettingsModal();switchSettingsTab('data')">Storage Settings →</button>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════════════════════
-       MOBILE BOTTOM TAB NAVIGATION BAR (< 720px)
-       ══════════════════════════════════════════════════════════════════════════ -->
-  <nav class="m-nav" id="mobileNav" aria-label="Mobile Navigation">
-    <button class="m-nav-item on" id="m-nav-dash" onclick="sp('dash')" aria-label="Dashboard">
-      <span class="msi">dashboard</span>
-      <span class="m-nav-lbl">Dashboard</span>
-    </button>
-    <button class="m-nav-item" id="m-nav-channels" onclick="sp('channels')" aria-label="My Channels">
-      <span class="msi">subscriptions</span>
-      <span class="m-nav-lbl">Channels</span>
-    </button>
-    <button class="m-nav-item" id="m-nav-studio" onclick="sp('studio')" aria-label="Creator Studio">
-      <span class="msi">movie_filter</span>
-      <span class="m-nav-lbl">Studio</span>
-    </button>
-    <button class="m-nav-item" id="m-nav-search" onclick="sp('search')" aria-label="Search Channels">
-      <span class="msi">search</span>
-      <span class="m-nav-lbl">Search</span>
-    </button>
-  </nav>
 
   <!-- Core Modular JS Application Engine -->
   <script src="static/js/state.js" defer></script>

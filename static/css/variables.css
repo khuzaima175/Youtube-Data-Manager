@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════════════════════════════════
-   YT TRACKER — OBSIDIAN DESIGN SYSTEM TOKENS
-   Calm, Deep Obsidian / Slate Dark Theme (Linear & Raycast Inspired)
+   YT TRACKER 2.0 — SAAS DESIGN SYSTEM TOKENS
+   Linear / Raycast Calibre Workspace Architecture
    ══════════════════════════════════════════════════════════════════════════════ */
 
 *, *::before, *::after {
@@ -10,36 +10,40 @@
 }
 
 :root {
-  /* Surfaces (Deep Obsidian Hierarchy) */
-  --bg-0: #06080c;       /* True deep canvas background */
-  --bg-1: #0a0d14;       /* Primary container surface & nav */
-  --bg-2: #0f141d;       /* Elevated cards & bento panels */
-  --bg-3: #151c27;       /* Interactive tiles, inputs & chips */
-  --bg-hover: #1c2432;   /* Hover state highlight */
-  --bg-active: #222c3c;  /* Active/Pressed state */
+  /* Layout Dimensions */
+  --sidebar-w: 240px;
+  --header-h: 56px;
+  --status-bar-h: 36px;
+  --max-canvas-w: 1440px;
 
-  /* Hairline Borders & Dividers */
+  /* Surfaces & Hierarchy (Deep Graphite / Obsidian Workspace) */
+  --bg-0: #08090b;       /* True Canvas */
+  --bg-1: #0d0f13;       /* Sidebar & Top Header */
+  --bg-2: #12151b;       /* Primary Panels, Cards, Tables */
+  --bg-3: #181c24;       /* Interactive Inputs, Sub-rows, Chips */
+  --bg-hover: #1f2530;   /* Hover & Active States */
+  --bg-elevated: #242b38;/* Popovers & Tooltips */
+
+  /* Hairline Borders */
   --line-1: rgba(255, 255, 255, 0.065);
   --line-2: rgba(255, 255, 255, 0.12);
-  --line-3: rgba(255, 255, 255, 0.2);
+  --line-3: rgba(255, 255, 255, 0.22);
 
-  /* Typography Colors */
-  --t1: #f8fafc;         /* High-contrast primary text */
-  --t2: #94a3b8;         /* Balanced secondary body text */
-  --t3: #64748b;         /* Muted tertiary & caption text */
-  --t4: #475569;         /* Subdued icons and disabled text */
+  /* High-Contrast Typography */
+  --t1: #f8fafc;         /* High-contrast crisp titles */
+  --t2: #94a3b8;         /* Neutral body & metadata */
+  --t3: #64748b;         /* Subdued tertiary / captions */
+  --t4: #475569;         /* Dividers / disabled */
 
-  /* Curated Semantic Accents (No harsh multi-color rainbow gradients) */
-  --acc: #38bdf8;        /* Sky blue clean interactive accent */
-  --acc-glow: rgba(56, 189, 248, 0.18);
-  --me: #f59e0b;         /* Warm amber for MY Channel */
-  --me-glow: rgba(245, 158, 11, 0.18);
-  --up: #10b981;         /* Emerald green positive metric */
-  --up-glow: rgba(16, 185, 129, 0.18);
-  --down: #f43f5e;       /* Rose red negative metric */
-  --down-glow: rgba(244, 63, 94, 0.18);
-  --warn: #f59e0b;       /* Amber warning state */
-  --yt: #ef4444;         /* YouTube signature crimson touch */
+  /* Cohesive Accents (No Emojis or Multi-Color AI Gradients) */
+  --acc: #3b82f6;        /* Electric Blue Interactive Action */
+  --acc-glow: rgba(59, 130, 246, 0.16);
+  --me: #f59e0b;         /* Warm Amber for Primary Channel */
+  --me-glow: rgba(245, 158, 11, 0.16);
+  --up: #10b981;         /* Emerald Green positive delta */
+  --down: #f43f5e;       /* Rose Red negative delta */
+  --warn: #f59e0b;       /* Amber warning */
+  --yt: #ef4444;         /* YouTube Brand Touch */
 
   /* Backward Compatibility Aliases */
   --pr: var(--acc);
@@ -51,21 +55,21 @@
   --sf: var(--bg-2);
   --sf-high: var(--bg-3);
 
-  /* Radii */
+  /* Radii & Geometry */
   --r-xs: 4px;
-  --r-s: 8px;
-  --r-m: 12px;
-  --r-l: 16px;
-  --r-xl: 20px;
+  --r-s: 6px;
+  --r-m: 10px;
+  --r-l: 14px;
+  --r-xl: 18px;
   --r-full: 9999px;
 
   /* Spacing Grid */
   --s1: 4px;
   --s2: 8px;
-  --s3: 14px;
-  --s4: 20px;
-  --s5: 32px;
-  --s6: 48px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 36px;
 
   /* Typography */
   --f-disp: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -75,14 +79,12 @@
   /* Motion & Easing */
   --e-out: cubic-bezier(0.16, 1, 0.3, 1);
   --e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --d-1: 0.15s;
-  --d-2: 0.25s;
-  --d-3: 0.4s;
+  --d-1: 0.12s;
+  --d-2: 0.2s;
+  --d-3: 0.35s;
 
-  /* Deep Elevation Shadows */
-  --sh-1: 0 4px 16px -2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  --sh-2: 0 12px 36px -4px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --sh-hover: 0 12px 32px -4px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --sh-glow-acc: 0 0 0 1px rgba(56, 189, 248, 0.4), 0 4px 14px rgba(56, 189, 248, 0.2);
-  --sh-glow-me: 0 0 0 1px rgba(245, 158, 11, 0.4), 0 4px 14px rgba(245, 158, 11, 0.2);
+  /* Subtle Hairline Shadows */
+  --sh-1: 0 2px 8px -2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --sh-2: 0 12px 32px -4px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --sh-hover: 0 8px 24px -2px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
