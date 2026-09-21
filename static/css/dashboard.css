@@ -407,31 +407,38 @@
 .lb-wrap {
   background: var(--bg-2);
   border: 1px solid var(--line-1);
-  border-radius: var(--r-m);
-  padding: 16px 20px;
+  border-radius: var(--r-l);
+  padding: 24px 28px;
   margin-top: var(--s5);
   box-shadow: var(--sh-1);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.lb-wrap:hover {
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .lb-table {
   width: 100%;
   table-layout: fixed;
-  border-collapse: collapse;
-  margin-top: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 14px;
 }
 
 .lb-table th {
-  padding: 10px 10px;
-  font-size: 10.5px;
+  padding: 12px 14px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--t3);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 1px solid var(--line-2);
   text-align: left;
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  background: var(--bg-2);
 }
 
 .lb-table th:hover {
@@ -439,25 +446,25 @@
 }
 
 .lb-table td {
-  padding: 10px 10px;
+  padding: 13px 14px;
   border-bottom: 1px solid var(--line-1);
   vertical-align: middle;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: background 0.15s var(--e-out);
 }
 
 .lb-table th:last-child,
 .lb-table td:last-child {
   text-align: center;
-  padding: 6px 0;
+  padding: 8px 0;
   overflow: visible;
   text-overflow: clip;
 }
 
 .lb-row {
   cursor: pointer;
-  transition: background 0.18s var(--e-out);
 }
 
 .lb-row:hover td {
@@ -466,6 +473,10 @@
 
 .lb-row.me td {
   background: rgba(245, 158, 11, 0.04);
+}
+
+.lb-row.me:hover td {
+  background: rgba(245, 158, 11, 0.08);
 }
 
 .lb-bar-cell {
@@ -478,7 +489,7 @@
   background: var(--bg-1);
   border-radius: var(--r-full);
   overflow: hidden;
-  margin-top: 4px;
+  margin-top: 5px;
 }
 
 .lb-bar-fill {

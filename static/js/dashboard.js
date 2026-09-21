@@ -767,39 +767,42 @@ function renderLeaderboardRows(primary, allChannels) {
     const threatScore = ch._threatScore || 0;
     const threatColor = threatScore >= 50 ? 'var(--down)' : threatScore >= 25 ? 'var(--warn)' : 'var(--t3)';
 
+    const rankDisplay = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
     return `
       <tr class="lb-row ${isMe ? 'me' : ''}" onclick="openDeepDive('${esc(ch.id)}', 'overview')">
-        <td style="font-family:var(--f-mono);font-size:11px;color:var(--t3);text-align:center;white-space:nowrap">#${i + 1} ${renderRankDeltaChip(ch.id)}</td>
+        <td style="font-family:var(--f-mono);font-size:12px;font-weight:700;color:var(--t3);text-align:center;white-space:nowrap">
+          <span style="font-size:${i < 3 ? '14px' : '11px'}">${rankDisplay}</span> ${renderRankDeltaChip(ch.id)}
+        </td>
         <td>
-          <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0">
             ${ch.logo_url
-        ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid ${col};flex-shrink:0" alt="">`
-        : `<div style="width:26px;height:26px;border-radius:50%;background:var(--bg-3);border:1px solid ${col};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${(ch.name || '?')[0]}</div>`}
+        ? `<img src="${esc(proxyImg(ch.logo_url))}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1.5px solid ${col};flex-shrink:0" alt="">`
+        : `<div style="width:28px;height:28px;border-radius:50%;background:var(--bg-3);border:1.5px solid ${col};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${(ch.name || '?')[0]}</div>`}
             <div style="min-width:0">
-              <div style="font-weight:600;color:${isMe ? 'var(--me)' : 'var(--t1)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.name)} ${isMe ? '⭐' : ''}</div>
-              <div style="font-size:10.5px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.handle || '')}</div>
+              <div style="font-weight:600;font-size:13px;color:${isMe ? 'var(--me)' : 'var(--t1)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.name)} ${isMe ? '<span class="badge bdg-gd" style="font-size:9px;margin-left:4px">YOU</span>' : ''}</div>
+              <div style="font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.handle || '')}</div>
             </div>
           </div>
         </td>
         <td class="lb-bar-cell">
-          <div style="font-family:var(--f-mono);font-weight:700;color:var(--t1)">${esc(ch.subscribers)}</div>
+          <div style="font-family:var(--f-mono);font-size:13px;font-weight:700;color:var(--t1)">${esc(ch.subscribers)}</div>
           <div class="lb-bar-bg">
             <div class="lb-bar-fill" style="width:${pct}%;background:${col}"></div>
           </div>
         </td>
-        <td style="font-family:var(--f-mono);color:var(--up);font-weight:700">${esc(ch.avg_views)}</td>
-        <td style="font-family:var(--f-mono);color:var(--t2)">${esc(ch.total_views)}</td>
-        <td style="font-family:var(--f-mono);color:var(--t3)">${esc(ch.total_videos)}</td>
-        <td style="font-size:11px;color:var(--t3)">${ch.video?.date || '—'}</td>
+        <td style="font-family:var(--f-mono);font-size:13px;color:var(--up);font-weight:700">${esc(ch.avg_views)}</td>
+        <td style="font-family:var(--f-mono);font-size:13px;color:var(--t2)">${esc(ch.total_views)}</td>
+        <td style="font-family:var(--f-mono);font-size:13px;color:var(--t3)">${esc(ch.total_videos)}</td>
+        <td style="font-size:11.5px;color:var(--t3)">${ch.video?.date || '—'}</td>
         <td style="text-align:center;padding:6px 4px" onclick="event.stopPropagation()">
           ${isMe
         ? `<span class="badge bdg-gd">YOU</span>`
         : !_topicCache.topics.size
-          ? `<span class="badge bdg-dim" title="Enrich channels to compute threat score">—</span>`
-          : `<span class="badge" style="background:${threatScore >= 50 ? 'rgba(255,107,107,0.12)' : threatScore >= 25 ? 'rgba(245,197,66,0.12)' : 'var(--bg-3)'};color:${threatColor}" title="Shared topics: ${(ch._sharedTopics || []).join(', ') || 'none'}">⚔️ ${threatScore}%</span>`}
+          ? `<span class="badge bdg-dim" title="Enrich channels to compute topic overlap">—</span>`
+          : `<span class="badge" style="background:${threatScore >= 50 ? 'rgba(244,63,94,0.12)' : threatScore >= 25 ? 'rgba(245,158,11,0.12)' : 'var(--bg-3)'};color:${threatColor}" title="Shared topics: ${(ch._sharedTopics || []).join(', ') || 'none'}">${threatScore}% overlap</span>`}
         </td>
         <td style="text-align:center;overflow:visible;text-overflow:clip;padding:6px 0" onclick="event.stopPropagation()">
-          <button class="icon-btn ${inCompare ? 'active' : ''}" style="display:inline-flex;margin:0 auto" onclick="toggleCompare('${esc(ch.id)}')" title="Toggle compare tray">
+          <button class="icon-btn ${inCompare ? 'active' : ''}" style="display:inline-flex;margin:0 auto;width:28px;height:28px" onclick="toggleCompare('${esc(ch.id)}')" title="Toggle compare tray">
             <span class="msi" style="font-size:14px">${inCompare ? 'check' : 'add'}</span>
           </button>
         </td>
