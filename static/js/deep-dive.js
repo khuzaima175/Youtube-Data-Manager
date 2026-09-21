@@ -32,12 +32,12 @@ async function openDeepDive(channelId, tab = 'overview') {
   const inCompare = compareSet.includes(ch.id) || ch.is_primary;
   if (actsEl) {
     actsEl.innerHTML = `
-      ${!ch.is_primary ? `<button class="btn btn-gh btn-sm" onclick="setPrimary('${esc(ch.id)}')"><span class="msi" style="font-size:14px">star</span> Set Mine</button>` : ''}
+      ${!ch.is_primary ? `<button class="btn btn-gh btn-sm" onclick="setPrimary('${esc(ch.id)}')"><i data-lucide="star" style="width:13px;height:13px"></i> Set Mine</button>` : ''}
       <button class="btn ${inCompare ? 'btn-acc' : 'btn-gh'} btn-sm" onclick="toggleCompare('${esc(ch.id)}')">
-        <span class="msi" style="font-size:14px">${inCompare ? 'check' : 'compare_arrows'}</span> ${inCompare ? 'In Compare' : '+ Compare'}
+        <i data-lucide="${inCompare ? 'check' : 'git-compare'}" style="width:13px;height:13px"></i> ${inCompare ? 'In Compare' : '+ Compare'}
       </button>
-      <button class="icon-btn" onclick="refreshOne('${esc(ch.id)}')"><span class="msi" style="font-size:15px">refresh</span></button>
-      <button class="icon-btn" onclick="closeDeepDive()"><span class="msi" style="font-size:16px">close</span></button>`;
+      <button class="icon-btn" onclick="refreshOne('${esc(ch.id)}')"><i data-lucide="refresh-cw" style="width:13px;height:13px"></i></button>
+      <button class="icon-btn" onclick="closeDeepDive()"><i data-lucide="x" style="width:14px;height:14px"></i></button>`;
   }
 
   const ddEl = document.getElementById('page-channel');
@@ -51,6 +51,7 @@ async function openDeepDive(channelId, tab = 'overview') {
   checkAchievements();
 
   switchDDTab(targetTab);
+  if (window.lucide) window.lucide.createIcons();
   serializeStateToHash();
 }
 
