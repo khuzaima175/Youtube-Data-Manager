@@ -78,7 +78,6 @@ button {
   from {
     transform: scaleY(0);
   }
-
   to {
     transform: scaleY(1);
   }
@@ -90,27 +89,20 @@ button {
   }
 }
 
-@keyframes shim {
-  from {
-    background-position: 100% 0;
+@keyframes skelShimmer {
+  0% {
+    background-position: 200% 0;
   }
-
-  to {
-    background-position: -100% 0;
+  100% {
+    background-position: -200% 0;
   }
 }
 
 @keyframes pop {
   0% {
-    transform: scale(0.6);
+    transform: scale(0.95);
     opacity: 0;
   }
-
-  70% {
-    transform: scale(1.06);
-    opacity: 1;
-  }
-
   100% {
     transform: scale(1);
     opacity: 1;
@@ -126,20 +118,30 @@ button {
 @keyframes modalIn {
   from {
     opacity: 0;
-    transform: translate(-50%, -46%) scale(0.96);
+    transform: translate(-50%, -47%) scale(0.97);
   }
-
   to {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .rev {
   opacity: 0;
-  transform: translateY(18px) scale(0.99);
-  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  transition-delay: calc(var(--i, 0) * 40ms);
+  transform: translateY(14px);
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--i, 0) * 35ms);
 }
 
 .rev.in,
@@ -153,7 +155,6 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   *,
   *::before,
   *::after {
@@ -183,18 +184,18 @@ button {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--t3);
+  background: var(--t4);
 }
 
-/* ── 04. Tooltips & Skeletons ─────────────────────────────────────────────── */
+/* ── 04. Tooltips & Universal Skeleton Engine ─────────────────────────────── */
 .tip {
   position: fixed;
   z-index: 9999;
   transform: translate(-50%, calc(-100% - 10px));
-  background: var(--bg-3);
+  background: var(--bg-2);
   border: 1px solid var(--line-2);
   border-radius: var(--r-s);
-  padding: 6px 10px;
+  padding: 6px 12px;
   font-family: var(--f-ui);
   font-size: 12px;
   font-weight: 500;
@@ -202,7 +203,7 @@ button {
   box-shadow: var(--sh-2);
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.15s var(--e-out);
+  transition: opacity 0.15s var(--e-out), transform 0.15s var(--e-out);
   white-space: nowrap;
 }
 
@@ -223,11 +224,92 @@ button {
   border-top: 5px solid var(--line-2);
 }
 
+/* Comprehensive Shimmer Skeleton Suite */
 .skel {
-  border-radius: 6px;
-  background: linear-gradient(90deg, var(--bg-3) 25%, #223140 37%, var(--bg-3) 63%);
-  background-size: 400% 100%;
-  animation: shim 1.1s linear infinite;
+  background: linear-gradient(90deg, var(--bg-3) 0%, rgba(255, 255, 255, 0.07) 50%, var(--bg-3) 100%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.8s ease-in-out infinite;
+  border-radius: var(--r-s);
+  display: inline-block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.skel-text {
+  height: 13px;
+  width: 100%;
+  border-radius: var(--r-xs);
+  margin: 3px 0;
+}
+
+.skel-text.sm {
+  height: 10px;
+  width: 65%;
+}
+
+.skel-title {
+  height: 22px;
+  width: 55%;
+  border-radius: var(--r-s);
+  margin-bottom: 8px;
+}
+
+.skel-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.skel-avatar.lg {
+  width: 56px;
+  height: 56px;
+}
+
+.skel-avatar.sm {
+  width: 32px;
+  height: 32px;
+}
+
+.skel-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-s);
+}
+
+.skel-badge {
+  height: 20px;
+  width: 64px;
+  border-radius: var(--r-full);
+}
+
+.skel-tile {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-m);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 84px;
+}
+
+.skel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+.skel-card {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-l);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .spin {
@@ -879,9 +961,9 @@ body.icons-fallback .msi {
   position: sticky;
   top: 0;
   z-index: 60;
-  background: rgba(16, 18, 24, 0.94);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(6, 8, 12, 0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid var(--line-1);
 }
 
