@@ -202,28 +202,7 @@ async function renderDash() {
       </div>
     </div>`;
 
-  // 2. Next-step recommendation Card
-  const nbaHtml = `
-    <div class="card" style="padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:var(--surface-1);border:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:12px;min-width:0">
-        <div style="width:32px;height:32px;border-radius:var(--r-sm);background:rgba(102,114,245,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <i data-lucide="sparkles" style="width:16px;height:16px"></i>
-        </div>
-        <div style="min-width:0">
-          <div style="font-size:13px;font-weight:500;color:var(--text-1);display:flex;align-items:center;gap:8px">
-            <span>${esc(nba.title)}</span>
-            <a href="javascript:void(0)" onclick="${nba.whyLink}" style="font-size:11.5px;color:var(--accent);text-decoration:underline">Why?</a>
-          </div>
-          <div style="font-size:12px;color:var(--text-3);margin-top:2px">${esc(nba.sub)}</div>
-        </div>
-      </div>
-      <button class="btn btn-acc btn-sm" style="flex-shrink:0" onclick="${nba.actionFn}">
-        <i data-lucide="arrow-right" style="width:13px;height:13px"></i>
-        ${esc(nba.actionText)}
-      </button>
-    </div>`;
-
-  // 3. 4 KPI Grid (Subscribers, 30d Views, Upload Cadence, Niche Share)
+  // 1. 4 KPI Cards (Row 1)
   const kpiHtml = `
     <div class="dash-kpi-grid" style="margin-bottom:24px">
       <!-- KPI 1: Subscribers -->
@@ -241,7 +220,7 @@ async function renderDash() {
       <!-- KPI 2: Total Views / 30d Velocity -->
       <div class="kpi-card" data-tip="views_velocity">
         <div class="kpi-hdr">
-          <span>Total Views</span>
+          <span>30-Day Views Velocity</span>
           <i data-lucide="eye" style="width:14px;height:14px;color:var(--text-3)"></i>
         </div>
         <div class="kpi-val">${esc(primary.total_views)}</div>
@@ -275,33 +254,61 @@ async function renderDash() {
       </div>
     </div>`;
 
-  // 4. Growth Trajectory Curve (Chart.js)
-  const chartHtml = `
-    <div class="dash-chart-card">
-      <div class="dash-chart-hdr">
-        <div class="dash-chart-title">
-          <i data-lucide="trending-up" style="width:16px;height:16px;color:var(--accent)"></i>
-          <span>Performance Trajectory</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="race-seg">
-            <button class="race-seg-btn ${currentChartMetric === 'views' ? 'on' : ''}" onclick="toggleDashChartMetric('views')">Views Velocity</button>
-            <button class="race-seg-btn ${currentChartMetric === 'cadence' ? 'on' : ''}" onclick="toggleDashChartMetric('cadence')">Upload Cadence</button>
+  // 2. Main Row: Performance Trajectory Chart (2/3) + Next Step Card (1/3)
+  const mainRowHtml = `
+    <div class="overview-main">
+      <!-- 2/3 Width Chart Card -->
+      <div class="dash-chart-card">
+        <div class="dash-chart-hdr">
+          <div class="dash-chart-title">
+            <i data-lucide="trending-up" style="width:16px;height:16px;color:var(--accent)"></i>
+            <span>Performance Trajectory</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="race-seg">
+              <button class="race-seg-btn ${currentChartMetric === 'views' ? 'on' : ''}" onclick="toggleDashChartMetric('views')">Views Velocity</button>
+              <button class="race-seg-btn ${currentChartMetric === 'cadence' ? 'on' : ''}" onclick="toggleDashChartMetric('cadence')">Upload Cadence</button>
+            </div>
           </div>
         </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="dashGrowthCanvas"></canvas>
+        </div>
       </div>
-      <div class="chart-canvas-wrap">
-        <canvas id="dashGrowthCanvas"></canvas>
+
+      <!-- 1/3 Width Next Step Card -->
+      <div class="next-step-card">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <div style="width:28px;height:28px;border-radius:var(--r-sm);background:rgba(102,114,245,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <i data-lucide="sparkles" style="width:15px;height:15px"></i>
+            </div>
+            <span style="font-size:13px;font-weight:600;color:var(--text-1)">Next Step</span>
+          </div>
+          <div style="font-size:14px;font-weight:500;color:var(--text-1);line-height:1.45;margin-bottom:8px">
+            ${esc(nba.title)}
+          </div>
+          <div style="font-size:12.5px;color:var(--text-3);line-height:1.45;margin-bottom:14px">
+            ${esc(nba.sub)}
+          </div>
+          <a href="javascript:void(0)" onclick="${nba.whyLink}" style="font-size:12px;color:var(--accent);text-decoration:underline;display:inline-flex;align-items:center;gap:4px">
+            Why? Learn more →
+          </a>
+        </div>
+        <button class="btn btn-acc" style="width:100%" onclick="${nba.actionFn}">
+          <i data-lucide="arrow-right" style="width:14px;height:14px"></i>
+          ${esc(nba.actionText)}
+        </button>
       </div>
     </div>`;
 
-  // 5. Recent Uploads Forensics
+  // 3. Row 3: Your Recent Uploads (5 rows max)
   const activityHtml = `
     <div class="card" style="padding:20px;margin-bottom:24px">
       <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid var(--border);margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <i data-lucide="play-circle" style="width:16px;height:16px;color:var(--accent)"></i>
-          <span style="font-size:14px;font-weight:600;color:var(--text-1)">Recent Uploads</span>
+          <span style="font-size:14px;font-weight:600;color:var(--text-1)">Your Recent Uploads</span>
         </div>
         <button class="btn btn-gh btn-sm" onclick="openDeepDive('${esc(primary.id)}', 'videos')">
           All Videos <i data-lucide="arrow-right" style="width:12px;height:12px"></i>
@@ -316,7 +323,7 @@ async function renderDash() {
       </div>
     </div>`;
 
-  el.innerHTML = heroHtml + nbaHtml + kpiHtml + chartHtml + activityHtml;
+  el.innerHTML = heroHtml + kpiHtml + mainRowHtml + activityHtml;
 
   if (window.lucide) window.lucide.createIcons();
 
@@ -361,7 +368,16 @@ function renderOverviewGrowthChart(enrichData, primary) {
     // Recent 15 videos performance velocity
     sampleVids = [...vids].slice(0, 15).reverse();
     if (sampleVids.length > 0) {
-      labels = sampleVids.map((v, i) => v.title ? (v.title.length > 18 ? v.title.slice(0, 18) + '…' : v.title) : `Upload #${i+1}`);
+      labels = sampleVids.map((v, i) => {
+        const pubDate = v.published_at || v.date;
+        if (pubDate) {
+          const d = new Date(pubDate);
+          if (!isNaN(d.getTime())) {
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          }
+        }
+        return `Drop #${i + 1}`;
+      });
       dataPoints = sampleVids.map(v => parseInt(v.view_count ?? v.views_raw ?? 0) || 0);
     } else {
       labels = ['Day 1', 'Day 5', 'Day 10', 'Day 15', 'Day 20', 'Day 25', 'Day 30'];
