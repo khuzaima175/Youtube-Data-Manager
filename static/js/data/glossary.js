@@ -563,6 +563,134 @@ const _GLOSSARY_CORE = {
     calc: 'Stage_Transition(Card_ID, New_Stage)',
     read: 'Provides real-time visibility into your upcoming release queue.',
     act: 'Move cards between stages as you progress through scriptwriting, editing, and packaging.'
+  },
+
+  // === AI Packaging Synthesizer & Archetypes ===
+  ai_synthesizer: {
+    title: 'Title & Packaging Synthesizer',
+    category: 'Packaging',
+    p: 'Generates 5 proven YouTube packaging angles and thumbnail concepts for any topic with zero quota burn.',
+    t: 'Algorithmic concept engine synthesizing curiosity hooks, power keywords, CTR scoring, and thumbnail composition blueprints.',
+    calc: 'Topic_Tokens × Archetype_Patterns(5) + CTR_Scoring',
+    read: 'Provides high-probability title hooks and thumbnail layouts so you never start from a blank canvas.',
+    act: 'Click "Test in Lab" to refine the title words or "+ Pipeline" to queue the video concept in your production board.'
+  },
+  packaging_archetypes: {
+    title: 'Packaging Archetypes',
+    category: 'Packaging',
+    p: 'The 5 psychological frameworks used by top YouTube creators to package video ideas for maximum click-through rate.',
+    t: 'Categorical frameworks: (1) Impossible Feat, (2) Hidden Flaw, (3) Head-to-Head, (4) Zero-to-Mastery, (5) Stress Test.',
+    calc: 'Categorical classification of title hooks and thumbnail tensions',
+    read: 'Different archetypes trigger different psychological responses: curiosity, loss-aversion, rivalry, or transformation.',
+    act: 'Test 2-3 different archetype angles for your topic to see which hook best fits your video format.'
+  },
+  impossible_feat: {
+    title: 'Archetype: Impossible Feat',
+    category: 'Packaging',
+    p: 'Curiosity hook centered on engineering breakthroughs, extreme challenges, or overcoming seemingly impossible barriers.',
+    t: 'Packaging angle: "The Impossible Engineering Behind {Topic}" or "Why Experts Said {Topic} Was Impossible".',
+    calc: 'Pattern: "Impossible / Breakthrough / Unbelievable {Topic}"',
+    read: 'Leverages cognitive dissonance and engineering intrigue to drive high browse and recommendation CTR.',
+    act: 'Pair with a macro cutaway or highlighted mechanism in your thumbnail.'
+  },
+  archetype_impossible_feat: {
+    title: 'Archetype: Impossible Feat',
+    category: 'Packaging',
+    p: 'Curiosity hook centered on engineering breakthroughs, extreme challenges, or overcoming seemingly impossible barriers.',
+    t: 'Packaging angle: "The Impossible Engineering Behind {Topic}" or "Why Experts Said {Topic} Was Impossible".',
+    calc: 'Pattern: "Impossible / Breakthrough / Unbelievable {Topic}"',
+    read: 'Leverages cognitive dissonance and engineering intrigue to drive high browse and recommendation CTR.',
+    act: 'Pair with a macro cutaway or highlighted mechanism in your thumbnail.'
+  },
+  hidden_flaw: {
+    title: 'Archetype: Hidden Flaw',
+    category: 'Packaging',
+    p: 'Loss-aversion hook warning viewers against subtle, expensive, or overlooked pitfalls.',
+    t: 'Packaging angle: "The Billion Dollar Flaw in {Topic} Nobody Talks About" or "The Fatal Mistake in {Topic}".',
+    calc: 'Pattern: "Flaw / Mistake / Problem / Dark Side of {Topic}"',
+    read: 'Viewers click because they fear making a critical mistake or losing time and money.',
+    act: 'Use warning badge callouts and amber/red accent highlights on your thumbnail.'
+  },
+  archetype_hidden_flaw: {
+    title: 'Archetype: Hidden Flaw',
+    category: 'Packaging',
+    p: 'Loss-aversion hook warning viewers against subtle, expensive, or overlooked pitfalls.',
+    t: 'Packaging angle: "The Billion Dollar Flaw in {Topic} Nobody Talks About" or "The Fatal Mistake in {Topic}".',
+    calc: 'Pattern: "Flaw / Mistake / Problem / Dark Side of {Topic}"',
+    read: 'Viewers click because they fear making a critical mistake or losing time and money.',
+    act: 'Use warning badge callouts and amber/red accent highlights on your thumbnail.'
+  },
+  head_to_head: {
+    title: 'Archetype: Head-to-Head',
+    category: 'Packaging',
+    p: 'High-tension comparison hook placing two competing methods, tools, or concepts against each other.',
+    t: 'Packaging angle: "{Topic} vs The Industry: The Brutal Truth" or "$500 vs $5,000 {Topic}".',
+    calc: 'Pattern: "{Topic} vs {Rival}: The Truth / Showdown"',
+    read: 'Viewers naturally click direct showdowns to validate their own opinions or buying decisions.',
+    act: 'Use a high-contrast 50/50 split layout in your thumbnail.'
+  },
+  archetype_head_to_head: {
+    title: 'Archetype: Head-to-Head',
+    category: 'Packaging',
+    p: 'High-tension comparison hook placing two competing methods, tools, or concepts against each other.',
+    t: 'Packaging angle: "{Topic} vs The Industry: The Brutal Truth" or "$500 vs $5,000 {Topic}".',
+    calc: 'Pattern: "{Topic} vs {Rival}: The Truth / Showdown"',
+    read: 'Viewers naturally click direct showdowns to validate their own opinions or buying decisions.',
+    act: 'Use a high-contrast 50/50 split layout in your thumbnail.'
+  },
+  zero_to_mastery: {
+    title: 'Archetype: Zero-to-Mastery',
+    category: 'Packaging',
+    p: 'Transformation hook promising a complete, definitive roadmap from beginner confusion to expert proficiency.',
+    t: 'Packaging angle: "I Mastered {Topic} in 30 Days (Complete Blueprint)" or "The Only {Topic} Guide You Need".',
+    calc: 'Pattern: "Zero to Master / Complete Guide / 30 Days of {Topic}"',
+    read: 'Strong evergreen appeal for tutorial and educational niches; ranks exceptionally well in YouTube search.',
+    act: 'Show a clear Before vs After progression or step-by-step roadmap badge in your thumbnail.'
+  },
+  archetype_zero_to_mastery: {
+    title: 'Archetype: Zero-to-Mastery',
+    category: 'Packaging',
+    p: 'Transformation hook promising a complete, definitive roadmap from beginner confusion to expert proficiency.',
+    t: 'Packaging angle: "I Mastered {Topic} in 30 Days (Complete Blueprint)" or "The Only {Topic} Guide You Need".',
+    calc: 'Pattern: "Zero to Master / Complete Guide / 30 Days of {Topic}"',
+    read: 'Strong evergreen appeal for tutorial and educational niches; ranks exceptionally well in YouTube search.',
+    act: 'Show a clear Before vs After progression or step-by-step roadmap badge in your thumbnail.'
+  },
+  stress_test: {
+    title: 'Archetype: Stress Test',
+    category: 'Packaging',
+    p: 'Extreme boundary testing hook pushing a concept or tool to its absolute breaking point.',
+    t: 'Packaging angle: "Pushing {Topic} to Its Absolute Breaking Point" or "I Tested {Topic} for 1,000 Hours".',
+    calc: 'Pattern: "Stress Testing / Breaking Point / 1,000 Hours of {Topic}"',
+    read: 'Extreme stakes and real-world experiments generate massive organic interest.',
+    act: 'Show an extreme test setup or gauge at the redline in your thumbnail.'
+  },
+  archetype_stress_test: {
+    title: 'Archetype: Stress Test',
+    category: 'Packaging',
+    p: 'Extreme boundary testing hook pushing a concept or tool to its absolute breaking point.',
+    t: 'Packaging angle: "Pushing {Topic} to Its Absolute Breaking Point" or "I Tested {Topic} for 1,000 Hours".',
+    calc: 'Pattern: "Stress Testing / Breaking Point / 1,000 Hours of {Topic}"',
+    read: 'Extreme stakes and real-world experiments generate massive organic interest.',
+    act: 'Show an extreme test setup or gauge at the redline in your thumbnail.'
+  },
+  thumbnail_blueprint: {
+    title: 'Thumbnail Concept Blueprint',
+    category: 'Packaging',
+    p: 'A structured visual recipe specifying layout composition, focal elements, and color contrast for your video.',
+    t: 'Three-part visual packaging architecture: Layout Structure + Focal Subject + Color Contrast Palette.',
+    calc: 'Composition: Layout + Focal_Point + Contrast_Rule',
+    read: 'Ensures your thumbnail and title tell one unified story before you open Photoshop or Canva.',
+    act: 'Follow the 3-element blueprint when taking your video screenshot or designing graphics.'
+  },
+  curiosity_gap: {
+    title: 'Curiosity Gap',
+    category: 'Packaging',
+    p: 'The psychological tension between what the viewer already knows and what they want to find out.',
+    t: 'Psychological trigger established when the title and thumbnail promise an intriguing answer that can only be resolved by clicking and watching.',
+    calc: 'Intrigue_Score(Title + Thumbnail)',
+    read: 'High curiosity gaps generate high CTR without being misleading clickbait.',
+    act: 'Pose an intriguing question or state an unexpected outcome without spoiling the conclusion in the title.'
   }
 };
 

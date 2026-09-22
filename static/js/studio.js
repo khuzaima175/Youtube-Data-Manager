@@ -467,54 +467,58 @@ function renderAiSynthesizerModal() {
   if (!modal || !ovrl || !content) return;
 
   const archetypes = [
-    { id: 'all', label: '⚡ All 5 Archetypes' },
-    { id: 'impossible_feat', label: '🏆 Impossible Feat' },
-    { id: 'hidden_flaw', label: '🚨 Hidden Flaw' },
-    { id: 'head_to_head', label: '⚔️ Head-to-Head' },
-    { id: 'zero_to_mastery', label: '🎓 Zero-to-Mastery' },
-    { id: 'stress_test', label: '💥 Stress Test' }
+    { id: 'all', label: 'All 5 Archetypes', tip: 'packaging_archetypes' },
+    { id: 'impossible_feat', label: 'Impossible Feat', tip: 'impossible_feat' },
+    { id: 'hidden_flaw', label: 'Hidden Flaw', tip: 'hidden_flaw' },
+    { id: 'head_to_head', label: 'Head-to-Head', tip: 'head_to_head' },
+    { id: 'zero_to_mastery', label: 'Zero-to-Mastery', tip: 'zero_to_mastery' },
+    { id: 'stress_test', label: 'Stress Test', tip: 'stress_test' }
   ];
 
   content.innerHTML = `
-    <div style="padding:22px">
+    <div style="padding:22px;background:var(--surface-1);border-radius:var(--r-md);color:var(--text-1)">
       <!-- Modal Header -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;border-bottom:1px solid var(--line-1);padding-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:14px">
         <div style="display:flex;align-items:center;gap:10px">
-          <span class="ic-tile cyan"><span class="msi" style="font-size:18px">auto_awesome</span></span>
+          <div style="width:32px;height:32px;border-radius:var(--r-sm);background:rgba(102,114,245,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center">
+            <i data-lucide="sparkles" style="width:18px;height:18px"></i>
+          </div>
           <div>
-            <div style="font-family:var(--f-disp);font-size:16px;font-weight:700;color:var(--t1)">AI Title & Packaging Synthesizer</div>
-            <div style="font-size:11px;color:var(--t3)">Generates 5 viral packaging archetypes with thumbnail concept blueprints. Zero quota consumption.</div>
+            <div style="font-size:16px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:6px" data-tip="ai_synthesizer">
+              <span>AI Title & Packaging Synthesizer</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px">Generates 5 viral packaging archetypes with thumbnail concept blueprints. Zero quota consumption.</div>
           </div>
         </div>
-        <button class="icon-btn" onclick="closeAiSynthesizerModal()"><span class="msi">close</span></button>
+        <button class="icon-btn" aria-label="Close synthesizer" onclick="closeAiSynthesizerModal()"><i data-lucide="x" style="width:16px;height:16px"></i></button>
       </div>
 
       <!-- Controls Row -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
         <div>
-          <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:block">Target Topic or Niche:</label>
-          <input type="text" id="aiSynthTopicInput" value="${esc(_aiSynthState.topic)}" placeholder="e.g. Next.js 15, DaVinci Resolve, EUV Lithography…"
-            style="width:100%;padding:8px 12px;font-size:13px;background:var(--bg-3);border:1px solid var(--line-2);border-radius:var(--r-s);color:var(--t1);outline:none"
+          <label style="font-size:11.5px;font-weight:500;color:var(--text-2);margin-bottom:6px;display:block">Target topic or niche:</label>
+          <input type="text" id="aiSynthTopicInput" value="${esc(_aiSynthState.topic)}" placeholder="e.g. Next.js 15, DaVinci Resolve, AutoCAD 3D Rib…"
+            style="width:100%;padding:8px 12px;font-size:13px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-1);outline:none"
             onchange="_aiSynthState.topic = this.value" />
         </div>
         <div>
-          <label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:block">Modifier / Angle (Optional):</label>
+          <label style="font-size:11.5px;font-weight:500;color:var(--text-2);margin-bottom:6px;display:block">Modifier / angle (optional):</label>
           <input type="text" id="aiSynthAngleInput" value="${esc(_aiSynthState.angle)}" placeholder="e.g. for beginners, after 100 days, $0 budget…"
-            style="width:100%;padding:8px 12px;font-size:13px;background:var(--bg-3);border:1px solid var(--line-2);border-radius:var(--r-s);color:var(--t1);outline:none"
+            style="width:100%;padding:8px 12px;font-size:13px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-1);outline:none"
             onchange="_aiSynthState.angle = this.value" />
         </div>
       </div>
 
       <!-- Archetype Segments & Generate Button -->
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px">
-        <div class="race-seg" style="overflow-x:auto;max-width:100%">
+        <div style="display:flex;align-items:center;gap:6px;overflow-x:auto;max-width:100%;padding-bottom:2px">
           ${archetypes.map(a => `
-            <button class="race-seg-btn ${_aiSynthState.archetype === a.id ? 'on' : ''}" onclick="setAiSynthArchetype('${a.id}')">
+            <button class="btn btn-gh btn-sm ${_aiSynthState.archetype === a.id ? 'active' : ''}" style="${_aiSynthState.archetype === a.id ? 'background:var(--surface-3);color:var(--text-1);border-color:var(--accent)' : ''}" onclick="setAiSynthArchetype('${a.id}')" data-tip="${a.tip}">
               ${a.label}
             </button>`).join('')}
         </div>
-        <button class="btn btn-acc" id="aiSynthRunBtn" onclick="executeAiSynthesis()">
-          <span class="msi">auto_awesome</span> Synthesize Archetypes
+        <button class="btn btn-acc btn-sm" id="aiSynthRunBtn" onclick="executeAiSynthesis()">
+          <i data-lucide="sparkles" style="width:13px;height:13px"></i> Synthesize Archetypes
         </button>
       </div>
 
@@ -526,6 +530,11 @@ function renderAiSynthesizerModal() {
 
   ovrl.classList.add('open');
   modal.classList.add('open');
+
+  if (window.lucide) window.lucide.createIcons();
+  if (window.Tooltip && typeof window.Tooltip.init === 'function') {
+    window.Tooltip.init();
+  }
 
   if (!_aiSynthState.results.length && !_aiSynthState.loading && _aiSynthState.topic) {
     executeAiSynthesis();
@@ -560,15 +569,15 @@ async function executeAiSynthesis() {
   const resWrap = document.getElementById('aiSynthResultsWrap');
   if (resWrap) {
     resWrap.innerHTML = `
-      <div style="padding:48px 16px;text-align:center;color:var(--t3);display:flex;flex-direction:column;align-items:center;gap:12px">
-        <div class="spin" style="width:28px;height:28px"></div>
-        <div style="font-size:14px;font-weight:700;color:var(--t1)">Synthesizing viral packaging archetypes for "${esc(topic)}"…</div>
-        <div style="font-size:11.5px">Assembling curiosity hooks, CTR scoring, and thumbnail blueprints</div>
+      <div style="padding:48px 16px;text-align:center;color:var(--text-3);display:flex;flex-direction:column;align-items:center;gap:12px">
+        <div class="spin" style="width:24px;height:24px"></div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-1)">Synthesizing viral packaging archetypes for "${esc(topic)}"…</div>
+        <div style="font-size:12px">Assembling curiosity hooks, CTR scoring, and thumbnail blueprints</div>
       </div>`;
   }
 
   const btn = document.getElementById('aiSynthRunBtn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin" style="width:14px;height:14px"></span> Generating…'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin" style="width:13px;height:13px"></span> Generating…'; }
 
   try {
     const res = await generateTitlesAI(topic, _aiSynthState.angle, _aiSynthState.title, _aiSynthState.archetype);
@@ -577,85 +586,91 @@ async function executeAiSynthesis() {
     toast('Synthesis failed', 'e');
   } finally {
     _aiSynthState.loading = false;
-    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="msi">auto_awesome</span> Synthesize Archetypes'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="sparkles" style="width:13px;height:13px"></i> Synthesize Archetypes'; }
     const w = document.getElementById('aiSynthResultsWrap');
     if (w) w.innerHTML = renderAiSynthResultsBodyHtml();
+    if (window.lucide) window.lucide.createIcons();
+    if (window.Tooltip && typeof window.Tooltip.init === 'function') {
+      window.Tooltip.init();
+    }
   }
 }
 
 function renderAiSynthResultsBodyHtml() {
   if (_aiSynthState.loading) {
     return `
-      <div style="padding:48px 16px;text-align:center;color:var(--t3);display:flex;flex-direction:column;align-items:center;gap:12px">
-        <div class="spin" style="width:28px;height:28px"></div>
-        <div style="font-size:14px;font-weight:700;color:var(--t1)">Synthesizing viral packaging archetypes…</div>
+      <div style="padding:48px 16px;text-align:center;color:var(--text-3);display:flex;flex-direction:column;align-items:center;gap:12px">
+        <div class="spin" style="width:24px;height:24px"></div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-1)">Synthesizing viral packaging archetypes…</div>
       </div>`;
   }
 
   if (!_aiSynthState.results.length) {
     return `
-      <div style="padding:36px 16px;text-align:center;color:var(--t3);font-size:12px;border:1.5px dashed var(--line-1);border-radius:var(--r-m)">
-        <span class="msi" style="font-size:32px;color:var(--t4);display:block;margin-bottom:8px">auto_awesome</span>
-        Enter a topic or niche above and click "Synthesize Archetypes" to generate packaging concepts!
+      <div style="padding:36px 16px;text-align:center;color:var(--text-3);font-size:12px;border:1px dashed var(--border);border-radius:var(--r-md)">
+        <i data-lucide="sparkles" style="width:28px;height:28px;color:var(--text-3);display:block;margin:0 auto 8px"></i>
+        Enter a topic or niche above and click "Synthesize Archetypes" to generate packaging concepts.
       </div>`;
   }
 
   return `
-    <div style="display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;flex-direction:column;gap:14px">
       ${_aiSynthState.results.map((item, idx) => {
     const sc = scoreTitle(item.title);
     const score = Math.max(item.estimated_score || 85, sc.score);
-    const st = scoreTone(score);
     const thumb = item.thumbnail_concept || {};
+    const archKey = item.archetype ? item.archetype.replace(/^archetype_/, '') : 'packaging_archetypes';
     return `
-          <div class="card" style="padding:16px;background:var(--bg-3);border:1px solid var(--line-2);border-radius:var(--r-m);display:flex;flex-direction:column;gap:12px;box-shadow:var(--sh-1)">
+          <div class="card" style="padding:16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);display:flex;flex-direction:column;gap:12px">
             <!-- Top Bar: Archetype and Score -->
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span class="badge bdg-pr" style="font-size:10.5px;font-weight:700;display:flex;align-items:center;gap:4px">
-                <span class="msi" style="font-size:14px">verified</span> ${esc(item.archetype_label || item.archetype)}
+              <span class="badge" style="background:rgba(102,114,245,0.12);color:var(--accent);border:1px solid rgba(102,114,245,0.25);font-size:11px;font-weight:500;display:flex;align-items:center;gap:4px" data-tip="${archKey}">
+                <i data-lucide="sparkles" style="width:12px;height:12px"></i> ${esc(item.archetype_label || item.archetype)}
               </span>
-              <div style="display:flex;align-items:center;gap:6px">
-                <span class="badge ${st.badge}" style="font-size:10px;font-weight:700">🔥 ${score}/100 Title Lab Score</span>
-                <span style="font-size:11px;color:var(--t3)">(${item.title.length} chars)</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="badge" style="background:rgba(78,164,99,0.12);color:var(--pos);border:1px solid rgba(78,164,99,0.25);font-size:11px;font-weight:500" data-tip="title_score">
+                  ${score}/100 Title Lab Score
+                </span>
+                <span style="font-size:11.5px;color:var(--text-3)" data-tip="title_length">(${item.title.length} chars)</span>
               </div>
             </div>
 
             <!-- Title Header -->
-            <div style="font-size:15px;font-weight:700;color:var(--t1);line-height:1.4">
+            <div style="font-size:15px;font-weight:600;color:var(--text-1);line-height:1.4">
               "${esc(item.title)}"
             </div>
 
             <!-- Thumbnail Blueprint Concept Card -->
-            <div style="background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-s);padding:12px;display:grid;grid-template-columns:140px 1fr;gap:14px;align-items:center">
+            <div style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;display:grid;grid-template-columns:140px 1fr;gap:14px;align-items:center" data-tip="thumbnail_blueprint">
               <!-- Visual Mockup Box -->
-              <div style="height:80px;background:linear-gradient(135deg, rgba(0,229,255,0.12), rgba(245,197,66,0.12));border:1.5px dashed var(--line-2);border-radius:var(--r-s);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;text-align:center">
-                <span class="msi" style="font-size:22px;color:var(--acc)">image</span>
-                <span style="font-size:9.5px;font-weight:800;color:var(--me);text-transform:uppercase;margin-top:2px;letter-spacing:0.04em">
+              <div style="height:76px;background:var(--surface-3);border:1px dashed var(--border);border-radius:var(--r-sm);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;text-align:center">
+                <i data-lucide="image" style="width:18px;height:18px;color:var(--accent)"></i>
+                <span style="font-size:10px;font-weight:600;color:var(--text-1);margin-top:4px;letter-spacing:0.02em">
                   "${esc(thumb.text_overlay || 'REVEALED')}"
                 </span>
-                <span style="font-size:8px;color:var(--t3);margin-top:2px">16:9 Concept</span>
+                <span style="font-size:8.5px;color:var(--text-3);margin-top:2px">16:9 Concept</span>
               </div>
 
               <!-- Blueprint Instructions -->
-              <div style="font-size:11px;line-height:1.45;color:var(--t2)">
-                <div><strong>🎨 Layout:</strong> ${esc(thumb.layout || 'Split-screen contrast')}</div>
-                <div><strong>🎯 Focal Subject:</strong> ${esc(thumb.focal_element || 'Extreme close-up with emotional expression')}</div>
-                <div><strong>🌈 Contrast:</strong> ${esc(thumb.contrast_colors || 'Deep dark slate background with neon cyan accents')}</div>
+              <div style="font-size:12px;line-height:1.5;color:var(--text-2)">
+                <div><strong style="color:var(--text-1)">Layout:</strong> ${esc(thumb.layout || 'Split-screen contrast')}</div>
+                <div><strong style="color:var(--text-1)">Focal Subject:</strong> ${esc(thumb.focal_element || 'Extreme close-up with emotional expression')}</div>
+                <div><strong style="color:var(--text-1)">Contrast:</strong> ${esc(thumb.contrast_colors || 'Deep dark slate background with neon cyan accents')}</div>
               </div>
             </div>
 
             <!-- Card Action Buttons -->
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:8px;border-top:1px solid var(--line-1)">
-              <div style="font-size:11px;color:var(--t3)">${esc(item.explanation || '')}</div>
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-gh btn-sm" onclick="navigator.clipboard.writeText('${esc(item.title)}');toast('Title copied!', 's')">
-                  <span class="msi" style="font-size:14px">content_copy</span> Copy
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:8px;border-top:1px solid var(--border)">
+              <div style="font-size:11.5px;color:var(--text-3)" data-tip="curiosity_gap">${esc(item.explanation || '')}</div>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-gh btn-sm" onclick="navigator.clipboard.writeText('${esc(item.title)}');toast('Title copied', 's')">
+                  <i data-lucide="copy" style="width:12px;height:12px"></i> Copy
                 </button>
                 <button class="btn btn-gh btn-sm" onclick="closeAiSynthesizerModal();useIdeaInTitleLab('${esc(item.title)}')">
-                  <span class="msi" style="font-size:14px">science</span> Test in Lab
+                  <i data-lucide="flask-conical" style="width:12px;height:12px"></i> Test in Lab
                 </button>
                 <button class="btn btn-acc btn-sm" onclick="closeAiSynthesizerModal();sendIdeaToPipeline('${esc(item.title)}', '${esc(_aiSynthState.topic || 'ai_synthesized')}', ${score})">
-                  <span class="msi" style="font-size:14px">add</span> + Pipeline
+                  <i data-lucide="plus" style="width:12px;height:12px"></i> + Pipeline
                 </button>
               </div>
             </div>
