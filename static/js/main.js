@@ -451,6 +451,17 @@ function renderDataHealthPopover() {
 
 /* ── 05. Compare Tray Engine ──────────────────────────────────────────────── */
 function renderCompareTray() {
+  const sidebarPill = document.getElementById('sidebarComparePill');
+  const sbText = document.getElementById('sbCompareText');
+  if (sidebarPill && sbText) {
+    if (compareSet.length > 0) {
+      sidebarPill.style.display = 'flex';
+      sbText.textContent = `Compare (${compareSet.length})`;
+    } else {
+      sidebarPill.style.display = 'none';
+    }
+  }
+
   const chipsEl = document.getElementById('compareTrayChips');
   const popoverList = document.getElementById('comparePopoverList');
   const compareNowWrap = document.getElementById('compareNowWrap');

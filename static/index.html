@@ -31,30 +31,35 @@
   <div class="app-layout">
     <!-- ── Left Sidebar ─────────────────────────────────────────────────────── -->
     <aside class="sidebar">
-      <!-- Brand & Version -->
+      <!-- Brand Header -->
       <div class="sidebar-brand-block">
         <div class="sidebar-brand" onclick="sp('dash')">
           <div class="brand-badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           </div>
           <span class="brand-text">YT Tracker</span>
-          <span class="brand-ver">v2.0</span>
         </div>
       </div>
 
       <!-- Active Channel Selector Pill -->
       <div class="sidebar-channel-selector" id="sidebarChannelPill" onclick="toggleChannelPicker(event)" title="Click to inspect primary channel">
-        <div class="sb-ch-avatar" id="sbChAvatar">C</div>
+        <div class="sb-ch-avatar" id="sbChAvatar">
+          <div class="skel" style="width:28px;height:28px;border-radius:50%"></div>
+        </div>
         <div class="sb-ch-details">
-          <div class="sb-ch-name" id="sbChName">Primary Channel</div>
-          <div class="sb-ch-sub" id="sbChSubs">Loading…</div>
+          <div class="sb-ch-name" id="sbChName">
+            <div class="skel" style="width:80px;height:13px;border-radius:3px"></div>
+          </div>
+          <div class="sb-ch-sub" id="sbChSubs">
+            <div class="skel" style="width:45px;height:10px;border-radius:2px;margin-top:2px"></div>
+          </div>
         </div>
         <i data-lucide="chevrons-up-down" class="sb-ch-chevron"></i>
       </div>
 
       <!-- Navigation Links -->
       <nav class="sidebar-nav">
-        <div class="sb-nav-section-title">INTELLIGENCE</div>
+        <div class="sb-nav-section-title">Intelligence</div>
         <button class="sb-nav-item active" id="sb-nav-dash" onclick="sp('dash')">
           <i data-lucide="layout-dashboard"></i>
           <span>Overview</span>
@@ -69,7 +74,7 @@
           <span>Topic Radar</span>
         </button>
 
-        <div class="sb-nav-section-title" style="margin-top:16px">WORKFLOW</div>
+        <div class="sb-nav-section-title" style="margin-top:16px">Workflow</div>
         <button class="sb-nav-item" id="sb-nav-studio" onclick="sp('studio')">
           <i data-lucide="clapperboard"></i>
           <span>Creator Studio</span>
@@ -82,16 +87,16 @@
 
       <!-- Sidebar Footer Utility -->
       <div class="sidebar-footer">
-        <!-- Persistent Compare Tray Pill -->
-        <div class="sb-compare-pill" id="sidebarComparePill" onclick="toggleComparePopover(event)" title="Manage channels in compare set">
+        <!-- Persistent Compare Tray Pill (Hidden at 0) -->
+        <div class="sb-compare-pill" id="sidebarComparePill" style="display:none" onclick="toggleComparePopover(event)" title="Manage channels in compare set">
           <i data-lucide="git-compare"></i>
-          <span id="sbCompareText">Compare Set (0)</span>
+          <span id="sbCompareText">Compare (0)</span>
         </div>
 
         <!-- Refresh Data Button -->
         <button class="sb-footer-btn" id="sbRefAllBtn" onclick="refreshAll()" title="Refresh telemetry and channels">
           <i data-lucide="refresh-cw" id="sbRefreshIcon"></i>
-          <span id="sbLastUpdated">Sync: Just now</span>
+          <span id="sbLastUpdated">Synced just now</span>
         </button>
 
         <!-- Command Menu Key Trigger -->
@@ -121,10 +126,14 @@
             <kbd>/</kbd>
           </div>
 
-          <!-- Add Channel Button -->
-          <button class="btn btn-acc btn-sm" onclick="toggleAdd()">
-            <i data-lucide="plus" style="width:14px;height:14px"></i>
-            <span>Add Channel</span>
+          <!-- Shortcuts & Help Trigger -->
+          <button class="icon-btn" onclick="openShortcutsModal()" title="Keyboard Shortcuts & Glossary (?)">
+            <i data-lucide="help-circle" style="width:15px;height:15px"></i>
+          </button>
+
+          <!-- Settings Trigger -->
+          <button class="icon-btn" onclick="openSettingsModal()" title="Settings">
+            <i data-lucide="settings" style="width:15px;height:15px"></i>
           </button>
         </div>
       </header>
@@ -396,6 +405,7 @@
   <script src="static/js/deep-dive.js" defer></script>
   <script src="static/js/settings-inbox.js" defer></script>
   <script src="static/js/report-gamification.js" defer></script>
+  <script src="static/js/ui/menu.js" defer></script>
   <script src="static/js/main.js" defer></script>
 </body>
 

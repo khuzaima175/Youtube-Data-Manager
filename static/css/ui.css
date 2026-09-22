@@ -1,1 +1,127 @@
-/* ── Phase 0 Scaffolding: Scaffolding Stylesheet (Extended in Phase 4) ── */
+/* ══════════════════════════════════════════════════════════════════════════════
+   YT TRACKER — SHARED UI ENGINE STYLESHEET (ui.css)
+   Context Dropdowns, Table Primitives, Detail Sheets & Skeletons
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 01. Context Dropdown Menu (⋯) ─────────────────────────────────────────── */
+.ui-dropdown-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  padding: 4px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: fadeIn 0.12s var(--ease) forwards;
+}
+
+.ui-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-family: var(--f-ui);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all var(--dur-1) var(--ease);
+}
+
+.ui-menu-item:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.ui-menu-item.danger {
+  color: var(--neg);
+}
+
+.ui-menu-item.danger:hover {
+  background: rgba(217, 92, 74, 0.12);
+  color: var(--neg);
+}
+
+.ui-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.row-menu-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease);
+}
+
+.row-menu-btn:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+  border-color: var(--border);
+}
+
+/* ── 02. Table Base Refinements ────────────────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.data-table th {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+  user-select: none;
+}
+
+.data-table th.sortable {
+  cursor: pointer;
+}
+
+.data-table th.sortable:hover {
+  color: var(--text-1);
+}
+
+.data-table th.num,
+.data-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table tr {
+  height: 48px;
+  transition: background var(--dur-1) var(--ease);
+}
+
+.data-table tr:hover {
+  background: var(--surface-2);
+}
+
+.data-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  vertical-align: middle;
+}
