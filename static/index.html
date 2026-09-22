@@ -127,7 +127,7 @@
           </div>
 
           <!-- Shortcuts & Help Trigger -->
-          <button class="icon-btn" onclick="openShortcutsModal()" title="Keyboard Shortcuts & Glossary (?)">
+          <button class="icon-btn" data-action="help" onclick="window.GlossaryModal ? window.GlossaryModal.open() : openShortcutsModal()" title="Keyboard Shortcuts & Glossary (?)">
             <i data-lucide="help-circle" style="width:15px;height:15px"></i>
           </button>
 
@@ -399,6 +399,7 @@
   <script src="static/js/ui/menu.js" defer></script>
   <script src="static/js/ui/tooltip.js" defer></script>
   <script src="static/js/ui/sheet.js" defer></script>
+  <script src="static/js/ui/glossary-modal.js" defer></script>
   <script src="static/js/ui/reveal.js" defer></script>
   <script src="static/js/main.js" defer></script>
 </body>

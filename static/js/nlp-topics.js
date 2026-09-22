@@ -447,30 +447,59 @@ async function renderTopicRadarPage() {
         </button>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:16px">
         ${topOpportunities.map((t, i) => {
           const myUploads = _topicCache.perChannel.get(primary?.id)?.get(t.topic)?.n || 0;
+          const isUntapped = myUploads === 0;
+          const rpiMultiplier = (t.shrunkenRpi || 1.2).toFixed(1);
+          
+          let statusBadge = '';
+          let rationale = '';
+          if (isUntapped && t.quadrant === 'blue_ocean') {
+            statusBadge = '<span class="badge" style="background:rgba(61,220,151,0.12);color:var(--pos);border:1px solid rgba(61,220,151,0.3);font-size:10px;font-weight:600;padding:2px 8px">💎 Untapped Blue Ocean</span>';
+            rationale = `Competitors average <strong style="color:var(--text-1)">${fmtN(t.avgViews)} views</strong> (${rpiMultiplier}× normal) with only ${t.supply14d || 0} recent drops and <strong style="color:var(--accent)">0 videos by you</strong>. High breakout probability.`;
+          } else if (t.quadrant === 'red_ocean' || t.quadrant === 'blue_ocean') {
+            statusBadge = '<span class="badge" style="background:rgba(102,114,245,0.12);color:var(--accent);border:1px solid rgba(102,114,245,0.3);font-size:10px;font-weight:600;padding:2px 8px">🔥 High Demand Pillar</span>';
+            rationale = `Strong niche staple averaging <strong style="color:var(--text-1)">${fmtN(t.avgViews)} views</strong> across ${t.n} competitor uploads. Steady viewer search volume.`;
+          } else {
+            statusBadge = '<span class="badge" style="background:rgba(255,171,0,0.12);color:var(--warn);border:1px solid rgba(255,171,0,0.3);font-size:10px;font-weight:600;padding:2px 8px">🌱 Emerging Trend</span>';
+            rationale = `Rising momentum with low competitor saturation. Publish early to capture first-mover search rankings.`;
+          }
+
           return `
-            <div class="card" style="padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:12px">
+            <div class="card" style="padding:18px;display:flex;flex-direction:column;justify-content:space-between;gap:14px;background:var(--surface-1);border:1px solid var(--border)">
               <div>
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-                  <div style="font-size:14px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(t.topic)}" data-tip="topic_keyword">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
+                  <div style="font-size:15px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(t.topic)}" data-tip="topic_keyword">
                     #${i + 1} ${capWords(t.topic)}
                   </div>
-                  <span style="font-size:11px;font-weight:500;color:${t.quadrant === 'blue_ocean' ? 'var(--pos)' : 'var(--accent)'}" data-tip="untapped_status">
-                    ${t.quadrant === 'blue_ocean' ? 'Untapped' : 'High Demand'}
-                  </span>
+                  ${statusBadge}
                 </div>
-                <div style="font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:6px">
-                  <span data-tip="topic_avg_views"><strong class="num" style="color:var(--text-1)">${fmtN(t.avgViews)}</strong> avg views</span>
-                  <span>·</span>
-                  <span data-tip="niche_frequency">${t.n} competitor vids</span>
-                  <span>·</span>
-                  <span data-tip="topic_coverage" style="color:${myUploads > 0 ? 'var(--text-2)' : 'var(--accent)'}">${myUploads > 0 ? `${myUploads} by you` : '0 by you'}</span>
+
+                <!-- Plain English Rationale -->
+                <div style="font-size:12.5px;color:var(--text-2);line-height:1.5;margin-bottom:12px">
+                  ${rationale}
+                </div>
+
+                <!-- Metric Row -->
+                <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:12px;font-size:11.5px">
+                  <div>
+                    <div style="color:var(--text-3);font-size:10.5px">Avg Views</div>
+                    <div class="num" style="font-weight:600;color:var(--text-1)">${fmtN(t.avgViews)}</div>
+                  </div>
+                  <div>
+                    <div style="color:var(--text-3);font-size:10.5px">Competitors</div>
+                    <div style="font-weight:600;color:var(--text-1)">${t.n} channels</div>
+                  </div>
+                  <div>
+                    <div style="color:var(--text-3);font-size:10.5px">Your Videos</div>
+                    <div style="font-weight:600;color:${myUploads > 0 ? 'var(--text-1)' : 'var(--accent)'}">${myUploads > 0 ? myUploads : '0 (Gap)'}</div>
+                  </div>
                 </div>
               </div>
 
-              <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--border)">
+              <!-- Action Bar -->
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--border);gap:8px;flex-wrap:wrap">
                 <div style="display:flex;align-items:center;gap:4px">
                   ${t.channels.slice(0, 3).map(chId => {
                     const ch = all.find(c => c.id === chId);
@@ -479,11 +508,16 @@ async function renderTopicRadarPage() {
                       ? `<img src="${esc(proxyImg(ch.logo_url))}" title="${esc(ch.name)}" style="width:20px;height:20px;border-radius:50%;object-fit:cover">`
                       : `<div title="${esc(ch.name)}" style="width:20px;height:20px;border-radius:50%;background:var(--surface-3);font-size:9px;font-weight:600;display:flex;align-items:center;justify-content:center">${(ch.name || '?')[0]}</div>`;
                   }).join('')}
-                  ${t.channels.length > 3 ? `<span style="font-size:11px;color:var(--text-3)">+${t.channels.length - 3}</span>` : ''}
+                  ${t.channels.length > 3 ? `<span style="font-size:10.5px;color:var(--text-3)">+${t.channels.length - 3}</span>` : ''}
                 </div>
-                <button class="btn btn-acc btn-sm" style="padding:4px 10px;font-size:11.5px" onclick="openTitleLabWithTopic('${esc(t.topic)}')">
-                  <i data-lucide="flask-conical" style="width:12px;height:12px"></i> Plan in Studio
-                </button>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <button class="btn btn-gh btn-sm" style="padding:4px 8px;font-size:11px" onclick="openAiTitleSynthesizer('${esc(t.topic)}')" title="Generate 6 packaging angles" data-tip="ai_synthesizer">
+                    <i data-lucide="sparkles" style="width:12px;height:12px"></i> Ideas
+                  </button>
+                  <button class="btn btn-acc btn-sm" style="padding:4px 10px;font-size:11px" onclick="openTitleLabWithTopic('${esc(t.topic)}')">
+                    <i data-lucide="flask-conical" style="width:12px;height:12px"></i> Plan in Studio
+                  </button>
+                </div>
               </div>
             </div>`;
         }).join('')}

@@ -1,22 +1,24 @@
 /* ══════════════════════════════════════════════════════════════════════════════
    YT TRACKER — TOOLTIP ENGINE (static/js/ui/tooltip.js)
-   Singleton L1 Hover Tooltip Engine with Progressive Disclosure
+   Singleton L1 Hover & Focus Tooltip Engine with Progressive Disclosure
    ══════════════════════════════════════════════════════════════════════════════ */
 
 (function () {
   let tipEl = null;
   let activeTarget = null;
-  let hideTimeout = null;
+  let showTimeout = null;
 
   function ensureTooltip() {
     if (!tipEl) {
       tipEl = document.createElement('div');
       tipEl.className = 'ui-tooltip';
+      tipEl.setAttribute('role', 'tooltip');
       tipEl.style.position = 'fixed';
       tipEl.style.zIndex = '9999';
       tipEl.style.display = 'none';
       tipEl.style.pointerEvents = 'auto'; // allow clicking 'Learn more'
-      tipEl.addEventListener('mouseenter', () => clearTimeout(hideTimeout));
+
+      tipEl.addEventListener('mouseenter', () => clearTimeout(showTimeout));
       tipEl.addEventListener('mouseleave', hide);
       document.body.appendChild(tipEl);
     }
@@ -24,33 +26,37 @@
 
   function show(target, customHtml) {
     ensureTooltip();
-    clearTimeout(hideTimeout);
-    activeTarget = target;
+    clearTimeout(showTimeout);
 
-    const tipId = target.getAttribute('data-tip');
-    const term = window.GLOSSARY && window.GLOSSARY[tipId];
+    showTimeout = setTimeout(() => {
+      activeTarget = target;
+      const tipId = target.getAttribute('data-tip');
+      const term = window.GLOSSARY && (window.GLOSSARY[tipId] || window.GLOSSARY[tipId?.replace(/-/g, '_')]);
 
-    if (customHtml) {
-      tipEl.innerHTML = customHtml;
-    } else if (term) {
-      tipEl.innerHTML = `
-        <div class="ui-tip-header">
-          <strong>${term.title}</strong>
-        </div>
-        <div class="ui-tip-body">${term.p}</div>
-        <div class="ui-tip-footer">
-          <button class="ui-tip-link" onclick="window.openMetricSheet('${tipId}')">
-            Learn more →
-          </button>
-        </div>`;
-    } else if (tipId) {
-      tipEl.innerHTML = `<div class="ui-tip-body">${tipId}</div>`;
-    } else {
-      return;
-    }
+      if (customHtml) {
+        tipEl.innerHTML = customHtml;
+      } else if (term) {
+        const titleText = term.title || term.t || 'Metric Detail';
+        const bodyText = term.p || term.desc || '';
+        tipEl.innerHTML = `
+          <div class="ui-tip-header">
+            <strong>${titleText}</strong>
+          </div>
+          <div class="ui-tip-body">${bodyText}</div>
+          <div class="ui-tip-footer">
+            <button class="ui-tip-link" onclick="if(window.Sheet){window.Sheet.open('${tipId}')}else if(window.openMetricSheet){window.openMetricSheet('${tipId}')}">
+              Learn more →
+            </button>
+          </div>`;
+      } else if (tipId) {
+        tipEl.innerHTML = `<div class="ui-tip-body">${tipId}</div>`;
+      } else {
+        return;
+      }
 
-    tipEl.style.display = 'block';
-    position(target);
+      tipEl.style.display = 'block';
+      position(target);
+    }, 120);
   }
 
   function position(target) {
@@ -61,7 +67,7 @@
     let top = rect.top - tipRect.height - 8;
     let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
 
-    // If clipping at top, place below target
+    // If clipping at top of viewport, flip to bottom
     if (top < 10) {
       top = rect.bottom + 8;
     }
@@ -77,31 +83,50 @@
   }
 
   function hide() {
-    clearTimeout(hideTimeout);
-    hideTimeout = setTimeout(() => {
-      if (tipEl) tipEl.style.display = 'none';
-      activeTarget = null;
-    }, 150);
+    clearTimeout(showTimeout);
+    if (tipEl) tipEl.style.display = 'none';
+    activeTarget = null;
   }
 
-  // Global event delegation for data-tip
+  // Global event delegation for data-tip: mouse hover + keyboard focus
   document.addEventListener('mouseover', function (e) {
+    const el = e.target.closest('[data-tip]');
+    if (el) {
+      show(el);
+    } else if (activeTarget && !tipEl.contains(e.target)) {
+      hide();
+    }
+  });
+
+  document.addEventListener('mouseout', function (e) {
+    const el = e.target.closest('[data-tip]');
+    if (el && (!e.relatedTarget || !el.contains(e.relatedTarget)) && (!tipEl || !tipEl.contains(e.relatedTarget))) {
+      hide();
+    }
+  });
+
+  document.addEventListener('focusin', function (e) {
     const el = e.target.closest('[data-tip]');
     if (el) {
       show(el);
     }
   });
 
-  document.addEventListener('mouseout', function (e) {
-    const el = e.target.closest('[data-tip]');
-    if (el) {
+  document.addEventListener('focusout', function (e) {
+    if (activeTarget && (!tipEl || !tipEl.contains(e.relatedTarget))) {
+      hide();
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && activeTarget) {
       hide();
     }
   });
 
   window.showTip = function (html, x, y) {
     ensureTooltip();
-    clearTimeout(hideTimeout);
+    clearTimeout(showTimeout);
     tipEl.innerHTML = `<div class="ui-tip-body">${html}</div>`;
     tipEl.style.display = 'block';
     tipEl.style.top = `${y - 30}px`;
@@ -109,4 +134,5 @@
   };
 
   window.hideTip = hide;
+  window.Tooltip = { show, hide };
 })();

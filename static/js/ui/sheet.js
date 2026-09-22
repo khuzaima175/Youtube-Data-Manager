@@ -22,55 +22,65 @@
 
   function openSheet(termId) {
     ensureSheet();
-    const term = window.GLOSSARY && window.GLOSSARY[termId];
+    const term = window.GLOSSARY && (window.GLOSSARY[termId] || window.GLOSSARY[termId?.replace(/-/g, '_')]);
     if (!term) return;
+
+    const titleText = term.title || term.t || 'Metric Forensics';
 
     sheetEl.innerHTML = `
       <div class="ui-sheet-header">
         <div>
-          <h3 class="ui-sheet-title">${term.title}</h3>
+          <h3 class="ui-sheet-title">${titleText}</h3>
           <span class="ui-sheet-sub">Metric Forensics & Action Guide</span>
         </div>
-        <button class="icon-btn" onclick="window.closeMetricSheet()" title="Close Sheet (Esc)">
+        <button class="icon-btn" onclick="window.Sheet.close()" title="Close Sheet (Esc)">
           <i data-lucide="x" style="width:16px;height:16px"></i>
         </button>
       </div>
 
       <div class="ui-sheet-body">
-        <!-- 1. Plain English Summary -->
+        <!-- 1. What it is -->
         <div class="ui-sheet-section">
-          <div class="ui-sheet-label">Summary</div>
-          <p class="ui-sheet-text">${term.p}</p>
+          <div class="ui-sheet-label">What it is</div>
+          <p class="ui-sheet-text">${term.p || term.desc || ''}</p>
         </div>
 
         <!-- 2. Technical Definition -->
+        ${term.t && term.t !== term.title ? `
         <div class="ui-sheet-section">
           <div class="ui-sheet-label">Technical Definition</div>
           <p class="ui-sheet-text">${term.t}</p>
         </div>
+        ` : ''}
 
-        <!-- 3. Math & Calculation Formula -->
+        <!-- 3. How we calculate it -->
+        ${term.calc ? `
         <div class="ui-sheet-section">
-          <div class="ui-sheet-label">Calculation Formula</div>
+          <div class="ui-sheet-label">How we calculate it</div>
           <div class="ui-sheet-code">
             <code>${term.calc}</code>
           </div>
         </div>
+        ` : ''}
 
-        <!-- 4. How to Interpret -->
+        <!-- 4. How to read it -->
+        ${term.read ? `
         <div class="ui-sheet-section">
-          <div class="ui-sheet-label">How to Interpret</div>
+          <div class="ui-sheet-label">How to read it</div>
           <p class="ui-sheet-text">${term.read}</p>
         </div>
+        ` : ''}
 
-        <!-- 5. Actionable Next Steps -->
+        <!-- 5. What to do next -->
+        ${term.act ? `
         <div class="ui-sheet-section">
-          <div class="ui-sheet-label">Recommended Action</div>
+          <div class="ui-sheet-label">What to do next</div>
           <div class="ui-sheet-action-card">
             <i data-lucide="lightbulb" style="width:16px;height:16px;color:var(--accent);flex-shrink:0"></i>
             <span>${term.act}</span>
           </div>
         </div>
+        ` : ''}
       </div>
     `;
 
@@ -93,7 +103,7 @@
     }
   });
 
-  // Global event delegation for data-sheet
+  // Global event delegation for data-sheet triggers
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-sheet]');
     if (el) {
@@ -105,4 +115,5 @@
 
   window.openMetricSheet = openSheet;
   window.closeMetricSheet = closeSheet;
+  window.Sheet = { open: openSheet, close: closeSheet };
 })();
