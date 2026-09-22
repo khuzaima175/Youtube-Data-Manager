@@ -35,7 +35,7 @@ async function renderChannels() {
 
   if (summaryStrip) {
     summaryStrip.innerHTML = `
-      <div style="font-size:13px;color:var(--text-2);margin-bottom:16px">
+      <div class="reveal" style="--i: 0;font-size:13px;color:var(--text-2);margin-bottom:16px">
         Cohort: <strong>${all.length} channels</strong> · <strong>${fmtN(totSubs)}</strong> combined subs · <strong>${fmtN(totViews)}</strong> views · your share <strong>${myShare}</strong>
       </div>`;
   }
@@ -55,7 +55,7 @@ async function renderChannels() {
 
   el.innerHTML = `
     <!-- Table Filter Input -->
-    <div class="bench-toolbar" style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+    <div class="bench-toolbar reveal" style="--i: 1;display:flex;align-items:center;gap:12px;margin-bottom:14px">
       <div class="bench-search-box" style="flex:1;max-width:320px;position:relative">
         <i data-lucide="search" style="width:14px;height:14px;color:var(--text-3);position:absolute;left:10px;top:50%;transform:translateY(-50%)"></i>
         <input type="text" style="width:100%;padding:7px 10px 7px 32px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-1);font-size:12.5px;outline:none" placeholder="Filter tracked channels…" value="${esc(chFilterQuery)}" oninput="filterCompetitorGrid(this.value)">
@@ -63,7 +63,7 @@ async function renderChannels() {
     </div>
 
     <!-- Linear-grade Benchmark Table -->
-    <div class="card" style="padding:0;overflow:hidden">
+    <div class="card reveal" style="--i: 2;padding:0;overflow:hidden">
       <table class="data-table">
         <thead>
           <tr>
@@ -86,6 +86,10 @@ async function renderChannels() {
     ${renderCompetitorActivityFeed()}`;
 
   if (window.lucide) window.lucide.createIcons();
+
+  if (window.Reveal && typeof window.Reveal.init === 'function') {
+    window.Reveal.init();
+  }
 
   // Async load sparklines
   filtered.forEach(async ch => {

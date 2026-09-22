@@ -1,47 +1,54 @@
 /* ══════════════════════════════════════════════════════════════════════════════
-   YT TRACKER — REVEAL MOTION ENGINE (static/js/ui/reveal.js)
-   Calm, Single-Fire Viewport Reveal with prefers-reduced-motion Guard
+   YT TRACKER — VIEWPORT REVEAL ENGINE (reveal.js)
+   Calm, Once-Only Viewport Reveal & CSS Stagger with prefers-reduced-motion Guard
    ══════════════════════════════════════════════════════════════════════════════ */
 
-(function () {
-  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const Reveal = (() => {
+  let observer = null;
 
-  function revealElement(el) {
-    if (el.classList.contains('in')) return;
-    el.classList.add('in');
-  }
+  const init = () => {
+    // Disconnect previous observer to prevent memory leaks on view switch
+    if (observer) observer.disconnect();
 
-  function setupScrollReveal() {
-    if (prefersReduced) {
-      document.querySelectorAll('.rev').forEach(el => el.classList.add('in'));
+    // Check for reduced motion preference
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      document.querySelectorAll('.reveal, .rev').forEach((el) => {
+        el.classList.add('is-visible', 'in');
+      });
       return;
     }
 
     if (!('IntersectionObserver' in window)) {
-      document.querySelectorAll('.rev').forEach(el => el.classList.add('in'));
+      document.querySelectorAll('.reveal, .rev').forEach((el) => {
+        el.classList.add('is-visible', 'in');
+      });
       return;
     }
 
-    const observer = new IntersectionObserver((entries, obs) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          revealElement(entry.target);
-          obs.unobserve(entry.target);
-        }
-      });
-    }, {
-      rootMargin: '0px 0px -40px 0px',
-      threshold: 0.05
-    });
+    observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible', 'in');
+            observer.unobserve(entry.target); // Once-only! Never replay or jump
+          }
+        });
+      },
+      { threshold: 0.05, rootMargin: '0px 0px -30px 0px' }
+    );
 
-    document.querySelectorAll('.rev:not(.in)').forEach(el => {
+    document.querySelectorAll('.reveal:not(.is-visible), .rev:not(.in)').forEach((el) => {
       observer.observe(el);
     });
-  }
+  };
 
-  window.setupScrollReveal = setupScrollReveal;
+  // Re-initialize when views change or content is rendered
+  window.addEventListener('hashchange', () => setTimeout(init, 50));
+  document.addEventListener('DOMContentLoaded', init);
 
-  document.addEventListener('DOMContentLoaded', () => {
-    setupScrollReveal();
-  });
+  return { init };
 })();
+
+window.Reveal = Reveal;
+window.setupScrollReveal = Reveal.init;

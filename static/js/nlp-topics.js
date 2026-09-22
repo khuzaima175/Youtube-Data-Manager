@@ -467,7 +467,7 @@ async function renderTopicRadarPage() {
           }
 
           return `
-            <div class="card" style="padding:18px;display:flex;flex-direction:column;justify-content:space-between;gap:14px;background:var(--surface-1);border:1px solid var(--border)">
+            <div class="card reveal" style="--i: ${i % 6};padding:18px;display:flex;flex-direction:column;justify-content:space-between;gap:14px;background:var(--surface-1);border:1px solid var(--border)">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
                   <div style="font-size:15px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(t.topic)}" data-tip="topic_keyword">
@@ -538,7 +538,7 @@ async function renderTopicRadarPage() {
   const hasMore = filteredCatalog.length > radarDisplayLimit;
 
   const catalogHtml = `
-    <div class="card" style="padding:0;overflow:hidden">
+    <div class="card reveal" style="--i: 4;padding:0;overflow:hidden">
       <!-- Table Filter Toolbar -->
       <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div class="bench-search-box" style="flex:1;max-width:300px;position:relative">
@@ -612,6 +612,10 @@ async function renderTopicRadarPage() {
 
   el.innerHTML = topOppHtml + catalogHtml;
   if (window.lucide) window.lucide.createIcons();
+
+  if (window.Reveal && typeof window.Reveal.init === 'function') {
+    window.Reveal.init();
+  }
 }
 
 function filterRadarTopics(query) {

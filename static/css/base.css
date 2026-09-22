@@ -1719,3 +1719,99 @@ body.density-compact .pipeline-card {
   gap: 20px;
   animation: viewFadeIn 0.15s ease-out;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PHASE 5: REVEAL ENGINE, STAGGER & MICRO-INTERACTIONS
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* 1. Viewport Reveal & Stagger */
+.reveal, .rev {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity var(--dur-3) var(--ease), transform var(--dur-3) var(--ease);
+  /* --i is the stagger index */
+  transition-delay: calc(var(--i, 0) * 45ms);
+}
+
+.reveal.is-visible, .rev.in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 2. View Switching Transition */
+.canvas-body-inner {
+  transition: opacity var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.canvas-body-inner.is-transitioning {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+/* 3. Skeleton Crossfade */
+.skeleton, .skel {
+  position: relative;
+  overflow: hidden;
+  transition: opacity var(--dur-2) var(--ease);
+}
+
+.skeleton.is-loaded, .skel.is-loaded {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 4. Micro-interactions & Tactile Press States */
+.btn, .icon-btn, .sb-nav-item, .category-btn, .vid-seg-btn, .row-menu-btn {
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+
+.btn:active, .icon-btn:active {
+  transform: scale(0.96);
+}
+
+/* 5. Table Row Smooth Hover */
+.data-table tbody tr {
+  transition: background var(--dur-1) var(--ease);
+}
+
+.data-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+/* 6. Keyboard Focus Rings (Crucial for accessibility) */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 7. Global Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .reveal, .rev {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .canvas-body-inner.is-transitioning {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .btn:active, .icon-btn:active {
+    transform: none !important;
+  }
+}

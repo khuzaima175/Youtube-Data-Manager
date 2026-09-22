@@ -149,6 +149,19 @@ function renderTabSkeleton(p) {
 
 function sp(p) {
   closeDeepDive();
+  const inner = document.querySelector('.canvas-body-inner');
+  if (inner && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    inner.classList.add('is-transitioning');
+    setTimeout(() => {
+      _executeSp(p);
+      inner.classList.remove('is-transitioning');
+    }, 80);
+  } else {
+    _executeSp(p);
+  }
+}
+
+function _executeSp(p) {
   document.querySelectorAll('.page').forEach(x => x.classList.remove('on'));
   document.querySelectorAll('.sb-nav-item').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.m-nav-item').forEach(x => x.classList.remove('on'));

@@ -39,7 +39,9 @@ function renderStudio() {
     </div>`;
 
   if (window.lucide) window.lucide.createIcons();
-  el.querySelectorAll('.rev').forEach(r => r.classList.add('in'));
+  if (window.Reveal && typeof window.Reveal.init === 'function') {
+    window.Reveal.init();
+  }
 }
 
 function setStudioSubTab(tab) {
@@ -48,6 +50,9 @@ function setStudioSubTab(tab) {
   if (p) {
     p.innerHTML = tab === 'lab' ? renderStudioLabHtml() : renderStudioPipelineHtml();
     if (window.lucide) window.lucide.createIcons();
+    if (window.Reveal && typeof window.Reveal.init === 'function') {
+      window.Reveal.init();
+    }
   }
 }
 
@@ -671,7 +676,7 @@ function renderStudioLabHtml() {
   return `
     <div style="display:grid;grid-template-columns:1fr;gap:20px">
       <!-- Title Lab Card -->
-      <div class="card" style="padding:22px;background:var(--surface-1);border:1px solid var(--border)">
+      <div class="card reveal" style="--i: 0;padding:22px;background:var(--surface-1);border:1px solid var(--border)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
           <div>
             <div style="font-size:15px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px" data-tip="title_score">
@@ -770,7 +775,7 @@ function renderStudioLabHtml() {
       </div>
 
       <!-- Algorithmic Idea Generator Card -->
-      <div class="card" style="padding:22px;background:var(--surface-1);border:1px solid var(--border)">
+      <div class="card reveal" style="--i: 1;padding:22px;background:var(--surface-1);border:1px solid var(--border)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
           <div>
             <div style="font-size:15px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px" data-tip="concept_match">

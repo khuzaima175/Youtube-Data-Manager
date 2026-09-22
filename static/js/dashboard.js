@@ -206,31 +206,31 @@ async function renderDash() {
   const kpiHtml = `
     <div class="dash-kpi-grid" style="margin-bottom:24px">
       <!-- KPI 1: Subscribers -->
-      <div class="kpi-card" data-tip="subscribers">
+      <div class="kpi-card reveal" style="--i: 0" data-tip="subscribers">
         <div class="kpi-hdr">
           <span>Subscribers</span>
           <i data-lucide="users" style="width:14px;height:14px;color:var(--text-3)"></i>
         </div>
-        <div class="kpi-val">${esc(primary.subscribers)}</div>
+        <div class="kpi-val" id="kpiValSubs">${esc(primary.subscribers)}</div>
         <div class="kpi-foot">
           <span>Rank #${subRank} of ${all.length} in cohort</span>
         </div>
       </div>
 
       <!-- KPI 2: Total Views / 30d Velocity -->
-      <div class="kpi-card" data-tip="views_velocity">
+      <div class="kpi-card reveal" style="--i: 1" data-tip="views_velocity">
         <div class="kpi-hdr">
           <span>30-Day Views Velocity</span>
           <i data-lucide="eye" style="width:14px;height:14px;color:var(--text-3)"></i>
         </div>
-        <div class="kpi-val">${esc(primary.total_views)}</div>
+        <div class="kpi-val" id="kpiValViews">${esc(primary.total_views)}</div>
         <div class="kpi-foot">
           <span style="color:${(primaryEnrich.momDelta || 0) >= 0 ? 'var(--pos)' : 'var(--neg)'}">${fmtDelta(primaryEnrich.momDelta || 0)} 30d velocity</span>
         </div>
       </div>
 
       <!-- KPI 3: Upload Cadence -->
-      <div class="kpi-card" data-tip="cadence">
+      <div class="kpi-card reveal" style="--i: 2" data-tip="cadence">
         <div class="kpi-hdr">
           <span>Upload Cadence</span>
           <i data-lucide="clock" style="width:14px;height:14px;color:var(--text-3)"></i>
@@ -242,7 +242,7 @@ async function renderDash() {
       </div>
 
       <!-- KPI 4: Niche Share -->
-      <div class="kpi-card" data-tip="niche_share">
+      <div class="kpi-card reveal" style="--i: 3" data-tip="niche_share">
         <div class="kpi-hdr">
           <span>Niche Share</span>
           <i data-lucide="pie-chart" style="width:14px;height:14px;color:var(--text-3)"></i>
@@ -258,7 +258,7 @@ async function renderDash() {
   const mainRowHtml = `
     <div class="overview-main">
       <!-- 2/3 Width Chart Card -->
-      <div class="dash-chart-card">
+      <div class="dash-chart-card reveal" style="--i: 4">
         <div class="dash-chart-hdr">
           <div class="dash-chart-title">
             <i data-lucide="trending-up" style="width:16px;height:16px;color:var(--accent)"></i>
@@ -277,7 +277,7 @@ async function renderDash() {
       </div>
 
       <!-- 1/3 Width Next Step Card -->
-      <div class="next-step-card">
+      <div class="next-step-card reveal" style="--i: 4">
         <div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
             <div style="width:28px;height:28px;border-radius:var(--r-sm);background:rgba(102,114,245,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -304,7 +304,7 @@ async function renderDash() {
 
   // 3. Row 3: Your Recent Uploads (5 rows max)
   const activityHtml = `
-    <div class="card" style="padding:20px;margin-bottom:24px">
+    <div class="card reveal" style="--i: 5;padding:20px;margin-bottom:24px">
       <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid var(--border);margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:8px">
           <i data-lucide="play-circle" style="width:16px;height:16px;color:var(--accent)"></i>
@@ -327,8 +327,24 @@ async function renderDash() {
 
   if (window.lucide) window.lucide.createIcons();
 
+  // Trigger KPI number count-up tickers
+  if (typeof animateValue === 'function') {
+    const subsEl = document.getElementById('kpiValSubs');
+    const viewsEl = document.getElementById('kpiValViews');
+    if (subsEl && primary.subscribers_raw) {
+      animateValue(subsEl, 0, primary.subscribers_raw, 600, (v) => fmtN(v));
+    }
+    if (viewsEl && primary.total_views_raw) {
+      animateValue(viewsEl, 0, primary.total_views_raw, 600, (v) => fmtN(v));
+    }
+  }
+
   renderOverviewGrowthChart(primaryEnrich, primary);
   loadDashboardRecentUploads(primary.id);
+
+  if (window.Reveal && typeof window.Reveal.init === 'function') {
+    window.Reveal.init();
+  }
 }
 
 function toggleDashChartMetric(metric) {
@@ -345,10 +361,10 @@ function toggleDashChartMetric(metric) {
     }
   });
 
-  renderOverviewGrowthChart(primaryEnrich, primary);
+  renderOverviewGrowthChart(primaryEnrich, primary, false);
 }
 
-function renderOverviewGrowthChart(enrichData, primary) {
+function renderOverviewGrowthChart(enrichData, primary, animate = true) {
   const canvas = document.getElementById('dashGrowthCanvas');
   if (!canvas || typeof Chart === 'undefined') return;
 
@@ -421,6 +437,10 @@ function renderOverviewGrowthChart(enrichData, primary) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: animate ? {
+        duration: 600,
+        easing: 'easeOutQuart'
+      } : false,
       onClick: (event, elements) => {
         if (elements && elements.length > 0 && currentChartMetric === 'views') {
           const idx = elements[0].index;
