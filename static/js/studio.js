@@ -15,22 +15,20 @@ function renderStudio() {
   el.innerHTML = `
     <div class="rev" style="max-width:1440px;margin:0 auto">
       <!-- Studio Header -->
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
-        <div>
-          <div class="pg-title" style="display:flex;align-items:center;gap:10px">
-            <i data-lucide="clapperboard" style="width:20px;height:20px;color:var(--acc)"></i>
-            <span>Creator Studio</span>
-            <span class="badge bdg-dim" style="font-size:10px">Intelligence-Driven</span>
-          </div>
-          <div class="pg-sub">Turn competitive topic intelligence into high-performing video concepts & manage production.</div>
+      <div class="page-head">
+        <div class="page-head-text">
+          <h1 class="page-title">Creator Studio</h1>
+          <p class="page-sub">Turn competitive topic intelligence into high-performing video concepts</p>
         </div>
-        <div class="vid-seg">
-          <button class="vid-seg-btn ${studioSubTab === 'lab' ? 'on' : ''}" onclick="setStudioSubTab('lab')">
-            <i data-lucide="flask-conical" style="width:13px;height:13px"></i> Title Lab & Ideas
-          </button>
-          <button class="vid-seg-btn ${studioSubTab === 'pipeline' ? 'on' : ''}" onclick="setStudioSubTab('pipeline')">
-            <i data-lucide="kanban" style="width:13px;height:13px"></i> Content Pipeline (${pipelineCards.filter(c => c.stage !== 'published').length})
-          </button>
+        <div class="page-head-actions">
+          <div class="vid-seg">
+            <button class="vid-seg-btn ${studioSubTab === 'lab' ? 'on' : ''}" onclick="setStudioSubTab('lab')">
+              <i data-lucide="flask-conical" style="width:13px;height:13px"></i> Title Lab & Ideas
+            </button>
+            <button class="vid-seg-btn ${studioSubTab === 'pipeline' ? 'on' : ''}" onclick="setStudioSubTab('pipeline')">
+              <i data-lucide="kanban" style="width:13px;height:13px"></i> Content Pipeline (${pipelineCards.filter(c => c.stage !== 'published').length})
+            </button>
+          </div>
         </div>
       </div>
 

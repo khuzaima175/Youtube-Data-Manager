@@ -54,16 +54,11 @@ async function renderChannels() {
     : sorted;
 
   el.innerHTML = `
-    <!-- Toolbar with search and primary action -->
-    <div class="bench-toolbar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+    <!-- Table Filter Input -->
+    <div class="bench-toolbar" style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
       <div class="bench-search-box" style="flex:1;max-width:320px;position:relative">
         <i data-lucide="search" style="width:14px;height:14px;color:var(--text-3);position:absolute;left:10px;top:50%;transform:translateY(-50%)"></i>
         <input type="text" style="width:100%;padding:7px 10px 7px 32px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-1);font-size:12.5px;outline:none" placeholder="Filter tracked channels…" value="${esc(chFilterQuery)}" oninput="filterCompetitorGrid(this.value)">
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-gh btn-sm" onclick="exportCSV()"><i data-lucide="download" style="width:13px;height:13px"></i> Export CSV</button>
-        <button class="btn btn-gh btn-sm" onclick="refreshAll()"><i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Refresh</button>
-        <button class="btn btn-acc btn-sm" onclick="toggleAdd()"><i data-lucide="plus" style="width:13px;height:13px"></i> Add Channel</button>
       </div>
     </div>
 

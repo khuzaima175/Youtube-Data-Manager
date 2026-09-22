@@ -151,27 +151,20 @@
 
           <!-- PAGE 2: COMPETITORS BENCHMARKING -->
           <div class="page" id="page-channels">
-            <div class="pg-head">
-              <div>
-                <div class="pg-title">Competitor Benchmark</div>
-                <div class="pg-sub"><span class="mono" id="chCntLbl"></span> channels tracked in your cohort</div>
+            <div class="page-head">
+              <div class="page-head-text">
+                <h1 class="page-title">Competitors</h1>
+                <p class="page-sub"><span class="mono" id="chCntLbl">0</span> channels tracked in your cohort</p>
               </div>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <div class="sel-wrap">
-                  <select class="sel" id="chSortSel" onchange="setChSort(this.value)">
-                    <option value="subscribers_raw">Sort: Subscribers</option>
-                    <option value="total_views_raw">Sort: Total Views</option>
-                    <option value="avg_views_raw">Sort: Avg Views</option>
-                  </select>
-                </div>
-                <button class="btn btn-gh" onclick="exportCSV()">
-                  <i data-lucide="download" style="width:14px;height:14px"></i> Export CSV
+              <div class="page-head-actions">
+                <button class="btn btn-gh btn-sm" onclick="exportCSV()">
+                  <i data-lucide="download" style="width:13px;height:13px"></i> Export CSV
                 </button>
-                <button class="btn btn-gh" onclick="refreshAll()">
-                  <i data-lucide="refresh-cw" style="width:14px;height:14px"></i> Refresh
+                <button class="btn btn-gh btn-sm" onclick="refreshAll()">
+                  <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Refresh
                 </button>
-                <button class="btn btn-acc" id="addTgl" onclick="toggleAdd()">
-                  <i data-lucide="plus" style="width:14px;height:14px"></i> Add Channel
+                <button class="btn btn-acc btn-sm" id="addTgl" onclick="toggleAdd()">
+                  <i data-lucide="plus" style="width:13px;height:13px"></i> Add Channel
                 </button>
               </div>
             </div>
@@ -201,11 +194,12 @@
 
           <!-- PAGE 3: TOPIC OPPORTUNITY RADAR -->
           <div class="page" id="page-radar">
-            <div class="pg-head">
-              <div>
-                <div class="pg-title">Topic Opportunities & Radar</div>
-                <div class="pg-sub">Uncover high-demand, low-competition topic gaps across your competitor cohort.</div>
+            <div class="page-head">
+              <div class="page-head-text">
+                <h1 class="page-title">Topic Radar</h1>
+                <p class="page-sub">Discover high-demand, low-competition topic gaps across your competitor cohort</p>
               </div>
+              <div class="page-head-actions"></div>
             </div>
             <div id="radarMain"></div>
           </div>
@@ -217,11 +211,12 @@
 
           <!-- PAGE 5: SEARCH CHANNELS -->
           <div class="page" id="page-search">
-            <div class="pg-head">
-              <div>
-                <div class="pg-title">Search Channels</div>
-                <div class="pg-sub">Inspect any channel on YouTube or add it to your tracking cohort</div>
+            <div class="page-head">
+              <div class="page-head-text">
+                <h1 class="page-title">Search Channels</h1>
+                <p class="page-sub">Inspect any channel on YouTube or add it to your tracking cohort</p>
               </div>
+              <div class="page-head-actions"></div>
             </div>
             <div class="sr-wrap">
               <div style="position:relative">
