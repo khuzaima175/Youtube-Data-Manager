@@ -1,92 +1,117 @@
 # ⚡ YT Tracker — YouTube Competitive Intelligence & Growth Studio
 
-A production-grade, full-spectrum competitive intelligence platform and creator workflow suite for YouTube creators. Built with a professional **Linear / Raycast-calibre Obsidian SaaS aesthetic** (Linear Indigo palette, layered depth, instant tab skeleton transitions, Lucide vector icons), a high-performance **Flask & Modular Vanilla JS** architecture, cloud PostgreSQL persistence via **Supabase**, and zero unnecessary YouTube Data API quota overhead.
+A production-grade, full-spectrum competitive intelligence platform and creator workflow suite for YouTube creators. Built with a calm, disciplined **Linear / Raycast-grade dark workspace aesthetic** (`#0b0c0e` dark surfaces, desaturated indigo `#6672f5` accent, tabular typography, Lucide vector icons), a modular **Flask & Vanilla ES6+ JS** architecture, cloud PostgreSQL persistence via **Supabase**, and zero YouTube Data API quota overhead.
 
 ---
 
-## 🌟 Platform Highlights & Intelligence Architecture (v2.2)
+## 🌟 Platform Highlights & Intelligence Architecture
 
 ```mermaid
 graph TD
-    A[Channel Enrichment / Video Sync] -->|P0: 50-Item Batches| B[(Supabase: videos table)]
-    B -->|P1: Empirical Bayes Shrinkage| C[Relative Performance Index - RPI]
-    C -->|P2: 14d Supply vs Demand| D[2x2 Saturation Matrix]
-    D -->|P3: Autocomplete + Jaccard Diff| E[Unmet Demand Void Miner]
-    E -->|P4: 5 Packaging Archetypes| F[AI Title & Packaging Synthesizer]
-    B -->|P5: 2nd Derivative Accel| G[Velocity Acceleration Radar]
+    A[Competitor Video Metadata] -->|P0: Batched Sync| B[(Supabase: videos table)]
+    B -->|NLP Tokenizer + Stopwords| C[Semantic Topic Extraction]
+    C -->|P1: Empirical Bayes Shrinkage| D[Relative Performance Index - RPI]
+    D -->|P2: 14d Supply vs Demand| E[2x2 Saturation Matrix]
+    E -->|Blue Ocean Formula| F[Top High-Leverage Opportunities]
+    F -->|P4: 5 Packaging Archetypes| G[AI Title & Packaging Synthesizer]
+    G -->|Thumbnail Blueprints| H[Studio Title Lab & Kanban Pipeline]
 ```
 
-### 1. 💎 Professional Linear / Raycast Workspace Design (v2.2)
-- **2-Pane Workspace Architecture**: Collapsible sidebar with active channel quick-selector, contextual navigation, compare tray indicator, and command menu shortcuts (`⌘K`).
-- **Linear Indigo & Monochrome Slate Palette**: Minimalist, high-contrast typography (`Inter` & `JetBrains Mono`) with subtle Linear Indigo accents (`#6366f1`) and crisp tabular figures, completely eliminating rainbow numbers and neon gradients.
-- **Instant Tab Skeleton Loading Screens**: Rich, tailored shimmer skeleton placeholders render instantly upon switching tabs, transitioning seamlessly into live telemetry via smooth cubic-bezier animations.
-- **Tactile Card Depth & Bevels**: Layered dark surfaces (`#090a0c`, `#0e1015`, `#14171f`, `#1a1e28`) with 1px top highlight bevels (`inset 0 1px 0 rgba(255,255,255,0.05)`), subtle gradient overlays, and smooth hover elevation.
-- **Vector Lucide Icons Suite**: Clean, sharp vector iconography replacing legacy ligatures for zero layout shift (CLS).
+---
+
+## 🧠 How the Topic Recommendation Engine Works
+
+When deciding **what video to make next**, YT Tracker replaces guesswork with a 4-step statistical pipeline:
+
+```
+[ All Niche Videos ] ──▶ [ NLP Token Extraction ] ──▶ [ Baseline-Normalized RPI ] ──▶ [ 2x2 Demand/Supply Matrix ] ──▶ [ Top 8 Opportunities ]
+```
+
+### 1. NLP Semantic Keyword Extraction
+- Extracts single-word tokens and bigrams (e.g. `"3d modeling"`, `"solidworks sheet metal"`, `"cad fillet"`) across all tracked competitor video titles.
+- Filters out non-informative stop-words (`how`, `tutorial`, `guide`, `vs`, `new`, `best`, `2026`) and merges aliases.
+
+### 2. Baseline Normalization (RPI) + Empirical Bayes Shrinkage
+- Comparing raw view counts between a 500K-subscriber channel and a 5K-subscriber channel is misleading.
+- **RPI (Relative Performance Index)** divides a video's views by its channel's median baseline:
+  $$\text{RPI} = \frac{\text{Video Views}}{\text{Channel Median Baseline}}$$
+  *(An RPI of $2.5\times$ means the video did $250\%$ of that channel's normal views).*
+- **Empirical Bayes Shrinkage** prevents low-sample flukes (e.g., 1 video with high views) from dominating:
+  $$\text{RPI}_{\text{shrunken}} = w \cdot \text{RPI} + (1 - w) \cdot 1.0, \quad \text{where } w = \frac{n}{n + 5}$$
+  *(As sample size $n$ grows, confidence approaches true field RPI).*
+
+### 3. Supply vs. Demand 2×2 Saturation Matrix
+Every topic is classified into one of 4 market quadrants:
+- 💎 **Untapped Blue Ocean** (*High Demand · Low Supply*): High competitor views, low recent uploads, and **0 videos on your channel**. High breakout potential.
+  $$\text{Blue Ocean Score} = \frac{\text{RPI}_{\text{shrunken}}}{1 + \text{Recent 14d Supply}}$$
+- 🔥 **High Demand Staple** (*High Demand · High Supply*): Proven evergreen topics with steady search volume across the niche.
+- 🌱 **Emerging Trend** (*Surging 14d Velocity*): Rapidly accelerating keyword velocity with low competitor saturation.
+- ⚠️ **Saturated** (*Low Demand · High Supply*): Overcrowded topics with diminishing returns.
+
+### 4. AI Title & Packaging Synthesizer
+- For any recommended topic, automatically synthesizes **5 Proven Packaging Archetypes**:
+  1. 🏆 **Impossible Feat**: Extreme curiosity and engineering intrigue (*"The Impossible Engineering Behind X"*)
+  2. 🚨 **Hidden Flaw**: Loss-aversion pitfall warning (*"The Billion Dollar Flaw in X Nobody Talks About"*)
+  3. ⚔️ **Head-to-Head**: Direct comparison showdown (*"X vs The Industry: The Brutal Truth"*)
+  4. 🎓 **Zero-to-Mastery**: Complete step-by-step masterclass (*"I Mastered X in 30 Days"*)
+  5. 💥 **Stress Test**: Extreme breaking point experiments (*"Pushing X to Its Breaking Point"*)
+- Generates 16:9 **Thumbnail Concept Blueprints** with specific recipes for **Layout Composition**, **Focal Subject**, and **Color Contrast**.
 
 ---
 
-### 2. 🧠 Advanced Intelligence Engine
-- **Module 0 (P0) — Video Persistence Sync**:
-  - Durable `videos` table in Supabase persisting complete catalog metadata.
-  - Mutable `title` column supporting title A/B testing and revisions.
-  - 180-second vertical YouTube Shorts heuristic.
-  - Historical backfill CLI tool (`scripts/backfill_videos.py`) operating in non-blocking 50-item batches.
-- **Module 1 (P1) — Relative Performance Index (RPI) + Empirical Bayes Shrinkage**:
-  - Replaces raw view counts with channel-normalized $RPI = \frac{\text{views}}{\text{channel\_baseline}}$.
-  - Empirical Bayes Shrinkage formula prevents small-sample skew:
-    $$RPI_{shrunken} = w \cdot RPI + (1 - w) \cdot 1.0, \quad \text{where } w = \frac{n}{n + 5}$$
-- **Module 2 (P2) — Supply/Demand Saturation Matrix**:
-  - Real-time 2×2 grid categorization:
-    - 🌊 **Blue Ocean** (*High Demand · Low Supply*) — Scored via $\text{Score} = \frac{RPI_{shrunken}}{1 + \text{Supply}_{14d}}$.
-    - 🔥 **Red Ocean** (*High Demand · High Supply*) — Hyper-competitive niches requiring standout packaging.
-    - 🌱 **Niche / Emerging** (*Low Demand · Low Supply*) — Early-stage topics for first-mover moats.
-    - ⚠️ **Saturated** (*Low Demand · High Supply*) — Overcrowded topics with diminishing returns.
-- **Module 3 (P3) — Autocomplete Void Miner**:
-  - Real-time Google/YouTube autocomplete suggestion mining ($\le 2$ depth).
-  - Jaccard token overlap analysis ($\le 0.40$ threshold) against tracked competitor catalogs.
-  - Automatically isolates **Unmet Search Voids** from **Competitor Covered Queries**.
-- **Module 4 (P4) — AI Title & Packaging Synthesizer**:
-  - 5 proven high-CTR packaging archetypes (*Impossible Feat*, *Hidden Flaw*, *Head-to-Head Clash*, *Zero-to-Mastery*, *Stress Test*).
-  - Generates 16:9 **Thumbnail Concept Blueprints** with specific recommendations for **Layout**, **Focal Subject**, **Color Contrast**, and **Text Overlay**.
-  - 1-Click transfer to Title Lab scorer or Kanban pipeline.
-- **Module 5 (P5) — Velocity Acceleration Radar**:
-  - Computes 2nd derivative view accrual acceleration ($\frac{d^2V}{dt^2}$).
-  - Identifies breakthrough competitor drops before traditional view totals reflect virality.
+## 🎨 Linear / Raycast-Grade Design & Explanation Layer
+
+### 1. The 4-Tier Progressive Disclosure System
+Never leaves the creator wondering *"What does this metric mean?"*:
+- **L0 (Numbers)**: Clean tabular figures (`1.2K`, `4.5%`, `↑ 4%`) with no rainbow clutter.
+- **L1 (Tooltips)**: Fast 120ms hover & focus tooltips on all `[data-tip]` metrics with a `"Learn more →"` trigger.
+- **L2 (Detail Sheets)**: Slide-out drawer displaying exact mathematical formulas, interpretation guides, and tactical next steps.
+- **L3 (Deep Dive)**: Dedicated full-screen forensics view with 90-day upload pulse, audience ratios, and topic moats.
+
+### 2. Data Honesty & The "—" Rule
+- If data is missing or calculations fail, the UI renders a clean em-dash (`—`) or `< 1%`, never a misleading `0` or hardcoded fallback.
+- Professional SaaS tone: **Zero exclamation marks** in copy, tooltips, or toast notifications.
+
+### 3. 60fps Motion & Animation
+- **Single-Fire Viewport Observer (`ui/reveal.js`)**: Elements fade up once upon entering viewport and never re-trigger on scroll.
+- **Hardware-Accelerated KPI Count-Up (`ui/countup.js`)**: Quartic easing ticker transitions with zero layout thrashing.
+- **Full Reduced-Motion Support**: Respects `prefers-reduced-motion: reduce`.
+
+### 4. Full Mobile & Responsive Design
+- **Off-Canvas Drawer**: Desktop sidebar smoothly collapses into a slide-out drawer on screens $\le 768px$ with a hamburger trigger (`☰`).
+- **Mobile Bottom Navigation Bar**: Fixed 5-tab bar (Overview, Competitors, Radar, Studio, Search) with active state indicators.
+- **Adaptive Grids**: Responsive 1-column & 2-column KPI cards and Title Lab meters.
 
 ---
 
-### 3. 📊 Executive Command Center (Dashboard)
-- **Primary Channel Hero Banner** — Real-time subscriber counters, 30-day velocity sparklines, next subscriber milestone progress rings, and live sync status.
-- **Strategic Prescription (Next Best Action)** — Live algorithmic engine diagnosing optimal upload timing, topic synergy, and upload cadence gaps.
-- **4-Metric Executive KPI Grid** — High-contrast metrics for Subscribers, Total Views (with 30-day velocity delta), Avg Views / Video, and Audience Engagement Rate.
-- **30-Day Performance Trajectory Curve** — Smooth Chart.js curve comparing views velocity and monthly upload cadence.
-- **2-Column Activity Forensics Split** — Side-by-side comparative inspection of your recent drops and the competitor radar feed.
+## 📊 Core Application Modules
 
----
+### 1. Overview (Command Center)
+- **Executive Hero**: Active channel details, subscriber count, and cohort ranking.
+- **Next Step Card**: Exactly 1 prioritized strategic recommendation with "Why?" explanation link and 1-click "Plan in Studio" action.
+- **4 Key Performance Indicators**: Subscribers, 30-Day Views Velocity, Upload Cadence, and Niche Share.
+- **30-Day Performance Velocity Trajectory**: Interactive Chart.js curve with dark tooltips.
+- **Recent Uploads**: Compact 5-row table with clear 16:9 thumbnails and relative age.
 
-### 4. ⚔️ Competitor Benchmark Grid
-- **Instant Search & Filter Toolbar** — Real-time instant filtering by channel name, handle, or country with zero page reload.
-- **Linear-Grade Data Grid** — Clean sortable columns (Subscribers, Avg Views, Total Views, Video Count, 30-Day Trend Sparklines, Threat Index).
-- **Competitor Sparklines** — Real-time 30-day view velocity curves embedded directly in table rows.
-- **Channel Deep-Dive Inspector Overlay** — 1-Click forensic inspection with 90-day upload pulse, top uploads, evergreen detection, and topic moats.
+### 2. Competitors (Benchmark Grid)
+- **Cohort Benchmark Table**: Instant search filter, tabular subscribers, view averages, total views, and sparkline trends.
+- **Overlap Forensics**: Topic overlap percentage calculated via Jaccard similarity.
+- **Competitor Drops Activity Feed**: Live feed of competitor video releases with daily view velocity.
+- **Context Menus (`⋯`)**: View details, compare set, set primary, or remove competitor.
 
----
+### 3. Topic Radar (Opportunities)
+- **Top 8 High-Leverage Opportunities**: Ranked cards with plain-English rationales (*"Competitors average 12.4K views with 0 videos by you"*).
+- **Niche Topic Catalog Table**: Searchable, paginated table with quadrant filters (All, Untapped, High Demand, Emerging).
 
-### 5. 🛰️ Topic Opportunities & Strategic Radar
-- **High-Impact Blue Ocean Gaps Hero** — Pinpoints high-traffic topics where competitors are actively gaining views while your channel has 0 uploads.
-- **Quadrant Filtering & Topic Search** — Filter the catalog across Blue Ocean, High Demand, Emerging, and Saturated quadrants.
-- **De-Cluttered Opportunity Cards** — Clean status tags, niche video coverage, and 1-click test transfer to Creator Studio.
+### 4. Creator Studio
+- **Title Lab Real-Time Scorer (0–100 CTR)**: Evaluates character length against the mobile truncation boundary (40–60 chars), topic keyword demand, power curiosity hooks, and syntax structure.
+- **Algorithmic Concept Cards**: Moat Convergence, Gap Attack, Franchise Follow-Up, and Contrarian Take.
+- **Kanban Content Pipeline**: 4 production stages (`Ideas` $\to$ `In Production` $\to$ `Scheduled` $\to$ `Published`).
 
----
-
-### 6. 🎬 Creator Studio & Content Pipeline
-- **Title Lab Real-Time Scorer (0–100 CTR)**:
-  - Algorithmic scoring based on length bounds, niche keyword resonance, hook & intrigue formulas, and structure.
-  - Interactive token pills to append surging niche topic tokens.
-- **Algorithmic Concept Generator**:
-  - Synthesizes your channel moats, untapped field gaps, and trending velocity spikes into ready-to-use video title formulas.
-- **4-Stage Drag-and-Drop Kanban Pipeline**:
-  - Stage tracking: `Idea` $\to$ `In Production` $\to$ `Scheduled` $\to$ `Published` with auto-sync telemetry.
+### 5. Deep Dive Forensics
+- **Channel Health Rail**: Engagement rates, upload cadence, publishing streak, and total catalog metrics.
+- **90-Day Upload Pulse**: Week-bucketed publishing histogram.
+- **Top Performing Videos & Topic Moats**: Breakdown of highest-performing uploads and keyword clusters.
 
 ---
 
@@ -94,60 +119,73 @@ graph TD
 
 ```text
 Youtube-Data-Manager/
-├── server.py                   # Flask backend with 7 intelligence endpoints & Supabase sync
+├── server.py                   # Flask backend & proxy endpoints (Zero quota waste)
 ├── requirements.txt            # Python dependencies
 ├── Procfile                    # Production deployment configuration (Gunicorn)
 │
-├── scripts/
-│   ├── schema_v2.sql           # Database schema (videos, channel_baselines, topic_metrics, voids, velocity)
-│   └── backfill_videos.py      # Standalone historical video backfill utility
+├── docs/
+│   └── ui-refactor/
+│       ├── selector-inventory.md # 128 DOM IDs & contract hooks
+│       └── DECISIONS.md        # Complete Phase 0–6 audit & decisions log
 │
 ├── static/
-│   ├── index.html              # Core application DOM shell (2-Pane Layout + Modals)
+│   ├── index.html              # Core application DOM shell (2-Pane Layout + Mobile Nav)
 │   ├── style.css               # Master stylesheet aggregator (@import)
 │   │
 │   ├── css/                    # Modular Style System
-│   │   ├── variables.css       # Design tokens (Linear Indigo, deep obsidian surfaces, shadows)
-│   │   ├── base.css            # Layout resets, buttons, badges, tab skeletons & keyframes
-│   │   ├── dashboard.css       # Dashboard hero, KPI grid, Chart.js wrap, activity split
-│   │   ├── deep-dive.css       # Channel forensics inspector modal & video matrix
-│   │   ├── studio.css          # Title Lab, Concept Generator, Kanban pipeline
-│   │   ├── modals.css          # Command palette, Settings, Reports, Popovers
-│   │   └── print.css           # @media print rules for PDF report dossiers
+│   │   ├── variables.css       # Design tokens (Surfaces, borders, text, single accent)
+│   │   ├── base.css            # Layout resets, sidebar skeleton, typography
+│   │   ├── ui.css              # Primitives: context menu, tooltips, sheets, mobile nav
+│   │   ├── dashboard.css       # Executive KPIs, Chart.js wrap, activity feeds
+│   │   ├── deep-dive.css       # Forensics inspector overlay & pulse charts
+│   │   ├── studio.css          # Title Lab, Synthesizer modal, Kanban pipeline
+│   │   ├── modals.css          # Command palette, Settings, Glossary modal
+│   │   └── print.css           # @media print rules for PDF export
 │   │
 │   └── js/                     # Modular JavaScript Engine
-│       ├── state.js            # Global state, constants, scoreTone, AnimKit
-│       ├── api.js              # API client, quota accounting, Supabase video sync
-│       ├── nlp-topics.js       # Topic radar, Shrunken RPI, 2x2 Saturation Matrix, Blue Ocean gaps
-│       ├── timing.js           # Publication timing heatmap, slot recommender & timezone engine
-│       ├── dashboard.js        # Overview KPI grid, 30-day trajectory curve, Next Best Action
-│       ├── channels.js         # Competitor benchmark data grid, instant filter, sparklines
-│       ├── studio.js           # Title Lab CTR scorer, Concept Generator, AI Synthesizer & Kanban
-│       ├── deep-dive.js        # Deep dive forensic inspector overlay
-│       ├── settings-inbox.js   # Settings control room & alert inbox feed
-│       ├── report-gamification.js # Report Center, Achievements & State URL sync
-│       └── main.js             # Routing, tab skeleton injector, command palette & wayfinding
+│       ├── ui/
+│       │   ├── format.js       # Single source of truth for numbers, deltas & dates
+│       │   ├── tooltip.js      # Singleton L1 hover/focus tooltip engine
+│       │   ├── sheet.js        # Singleton L2 slide-out detail drawer
+│       │   ├── glossary-modal.js # Searchable metric glossary reference modal (?)
+│       │   ├── menu.js         # Singleton context dropdown menu (⋯)
+│       │   ├── countup.js      # 60fps hardware-accelerated KPI tickers
+│       │   └── reveal.js       # Single-fire IntersectionObserver viewport reveal
+│       │
+│       ├── data/
+│       │   └── glossary.js     # Comprehensive data dictionary with 30+ definitions
+│       │
+│       ├── dashboard.js        # Overview KPI grid, trajectory chart, next step card
+│       ├── channels.js         # Competitor benchmark table & drops activity feed
+│       ├── nlp-topics.js       # Topic radar, Empirical Bayes RPI, Blue Ocean scoring
+│       ├── studio.js           # Title Lab scorer, AI packaging synthesizer, Kanban
+│       ├── deep-dive.js        # Channel forensics inspector modal
+│       ├── timing.js           # Publication timing heatmap & timezone engine
+│       ├── state.js            # Global state & local storage persistence
+│       ├── api.js              # API client & quota accounting
+│       ├── settings-inbox.js   # Settings modal & alert inbox
+│       ├── report-gamification.js # Report Center & export utilities
+│       └── main.js             # Routing, mobile navigation drawer, command palette
 │
-└── yt_channel_viewer.py        # Standalone Python Desktop GUI (Tkinter + Pillow)
+└── scripts/
+    └── schema_v2.sql           # PostgreSQL schema (videos, channel_baselines, topic_metrics)
 ```
 
 ---
 
 ## 🛠️ Technology Stack
 
-- **Backend**: Python 3.8+ / Flask / Gunicorn
-- **Database & Persistence**: Supabase (Cloud PostgreSQL) via `supabase-py` SDK
-- **Frontend Architecture**: Vanilla HTML5, Modular CSS3 (Obsidian Dark Tokens, Linear Indigo Palette), Modular ES6+ JavaScript
+- **Backend**: Python 3.9+ / Flask / Gunicorn
+- **Database & Persistence**: Supabase (Cloud PostgreSQL) via `supabase-py`
+- **Frontend Architecture**: Vanilla HTML5, Modular CSS3 (Obsidian Dark Tokens, Linear Indigo `#6672f5`), Modular ES6+ JavaScript
 - **Charting & Visualizations**: Chart.js 4.x (Linear curves, subtle gradient fills), SVG Sparklines
 - **Icons**: Lucide Icons (vector SVG)
-- **Typography**: Inter (UI & Displays), JetBrains Mono (Tabular Numerals & Monospace)
-- **API**: YouTube Data API v3 (`google-api-python-client`) with thread-local client pooling and zero-quota client caching
-- **AI / LLM**: Multi-provider support (Gemini, OpenAI, Anthropic, Groq) with deterministic algorithmic fallbacks
-- **Desktop Companion**: Python Tkinter / Pillow (PIL)
+- **Typography**: Inter (UI & Displays), JetBrains Mono (Tabular Numerals & Code)
+- **API**: YouTube Data API v3 (`google-api-python-client`) with client caching & thread pooling
 
 ---
 
-## 📦 Setup & Installation
+## 📦 Local Setup & Installation
 
 ### 1. Clone & Install Dependencies
 ```bash
@@ -155,58 +193,49 @@ git clone https://github.com/khuzaima175/Youtube-Data-Manager.git
 cd Youtube-Data-Manager
 
 # Create and activate virtual environment
-python -m venv .venv
-.\.venv\Scripts\activate       # Windows
-source .venv/bin/activate      # macOS/Linux
+python -m venv venv
+
+# On Windows PowerShell:
+.\venv\Scripts\Activate.ps1
+
+# On macOS / Linux:
+source venv/bin/activate
 
 # Install requirements
 pip install -r requirements.txt
 ```
 
 ### 2. Configure Environment Variables
-Create a `.env` file in the root directory:
+Create a `.env` file in the project root:
 ```env
 YOUTUBE_API_KEY=your_youtube_api_key_here
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your_supabase_service_key_here
-GEMINI_API_KEY=your_optional_gemini_key
-OPENAI_API_KEY=your_optional_openai_key
-FLASK_DEBUG=0
+FLASK_DEBUG=1
 PORT=5000
-ALLOWED_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
 ```
 
-### 3. Apply Database Migration (Supabase SQL Editor)
-1. Open your [Supabase Dashboard](https://app.supabase.com) and go to the **SQL Editor**.
-2. Run the SQL script in [`scripts/schema_v2.sql`](file:///g:/Important%20Projects/Youtube%20Data%20Manager/scripts/schema_v2.sql).
-3. *(Optional)* Seed historical video data:
-   ```bash
-   python scripts/backfill_videos.py --all
-   ```
-
-### 4. Run Locally
+### 3. Run Locally
 ```bash
-# Start Flask Server
 python server.py
-
-# Open your browser at http://localhost:5000
 ```
+Open your browser at **[http://localhost:5000](http://localhost:5000)**.
 
 ---
 
 ## ⌨️ Keyboard Shortcuts Reference
 
 | Shortcut | Action |
-|---|---|
-| `Ctrl + K` / `Cmd + K` | Open Command Palette |
-| `/` | Focus Search Channels |
-| `?` | Open Keyboard Shortcuts & Help |
-| `1` | Switch to Dashboard |
-| `2` | Switch to My Channels |
-| `3` | Switch to Creator Studio |
-| `R` | Refresh All Tracked Channels |
-| `[` / `]` | Toggle Compact / Comfortable UI Density |
-| `Escape` | Close any open modal / deep dive / popover |
+| :--- | :--- |
+| <kbd>⌘K</kbd> / <kbd>Ctrl+K</kbd> | Open Command Palette |
+| <kbd>/</kbd> | Focus Channel Search |
+| <kbd>?</kbd> | Open Metric Glossary & Help Modal |
+| <kbd>1</kbd> | Switch to Overview |
+| <kbd>2</kbd> | Switch to Competitors |
+| <kbd>3</kbd> | Switch to Topic Radar |
+| <kbd>4</kbd> | Switch to Creator Studio |
+| <kbd>R</kbd> | Refresh All Tracked Channels |
+| <kbd>Esc</kbd> | Close any active modal, detail sheet, or menu |
 
 ---
 
