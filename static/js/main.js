@@ -147,8 +147,24 @@ function renderTabSkeleton(p) {
   }
 }
 
+function toggleSidebar(forceState) {
+  const sidebar = document.querySelector('.sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebar) return;
+  const isOpen = typeof forceState === 'boolean' ? forceState : !sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', isOpen);
+  if (backdrop) backdrop.classList.toggle('open', isOpen);
+  if (isOpen) {
+    document.body.style.overflow = 'hidden';
+  } else if (!document.getElementById('page-channel')?.classList.contains('open')) {
+    document.body.style.overflow = '';
+  }
+}
+window.toggleSidebar = toggleSidebar;
+
 function sp(p) {
   closeDeepDive();
+  toggleSidebar(false);
   const inner = document.querySelector('.canvas-body-inner');
   if (inner && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     inner.classList.add('is-transitioning');
@@ -165,15 +181,16 @@ function _executeSp(p) {
   document.querySelectorAll('.page').forEach(x => x.classList.remove('on'));
   document.querySelectorAll('.sb-nav-item').forEach(x => x.classList.remove('active'));
   document.querySelectorAll('.m-nav-item').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('.mobile-tab').forEach(x => {
+    x.classList.remove('active');
+    x.classList.remove('on');
+  });
 
   const pageEl = document.getElementById('page-' + p);
   const sbItem = document.getElementById('sb-nav-' + p);
   const mLinkEl = document.getElementById('m-nav-' + p);
+  const mTabEl = document.getElementById('m-tab-' + p);
   const crumbEl = document.getElementById('crumbCurrent');
-
-  if (pageEl) pageEl.classList.add('on');
-  if (sbItem) sbItem.classList.add('active');
-  if (mLinkEl) mLinkEl.classList.add('on');
 
   const titles = {
     dash: 'Overview',
@@ -182,6 +199,14 @@ function _executeSp(p) {
     studio: 'Creator Studio',
     search: 'Channel Search'
   };
+
+  if (pageEl) pageEl.classList.add('on');
+  if (sbItem) sbItem.classList.add('active');
+  if (mLinkEl) mLinkEl.classList.add('on');
+  if (mTabEl) {
+    mTabEl.classList.add('active');
+    mTabEl.classList.add('on');
+  }
   if (crumbEl) crumbEl.textContent = titles[p] || 'Overview';
 
   renderTabSkeleton(p);

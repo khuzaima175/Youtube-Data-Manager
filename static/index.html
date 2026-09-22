@@ -108,14 +108,22 @@
       </div>
     </aside>
 
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar(false)"></div>
+
     <!-- ── Main Canvas ──────────────────────────────────────────────────────── -->
     <div class="main-canvas">
       <!-- Top Canvas Header -->
       <header class="canvas-header">
-        <div class="canvas-breadcrumbs" id="canvasBreadcrumbs">
-          <span class="crumb-root">YT Tracker</span>
-          <span class="crumb-slash">/</span>
-          <span class="crumb-current" id="crumbCurrent">Overview</span>
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <button class="icon-btn mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle navigation menu" onclick="toggleSidebar()" style="display:none">
+            <i data-lucide="menu" style="width:16px;height:16px"></i>
+          </button>
+          <div class="canvas-breadcrumbs" id="canvasBreadcrumbs">
+            <span class="crumb-root">YT Tracker</span>
+            <span class="crumb-slash">/</span>
+            <span class="crumb-current" id="crumbCurrent">Overview</span>
+          </div>
         </div>
 
         <div class="canvas-header-actions">
@@ -381,8 +389,29 @@
     <div id="aiSynthModalContent"></div>
   </div>
 
-  <!-- Achievement Celebration Pop-up Banner -->
-  <div id="achievementToast" class="achievement-toast"></div>
+  <!-- Mobile Bottom Tab Navigation -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">
+    <button class="mobile-tab on" id="m-tab-dash" onclick="sp('dash')" aria-label="Overview">
+      <i data-lucide="layout-dashboard"></i>
+      <span>Overview</span>
+    </button>
+    <button class="mobile-tab" id="m-tab-channels" onclick="sp('channels')" aria-label="Competitors">
+      <i data-lucide="users"></i>
+      <span>Competitors</span>
+    </button>
+    <button class="mobile-tab" id="m-tab-radar" onclick="sp('radar')" aria-label="Topic Radar">
+      <i data-lucide="radar"></i>
+      <span>Radar</span>
+    </button>
+    <button class="mobile-tab" id="m-tab-studio" onclick="sp('studio')" aria-label="Creator Studio">
+      <i data-lucide="clapperboard"></i>
+      <span>Studio</span>
+    </button>
+    <button class="mobile-tab" id="m-tab-search" onclick="sp('search')" aria-label="Channel Search">
+      <i data-lucide="search"></i>
+      <span>Search</span>
+    </button>
+  </nav>
 
   <!-- Core Modular JS Application Engine -->
   <script src="static/js/ui/format.js" defer></script>

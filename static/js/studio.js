@@ -727,7 +727,7 @@ function renderStudioLabHtml() {
         </div>
 
         <!-- 4 Factor Grid -->
-        <div class="tl-factors-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+        <div class="tl-factors-grid">
           <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;cursor:pointer" data-tip="title_length">
             <div style="font-size:11px;font-weight:500;color:var(--text-3);margin-bottom:4px">
               Length (${res.lenScore}/25)
