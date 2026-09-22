@@ -187,7 +187,7 @@ async function renderDDOverview(ch) {
         <!-- Pulse card -->
         <div class="dd-pulse-card" style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--r-md);padding:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <div style="font-size:13px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:6px">
+            <div style="font-size:13px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:6px" data-tip="upload_pulse">
               <i data-lucide="activity" style="width:15px;height:15px;color:var(--accent)"></i>
               <span>90-Day Upload Pulse</span>
             </div>
@@ -293,16 +293,31 @@ function buildPulseChart(vids, col) {
   const now = Date.now();
   const weeks = 13;
   const weekMs = 7 * 864e5;
-  const buckets = Array.from({ length: weeks }, (_, i) => ({
-    count: 0,
-    startMs: now - (weeks - i) * weekMs
-  }));
+  const buckets = Array.from({ length: weeks }, (_, i) => {
+    const startMs = now - (weeks - i) * weekMs;
+    const endMs = startMs + weekMs;
+    const startD = new Date(startMs);
+    const endD = new Date(endMs);
+    const startStr = startD.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const endStr = endD.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return {
+      count: 0,
+      totalViews: 0,
+      startMs,
+      endMs,
+      label: `${startStr} – ${endStr}`
+    };
+  });
 
   vids.forEach(v => {
     const pub = new Date(v.published_at || v.date || 0).getTime();
     if (!pub) return;
+    const vc = parseInt(v.view_count ?? v.views_raw ?? 0) || 0;
     const idx = buckets.findIndex((b, i) => pub >= b.startMs && (i === weeks - 1 || pub < buckets[i + 1].startMs));
-    if (idx >= 0) buckets[idx].count++;
+    if (idx >= 0) {
+      buckets[idx].count++;
+      buckets[idx].totalViews += vc;
+    }
   });
 
   const maxC = Math.max(...buckets.map(b => b.count), 1);
@@ -316,9 +331,22 @@ function buildPulseChart(vids, col) {
     const h = b.count > 0 ? Math.max(6, Math.round((b.count / maxC) * plotH)) : 3;
     const x = padL + i * (plotW / weeks);
     const y = padT + plotH - h;
-    const opacity = b.count > 0 ? 0.8 : 0.2;
-    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bW}" height="${h}" rx="2" fill="var(--accent)" opacity="${opacity}"
-      title="${b.count} upload${b.count !== 1 ? 's' : ''} (week ${i + 1})" style="cursor:pointer"/>`;
+    const opacity = b.count > 0 ? 0.85 : 0.2;
+    const isLatest = i === weeks - 1;
+    const barLabel = isLatest ? `This week (${b.label})` : `Week ${i + 1} (${b.label})`;
+    const tipHtml = `
+      <div style="font-weight:600;color:var(--text-1);margin-bottom:2px">${esc(barLabel)}</div>
+      <div style="color:var(--accent);font-weight:500">${b.count} upload${b.count !== 1 ? 's' : ''}</div>
+      ${b.totalViews > 0 ? `<div style="color:var(--text-3);font-size:11px;margin-top:2px">${fmtN(b.totalViews)} views</div>` : ''}
+    `.trim();
+
+    bars += `
+      <g class="pulse-bar-group" data-tip-custom="${esc(tipHtml)}" style="cursor:pointer">
+        <rect class="pulse-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bW}" height="${h}" rx="2" fill="var(--accent)" opacity="${opacity}" style="transition:opacity 0.15s, transform 0.15s">
+          <title>${esc(barLabel)}: ${b.count} uploads</title>
+        </rect>
+        <rect x="${x.toFixed(1)}" y="${padT}" width="${bW}" height="${plotH}" fill="transparent" />
+      </g>`;
   });
 
   return `

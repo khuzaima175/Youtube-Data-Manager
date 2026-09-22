@@ -31,10 +31,11 @@
     showTimeout = setTimeout(() => {
       activeTarget = target;
       const tipId = target.getAttribute('data-tip');
+      const customContent = customHtml || target.getAttribute('data-tip-custom') || target.getAttribute('data-tip-text') || target.getAttribute('data-tip-html');
       const term = window.GLOSSARY && (window.GLOSSARY[tipId] || window.GLOSSARY[tipId?.replace(/-/g, '_')]);
 
-      if (customHtml) {
-        tipEl.innerHTML = customHtml;
+      if (customContent) {
+        tipEl.innerHTML = `<div class="ui-tip-body">${customContent}</div>`;
       } else if (term) {
         const titleText = term.title || term.t || 'Metric Detail';
         const bodyText = term.p || term.desc || '';
@@ -48,7 +49,7 @@
               Learn more →
             </button>
           </div>`;
-      } else if (tipId) {
+      } else if (tipId && tipId !== 'custom') {
         tipEl.innerHTML = `<div class="ui-tip-body">${tipId}</div>`;
       } else {
         return;
@@ -56,7 +57,7 @@
 
       tipEl.style.display = 'block';
       position(target);
-    }, 120);
+    }, 80);
   }
 
   function position(target) {
@@ -90,7 +91,7 @@
 
   // Global event delegation for data-tip: mouse hover + keyboard focus
   document.addEventListener('mouseover', function (e) {
-    const el = e.target.closest('[data-tip]');
+    const el = e.target.closest('[data-tip], [data-tip-custom], [data-tip-text], [data-tip-html]');
     if (el) {
       show(el);
     } else if (activeTarget && !tipEl.contains(e.target)) {
@@ -99,14 +100,14 @@
   });
 
   document.addEventListener('mouseout', function (e) {
-    const el = e.target.closest('[data-tip]');
+    const el = e.target.closest('[data-tip], [data-tip-custom], [data-tip-text], [data-tip-html]');
     if (el && (!e.relatedTarget || !el.contains(e.relatedTarget)) && (!tipEl || !tipEl.contains(e.relatedTarget))) {
       hide();
     }
   });
 
   document.addEventListener('focusin', function (e) {
-    const el = e.target.closest('[data-tip]');
+    const el = e.target.closest('[data-tip], [data-tip-custom], [data-tip-text], [data-tip-html]');
     if (el) {
       show(el);
     }
