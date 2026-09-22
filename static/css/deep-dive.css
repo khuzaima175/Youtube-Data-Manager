@@ -195,8 +195,8 @@
   font-size: 11px;
   font-weight: 700;
   color: var(--t3);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  text-transform: none;
+  letter-spacing: normal;
   background: var(--bg-1);
 }
 

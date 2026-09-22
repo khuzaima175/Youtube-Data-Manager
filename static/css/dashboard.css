@@ -96,8 +96,8 @@
 .dash-hero-nba-tag {
   font-size: 9.5px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--acc);
   display: flex;
   align-items: center;
@@ -145,8 +145,8 @@
   justify-content: space-between;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--t3);
 }
 
@@ -325,8 +325,8 @@
 .nba-title {
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--acc);
   display: flex;
   align-items: center;
@@ -399,7 +399,7 @@
 
 /* 2. You vs Field Panel */
 .you-vs-field {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, rgba(255, 255, 255, 0) 100%), var(--bg-2);
+  background: var(--surface-1);
   border: 1px solid var(--line-1);
   border-radius: var(--r-l);
   padding: 24px 28px;
@@ -608,8 +608,8 @@
   padding: 12px 14px;
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--t3);
   border-bottom: 1px solid var(--line-2);
   text-align: left;
@@ -816,7 +816,7 @@
 .lb-stat-lbl {
   font-size: 9px;
   font-weight: 700;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--t3);
   letter-spacing: 0.04em;
 }
@@ -1054,8 +1054,8 @@
   padding: 13px 14px;
   font-size: 10.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--t3);
   border-bottom: 1px solid var(--line-2);
   background: var(--bg-2);
@@ -1491,7 +1491,7 @@
 .topic-section-label {
   font-size: 9.5px;
   font-weight: 700;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: .08em;
   color: var(--t3);
   margin-bottom: 8px;
@@ -1653,7 +1653,7 @@
   font-size: 9.5px;
   color: var(--t3);
   font-weight: 700;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.04em;
 }
 
@@ -2137,8 +2137,8 @@
 .timing-insight-card .lbl {
   font: 700 10.5px var(--f-ui);
   color: var(--t3);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  text-transform: none;
+  letter-spacing: normal;
   margin-bottom: 6px;
 }
 
@@ -2529,7 +2529,7 @@
     font-size: 9px;
     letter-spacing: .05em;
     color: var(--t3);
-    text-transform: uppercase;
+    text-transform: none;
   }
 }
 
@@ -2558,7 +2558,7 @@
 
 .sat-quadrant {
   padding: 20px 22px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 100%), var(--bg-2);
+  background: var(--surface-1);
   border: 1px solid var(--line-1);
   border-radius: var(--r-m);
   display: flex;
@@ -2635,7 +2635,7 @@
 
 .sat-topic-item {
   padding: 10px 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 100%), var(--bg-3);
+  background: var(--surface-2);
   border: 1px solid var(--line-1);
   border-radius: var(--r-s);
   display: flex;

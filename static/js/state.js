@@ -205,10 +205,10 @@ function hash(str) {
   return h;
 }
 
-const COHORT_PALETTE = ['#38bdf8', '#818cf8', '#34d399', '#f472b6', '#fb923c', '#a78bfa', '#2dd4bf'];
+const COHORT_PALETTE = ['#8b919b', '#7a818c', '#9ca3af', '#6b7280', '#94a3b8', '#a1a1aa'];
 const colorOf = ch => {
   if (!ch) return '#94a3b8';
-  if (ch.is_primary) return 'var(--me)';
+  if (ch.is_primary) return 'var(--accent)';
   const idx = Math.abs(hash(ch.id || ch.name || '0')) % COHORT_PALETTE.length;
   return COHORT_PALETTE[idx];
 };

@@ -402,8 +402,8 @@ function renderOverviewGrowthChart(enrichData, primary) {
   }
 
   const gradient = ctx.createLinearGradient(0, 0, 0, 220);
-  gradient.addColorStop(0, 'rgba(99, 102, 241, 0.16)');
-  gradient.addColorStop(1, 'rgba(99, 102, 241, 0.00)');
+  gradient.addColorStop(0, 'rgba(102, 114, 245, 0.14)');
+  gradient.addColorStop(1, 'rgba(102, 114, 245, 0.00)');
 
   dashChartInstance = new Chart(ctx, {
     type: 'line',
@@ -412,13 +412,13 @@ function renderOverviewGrowthChart(enrichData, primary) {
       datasets: [{
         label: currentChartMetric === 'views' ? 'Views' : 'Uploads',
         data: dataPoints,
-        borderColor: '#6366f1',
+        borderColor: '#6672f5',
         borderWidth: 2,
         backgroundColor: gradient,
         fill: true,
         tension: 0.35,
-        pointBackgroundColor: '#6366f1',
-        pointBorderColor: '#0e1015',
+        pointBackgroundColor: '#6672f5',
+        pointBorderColor: '#101216',
         pointBorderWidth: 2,
         pointRadius: 3,
         pointHoverRadius: 5
@@ -430,14 +430,14 @@ function renderOverviewGrowthChart(enrichData, primary) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: 'rgba(14, 16, 21, 0.95)',
-          borderColor: 'rgba(255, 255, 255, 0.12)',
+          backgroundColor: '#171a1f',
+          borderColor: '#262a31',
           borderWidth: 1,
-          titleColor: '#f8fafc',
-          bodyColor: '#94a3b8',
-          titleFont: { family: 'Inter', size: 12, weight: '600' },
-          bodyFont: { family: 'JetBrains Mono', size: 12 },
-          padding: 10,
+          titleColor: '#e8eaed',
+          bodyColor: '#9aa0a8',
+          titleFont: { family: 'Inter', size: 12, weight: '500' },
+          bodyFont: { family: 'Inter', size: 12 },
+          padding: 8,
           displayColors: false,
           callbacks: {
             label: (context) => `${context.dataset.label}: ${fmtN(context.parsed.y)}`
@@ -446,14 +446,14 @@ function renderOverviewGrowthChart(enrichData, primary) {
       },
       scales: {
         x: {
-          grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false },
-          ticks: { color: 'rgba(255, 255, 255, 0.45)', font: { family: 'Inter', size: 10.5 }, maxRotation: 0 }
+          grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
+          ticks: { color: '#6b727c', font: { family: 'Inter', size: 11 }, maxRotation: 0 }
         },
         y: {
-          grid: { color: 'rgba(255, 255, 255, 0.04)', drawBorder: false },
+          grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
           ticks: {
-            color: 'rgba(255, 255, 255, 0.45)',
-            font: { family: 'JetBrains Mono', size: 10 },
+            color: '#6b727c',
+            font: { family: 'Inter', size: 11 },
             callback: (val) => fmtN(val)
           }
         }

@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════════════════════════════════
-   YT TRACKER 2.0 — SAAS DESIGN SYSTEM TOKENS
-   Linear / Raycast Calibre Workspace Architecture
+   YT TRACKER — TARGET DESIGN SYSTEM TOKENS (PHASE 1 SKIN SWAP)
+   Clean, Disciplined SaaS Architecture (Linear / Raycast Calibre)
    ══════════════════════════════════════════════════════════════════════════════ */
 
 *, *::before, *::after {
@@ -14,39 +14,77 @@
   --sidebar-w: 240px;
   --header-h: 56px;
   --status-bar-h: 36px;
-  --max-canvas-w: 1440px;
+  --max-canvas-w: 1280px;
 
-  /* Surfaces & Hierarchy (Deep Graphite / Obsidian Workspace) */
-  --bg-0: #090a0c;       /* True Canvas */
-  --bg-1: #0e1015;       /* Sidebar & Top Header */
-  --bg-2: #14171f;       /* Primary Panels, Cards, Tables */
-  --bg-3: #1a1e28;       /* Interactive Inputs, Sub-rows, Chips */
-  --bg-hover: #222734;   /* Hover & Active States */
-  --bg-elevated: #282e3d;/* Popovers & Tooltips */
+  /* Target Surfaces (Flat, Zero Gradients, Zero Bevels) */
+  --bg: #0b0c0e;
+  --surface-1: #101216;
+  --surface-2: #171a1f;
+  --surface-3: #1e2228;
 
-  /* Hairline Borders */
-  --line-1: rgba(255, 255, 255, 0.07);
-  --line-2: rgba(255, 255, 255, 0.13);
-  --line-3: rgba(255, 255, 255, 0.22);
+  /* Target Borders */
+  --border: #262a31;
+  --border-strong: #363c46;
 
-  /* High-Contrast Typography */
-  --t1: #f8fafc;         /* High-contrast crisp titles */
-  --t2: #94a3b8;         /* Neutral body & metadata */
-  --t3: #64748b;         /* Subdued tertiary / captions */
-  --t4: #475569;         /* Dividers / disabled */
+  /* Target Typography Colors */
+  --text-1: #e8eaed;
+  --text-2: #9aa0a8;
+  --text-3: #6b727c;
 
-  /* Cohesive Accents (Linear Indigo & Purposeful Semantic Hues) */
-  --acc: #6366f1;        /* Linear Indigo Interactive Action */
-  --acc-glow: rgba(99, 102, 241, 0.14);
-  --acc-hover: #4f46e5;
-  --me: #f59e0b;         /* Warm Amber for Primary Channel */
-  --me-glow: rgba(245, 158, 11, 0.14);
-  --up: #10b981;         /* Emerald Green positive delta */
-  --down: #f43f5e;       /* Rose Red negative delta */
-  --warn: #f59e0b;       /* Amber warning */
-  --yt: #ef4444;         /* YouTube Brand Touch */
+  /* Single Accent (Indigo, Desaturated) */
+  --accent: #6672f5;
+  --accent-hover: #7b86f7;
+  --accent-soft: rgba(102, 114, 245, 0.14);
 
-  /* Backward Compatibility Aliases */
+  /* Target Semantics (Status Dots & Deltas Only) */
+  --pos: #4ea463;
+  --neg: #d95c4a;
+  --warn: #c9973a;
+
+  /* Target Radii & Geometry */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-full: 9999px;
+
+  /* Target Shadows */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  /* Target Motion */
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 360ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ── Full Backward-Compatibility Aliases ────────────────────────────────── */
+  --bg-0: var(--bg);
+  --bg-1: var(--surface-1);
+  --bg-2: var(--surface-2);
+  --bg-3: var(--surface-3);
+  --bg-hover: var(--surface-3);
+  --bg-elevated: var(--surface-3);
+
+  --line-1: var(--border);
+  --line-2: var(--border-strong);
+  --line-3: var(--border-strong);
+
+  --t1: var(--text-1);
+  --t2: var(--text-2);
+  --t3: var(--text-3);
+  --t4: var(--text-3);
+
+  --acc: var(--accent);
+  --acc-hover: var(--accent-hover);
+  --acc-glow: var(--accent-soft);
+
+  --me: var(--accent);
+  --me-glow: var(--accent-soft);
+
+  --up: var(--pos);
+  --down: var(--neg);
+  --yt: var(--neg);
+
   --pr: var(--acc);
   --gr: var(--up);
   --rd: var(--down);
@@ -56,36 +94,30 @@
   --sf: var(--bg-2);
   --sf-high: var(--bg-3);
 
-  /* Radii & Geometry */
-  --r-xs: 4px;
-  --r-s: 6px;
-  --r-m: 10px;
-  --r-l: 14px;
-  --r-xl: 18px;
-  --r-full: 9999px;
+  --r-xs: var(--r-sm);
+  --r-s: var(--r-sm);
+  --r-m: var(--r-md);
+  --r-l: var(--r-lg);
+  --r-xl: var(--r-lg);
 
-  /* Spacing Grid */
   --s1: 4px;
   --s2: 8px;
   --s3: 12px;
   --s4: 16px;
   --s5: 24px;
-  --s6: 36px;
+  --s6: 32px;
 
-  /* Typography */
   --f-disp: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --f-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --f-mono: 'JetBrains Mono', monospace;
+  --f-mono: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  /* Motion & Easing */
-  --e-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --e-out: var(--ease);
   --e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --d-1: 0.12s;
-  --d-2: 0.2s;
-  --d-3: 0.35s;
+  --d-1: var(--dur-1);
+  --d-2: var(--dur-2);
+  --d-3: var(--dur-3);
 
-  /* Multi-Layered Tactile Shadows */
-  --sh-1: 0 1px 3px rgba(0, 0, 0, 0.45), 0 4px 12px -2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --sh-2: 0 16px 40px -8px rgba(0, 0, 0, 0.8), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  --sh-hover: 0 8px 24px -2px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --sh-1: var(--shadow-1);
+  --sh-2: var(--shadow-2);
+  --sh-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
