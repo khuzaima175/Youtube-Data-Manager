@@ -355,10 +355,11 @@ function renderOverviewGrowthChart(enrichData, primary) {
   
   let labels = [];
   let dataPoints = [];
+  let sampleVids = [];
 
   if (currentChartMetric === 'views') {
     // Recent 15 videos performance velocity
-    const sampleVids = [...vids].slice(0, 15).reverse();
+    sampleVids = [...vids].slice(0, 15).reverse();
     if (sampleVids.length > 0) {
       labels = sampleVids.map((v, i) => v.title ? (v.title.length > 18 ? v.title.slice(0, 18) + '…' : v.title) : `Upload #${i+1}`);
       dataPoints = sampleVids.map(v => parseInt(v.view_count ?? v.views_raw ?? 0) || 0);
@@ -397,13 +398,31 @@ function renderOverviewGrowthChart(enrichData, primary) {
         pointBackgroundColor: '#6672f5',
         pointBorderColor: '#101216',
         pointBorderWidth: 2,
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: 4,
+        pointHoverRadius: 6
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      onClick: (event, elements) => {
+        if (elements && elements.length > 0 && currentChartMetric === 'views') {
+          const idx = elements[0].index;
+          const v = sampleVids[idx];
+          if (v) {
+            const vidUrl = v.url || (v.id || v.video_id ? `https://www.youtube.com/watch?v=${v.id || v.video_id}` : null);
+            if (vidUrl) {
+              window.open(vidUrl, '_blank', 'noopener');
+            }
+          }
+        }
+      },
+      onHover: (event, elements) => {
+        const target = event.native ? event.native.target : canvas;
+        if (target) {
+          target.style.cursor = (elements && elements.length > 0 && currentChartMetric === 'views') ? 'pointer' : 'default';
+        }
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -412,12 +431,33 @@ function renderOverviewGrowthChart(enrichData, primary) {
           borderWidth: 1,
           titleColor: '#e8eaed',
           bodyColor: '#9aa0a8',
-          titleFont: { family: 'Inter', size: 12, weight: '500' },
-          bodyFont: { family: 'Inter', size: 12 },
-          padding: 8,
+          titleFont: { family: 'Inter', size: 12.5, weight: '600' },
+          bodyFont: { family: 'Inter', size: 11.5 },
+          padding: 10,
           displayColors: false,
           callbacks: {
-            label: (context) => `${context.dataset.label}: ${fmtN(context.parsed.y)}`
+            title: (items) => {
+              if (currentChartMetric === 'views' && items.length > 0) {
+                const v = sampleVids[items[0].dataIndex];
+                return v ? (v.title || `Upload #${items[0].dataIndex + 1}`) : items[0].label;
+              }
+              return items[0]?.label || '';
+            },
+            label: (context) => {
+              const label = context.dataset.label || 'Value';
+              return `${label}: ${fmtN(context.parsed.y)}`;
+            },
+            afterLabel: (context) => {
+              if (currentChartMetric === 'views') {
+                const v = sampleVids[context.dataIndex];
+                if (!v) return '';
+                const pubDate = v.published_at || v.date;
+                const days = pubDate ? Math.floor((Date.now() - new Date(pubDate).getTime()) / 864e5) : null;
+                const timeStr = days !== null ? (days === 0 ? 'Uploaded today' : `${days}d ago`) : '';
+                return `${timeStr ? `${timeStr} · ` : ''}Click to open on YouTube ↗`;
+              }
+              return '';
+            }
           }
         }
       },
