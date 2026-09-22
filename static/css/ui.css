@@ -578,6 +578,32 @@
   .data-table {
     min-width: 540px;
   }
+
+  /* Deep Dive Forensics Mobile Layout */
+  .dd-overview-bento {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    gap: 16px !important;
+  }
+
+  .dd-overview-left,
+  .dd-overview-right {
+    width: 100% !important;
+    flex-direction: column !important;
+    display: flex !important;
+    gap: 14px !important;
+  }
+
+  .dd-overview-right .card,
+  .dd-overview-left .card {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .dd-kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
 }
 
 @media (max-width: 480px) {

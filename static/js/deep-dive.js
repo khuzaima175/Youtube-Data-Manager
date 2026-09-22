@@ -103,9 +103,9 @@ async function renderDDOverview(ch) {
   if (!panel) return;
 
   panel.innerHTML = `
-    <div class="dd-overview-bento" style="display:grid;grid-template-columns:1fr 320px;gap:20px">
-      <div style="display:flex;flex-direction:column;gap:16px">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div class="dd-overview-bento">
+      <div class="dd-overview-left">
+        <div class="dd-kpi-strip">
           <div class="skel skel-tile"></div>
           <div class="skel skel-tile"></div>
           <div class="skel skel-tile"></div>

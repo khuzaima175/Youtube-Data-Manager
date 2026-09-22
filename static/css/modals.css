@@ -1622,7 +1622,7 @@
   }
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1080px) and (min-width: 769px) {
   .dd-overview-bento {
     grid-template-columns: 1fr;
   }
@@ -1637,6 +1637,13 @@
 
   .rrow>.rrow-eng {
     display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .dd-overview-right {
+    flex-direction: column !important;
+    width: 100% !important;
   }
 }
 
