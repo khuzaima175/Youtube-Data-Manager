@@ -36,8 +36,8 @@ async function openDeepDive(channelId, tab = 'overview') {
       <button class="btn ${inCompare ? 'btn-acc' : 'btn-gh'} btn-sm" onclick="toggleCompare('${esc(ch.id)}')">
         <i data-lucide="${inCompare ? 'check' : 'git-compare'}" style="width:13px;height:13px"></i> ${inCompare ? 'In Compare' : '+ Compare'}
       </button>
-      <button class="icon-btn" onclick="refreshOne('${esc(ch.id)}')"><i data-lucide="refresh-cw" style="width:13px;height:13px"></i></button>
-      <button class="icon-btn" onclick="closeDeepDive()"><i data-lucide="x" style="width:14px;height:14px"></i></button>`;
+      <button class="icon-btn" aria-label="Refresh channel telemetry" title="Refresh channel data" onclick="refreshOne('${esc(ch.id)}')"><i data-lucide="refresh-cw" style="width:13px;height:13px"></i></button>
+      <button class="icon-btn" aria-label="Close channel deep dive" title="Close deep dive (Esc)" onclick="closeDeepDive()"><i data-lucide="x" style="width:14px;height:14px"></i></button>`;
   }
 
   const ddEl = document.getElementById('page-channel');

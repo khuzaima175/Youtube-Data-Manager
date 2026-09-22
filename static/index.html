@@ -127,12 +127,12 @@
           </div>
 
           <!-- Shortcuts & Help Trigger -->
-          <button class="icon-btn" data-action="help" onclick="window.GlossaryModal ? window.GlossaryModal.open() : openShortcutsModal()" title="Keyboard Shortcuts & Glossary (?)">
+          <button class="icon-btn" data-action="help" aria-label="Help & Metric Glossary" onclick="window.GlossaryModal ? window.GlossaryModal.open() : openShortcutsModal()" title="Keyboard Shortcuts & Glossary (?)">
             <i data-lucide="help-circle" style="width:15px;height:15px"></i>
           </button>
 
           <!-- Settings Trigger -->
-          <button class="icon-btn" onclick="openSettingsModal()" title="Settings">
+          <button class="icon-btn" aria-label="Settings & Configuration" onclick="openSettingsModal()" title="Settings">
             <i data-lucide="settings" style="width:15px;height:15px"></i>
           </button>
         </div>
@@ -324,7 +324,7 @@
         <button class="vid-seg-btn on" id="helpTabShortcuts" onclick="switchHelpTab('shortcuts')">Shortcuts</button>
         <button class="vid-seg-btn" id="helpTabGlossary" onclick="switchHelpTab('glossary')">Metric Glossary</button>
       </div>
-      <button class="icon-btn" onclick="closeShortcutsModal()"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+      <button class="icon-btn" aria-label="Close shortcuts modal" onclick="closeShortcutsModal()"><i data-lucide="x" style="width:14px;height:14px"></i></button>
     </div>
 
     <!-- Panel 1: Shortcuts -->
@@ -385,6 +385,7 @@
   <div id="achievementToast" class="achievement-toast"></div>
 
   <!-- Core Modular JS Application Engine -->
+  <script src="static/js/ui/format.js" defer></script>
   <script src="static/js/data/glossary.js" defer></script>
   <script src="static/js/state.js" defer></script>
   <script src="static/js/api.js" defer></script>

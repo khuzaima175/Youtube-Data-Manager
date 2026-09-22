@@ -185,7 +185,7 @@ function copyTitleLabText() {
   const input = document.getElementById('titleLabInput');
   if (!input || !input.value.trim()) return;
   navigator.clipboard.writeText(input.value.trim()).then(() => {
-    toast('Title copied to clipboard!', 's');
+    toast('Title copied to clipboard', 's');
   });
 }
 
@@ -209,7 +209,7 @@ function sendTitleLabToPipeline() {
 
   pipelineCards.unshift(newCard);
   savePipelineCards();
-  toast('Added to Content Pipeline (Idea)!', 's');
+  toast('Added to pipeline', 's');
   setStudioSubTab('pipeline');
 }
 
@@ -267,7 +267,7 @@ function generateStudioIdeas() {
     }
   }
 
-  // Formula 3: Franchise Follow-Up
+  // Formula 3: Franchise Follow-Up -> Sequel
   const primaryEnrich = _enrichCache[primary?.id] || {};
   const myTop = primaryEnrich.vids ? [...primaryEnrich.vids].sort((a, b) => (parseInt(b.view_count ?? b.views_raw ?? 0)) - (parseInt(a.view_count ?? a.views_raw ?? 0)))[0] : null;
   if (myTop) {
@@ -275,12 +275,12 @@ function generateStudioIdeas() {
     ideas.push({
       id: 'idea-franchise',
       type: 'franchise',
-      formula: 'Franchise Follow-Up',
+      formula: 'Sequel',
       tag: 'Proven Winner',
       title: `Part 2: Why ${capWords(myTok)} Really Matters (1 Year Later)`,
       topic: myTok,
       score: 89,
-      reason: `Direct sequel to your best-performing video (${fmtN(parseInt(myTop.view_count ?? myTop.views_raw ?? 0))} views)`
+      reason: `Direct sequel to your best-performing video (${Format.count(parseInt(myTop.view_count ?? myTop.views_raw ?? 0))} views)`
     });
   }
 
@@ -299,13 +299,13 @@ function generateStudioIdeas() {
     });
   }
 
-  // Formula 5: Masterclass
+  // Formula 5: Masterclass -> Complete Guide
   if (moats.length > 1) {
     const m2 = moats[1].topic;
     ideas.push({
       id: 'idea-mastery',
       type: 'mastery',
-      formula: 'Mastery Blueprint',
+      formula: 'Complete Guide',
       tag: 'Evergreen Pillar',
       title: `From Zero to Master: The Complete ${capWords(m2)} Guide`,
       topic: m2,

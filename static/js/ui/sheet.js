@@ -33,7 +33,7 @@
           <h3 class="ui-sheet-title">${titleText}</h3>
           <span class="ui-sheet-sub">Metric Forensics & Action Guide</span>
         </div>
-        <button class="icon-btn" onclick="window.Sheet.close()" title="Close Sheet (Esc)">
+        <button class="icon-btn" aria-label="Close detail sheet (Esc)" onclick="window.Sheet.close()" title="Close Sheet (Esc)">
           <i data-lucide="x" style="width:16px;height:16px"></i>
         </button>
       </div>

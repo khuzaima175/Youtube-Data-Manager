@@ -150,10 +150,12 @@ function renderBenchmarkRow(ch, i, primary) {
           ? `<span style="color:var(--accent)">—</span>`
           : !_topicCache.topics.size
             ? `<span style="color:var(--text-3)">—</span>`
-            : `${threatScore}%`}
+            : threatScore <= 0
+              ? `<span style="color:var(--text-3)">&lt; 1%</span>`
+              : `${threatScore}%`}
       </td>
       <td style="text-align:center" onclick="event.stopPropagation()">
-        <button class="row-menu-btn" title="Channel options" onclick="showChannelRowMenu(event, '${esc(ch.id)}')">
+        <button class="row-menu-btn" aria-label="Channel options for ${esc(ch.name)}" title="Channel options" onclick="showChannelRowMenu(event, '${esc(ch.id)}')">
           <i data-lucide="more-horizontal" style="width:15px;height:15px"></i>
         </button>
       </td>
