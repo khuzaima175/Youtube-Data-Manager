@@ -674,14 +674,14 @@ function renderStudioLabHtml() {
       <div class="card" style="padding:22px;background:var(--surface-1);border:1px solid var(--border)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
           <div>
-            <div style="font-size:15px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px">
+            <div style="font-size:15px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px" data-tip="title_score">
               <i data-lucide="flask-conical" style="width:16px;height:16px;color:var(--accent)"></i>
               <span>Title Lab Real-Time Scorer</span>
             </div>
             <div style="font-size:12px;color:var(--text-3);margin-top:2px">Algorithmic scoring based on keyword demand, search hooks, and title length.</div>
           </div>
           <div style="display:flex;align-items:center;gap:12px">
-            <div style="display:flex;align-items:baseline;gap:6px">
+            <div style="display:flex;align-items:baseline;gap:6px" data-tip="title_score">
               <div style="font-size:26px;font-weight:700;color:var(--text-1);font-variant-numeric:tabular-nums" id="tlScoreNum">${res.score}</div>
               <span style="font-size:13px;color:var(--text-3)">/100</span>
               <span id="tlScoreRating" style="margin-left:4px"><span style="color:${ratingColor};font-weight:500">${ratingText}</span></span>
@@ -698,17 +698,17 @@ function renderStudioLabHtml() {
         </div>
 
         <!-- Character Meter & Feedback -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:11.5px;color:var(--text-3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:11.5px;color:var(--text-3)" data-tip="title_length">
           <span id="tlFeedback">${res.lenFeedback}</span>
           <span id="tlLenCount" class="num">${res.len} / 60 chars</span>
         </div>
-        <div style="width:100%;height:4px;background:var(--surface-3);border-radius:2px;overflow:hidden;margin-bottom:16px">
+        <div style="width:100%;height:4px;background:var(--surface-3);border-radius:2px;overflow:hidden;margin-bottom:16px" data-tip="title_length">
           <div id="tlLenFill" style="height:100%;width:${Math.min(100, Math.round((res.len / 80) * 100))}%;background:${res.len >= 40 && res.len <= 60 ? 'var(--pos)' : res.len >= 30 && res.len <= 70 ? 'var(--warn)' : 'var(--neg)'};transition:width .2s"></div>
         </div>
 
         <!-- 4 Factor Grid -->
         <div class="tl-factors-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px">
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;cursor:pointer" data-tip="title_length">
             <div style="font-size:11px;font-weight:500;color:var(--text-3);margin-bottom:4px">
               Length (${res.lenScore}/25)
             </div>
@@ -716,7 +716,7 @@ function renderStudioLabHtml() {
               <div id="tlMeterLen" style="height:100%;width:${Math.round((res.lenScore / 25) * 100)}%;background:var(--accent);transition:width .2s"></div>
             </div>
           </div>
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px">
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;cursor:pointer" data-tip="topic_match">
             <div style="font-size:11px;font-weight:500;color:var(--text-3);margin-bottom:4px">
               Topic Match (${res.topicScore}/35)
             </div>
@@ -724,7 +724,7 @@ function renderStudioLabHtml() {
               <div id="tlMeterTopic" style="height:100%;width:${Math.round((res.topicScore / 35) * 100)}%;background:var(--accent);transition:width .2s"></div>
             </div>
           </div>
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px">
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;cursor:pointer" data-tip="hook_format">
             <div style="font-size:11px;font-weight:500;color:var(--text-3);margin-bottom:4px">
               Hook & Format (${res.hookScore}/25)
             </div>
@@ -732,7 +732,7 @@ function renderStudioLabHtml() {
               <div id="tlMeterHook" style="height:100%;width:${Math.round((res.hookScore / 25) * 100)}%;background:var(--accent);transition:width .2s"></div>
             </div>
           </div>
-          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px">
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;cursor:pointer" data-tip="structure_score">
             <div style="font-size:11px;font-weight:500;color:var(--text-3);margin-bottom:4px">
               Structure (${res.structScore}/15)
             </div>
@@ -744,12 +744,12 @@ function renderStudioLabHtml() {
 
         <!-- Missing High-Momentum Tokens -->
         <div style="margin-bottom:16px">
-          <div style="font-size:11.5px;color:var(--text-3);margin-bottom:8px">
+          <div style="font-size:11.5px;color:var(--text-3);margin-bottom:8px" data-tip="topic_tokens">
             Trending topic tokens in niche (click to append):
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${res.missingHotTokens.length ? res.missingHotTokens.map(tok => `
-              <button class="btn btn-gh btn-sm" style="padding:3px 8px;font-size:11px" onclick="appendTokenToTitle('${esc(tok.topic)}')">
+              <button class="btn btn-gh btn-sm" style="padding:3px 8px;font-size:11px" onclick="appendTokenToTitle('${esc(tok.topic)}')" data-tip="topic_tokens">
                 + ${esc(tok.topic)}
               </button>`).join('') : '<span style="font-size:11.5px;color:var(--text-3)">All key trending niche topics covered.</span>'}
           </div>
@@ -760,7 +760,7 @@ function renderStudioLabHtml() {
           <button class="btn btn-acc btn-sm" onclick="sendTitleLabToPipeline()">
             <i data-lucide="plus" style="width:13px;height:13px"></i> Send to Pipeline
           </button>
-          <button class="btn btn-gh btn-sm" onclick="openAiTitleSynthesizer('', titleLabDraft)">
+          <button class="btn btn-gh btn-sm" onclick="openAiTitleSynthesizer('', titleLabDraft)" data-tip="ai_synthesizer">
             <i data-lucide="sparkles" style="width:13px;height:13px"></i> AI Synthesizer
           </button>
           <button class="btn btn-gh btn-sm" onclick="copyTitleLabText()">
@@ -773,7 +773,7 @@ function renderStudioLabHtml() {
       <div class="card" style="padding:22px;background:var(--surface-1);border:1px solid var(--border)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
           <div>
-            <div style="font-size:15px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px">
+            <div style="font-size:15px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px" data-tip="concept_match">
               <i data-lucide="lightbulb" style="width:16px;height:16px;color:var(--accent)"></i>
               <span>Algorithmic Concept Generator</span>
             </div>
@@ -783,12 +783,19 @@ function renderStudioLabHtml() {
 
         <!-- Idea Grid -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:14px">
-          ${filteredIdeas.map(idea => `
+          ${filteredIdeas.map(idea => {
+            const tipKey = idea.type === 'moat_conv' ? 'moat_convergence'
+              : idea.type === 'gap_attack' ? 'gap_attack'
+              : idea.type === 'franchise' ? 'franchise_followup'
+              : idea.type === 'contrarian' ? 'contrarian_take'
+              : idea.type === 'mastery' ? 'mastery_blueprint'
+              : 'concept_match';
+            return `
             <div class="card" style="background:var(--surface-2);border:1px solid var(--border);padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:12px">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                  <span style="font-size:11px;color:var(--text-3)">${idea.formula}</span>
-                  <span class="num" style="font-size:11px;font-weight:500;color:var(--accent)">${idea.score}% Match</span>
+                  <span style="font-size:11px;color:var(--text-3);cursor:pointer" data-tip="${tipKey}">${idea.formula}</span>
+                  <span class="num" style="font-size:11px;font-weight:500;color:var(--accent);cursor:pointer" data-tip="concept_match">${idea.score}% Match</span>
                 </div>
                 <div style="font-size:13px;font-weight:500;color:var(--text-1);line-height:1.4;margin-bottom:6px">${esc(idea.title)}</div>
                 <div style="font-size:11px;color:var(--text-3);line-height:1.4">${esc(idea.reason)}</div>
@@ -801,7 +808,8 @@ function renderStudioLabHtml() {
                   <i data-lucide="flask-conical" style="width:12px;height:12px"></i> Test
                 </button>
               </div>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
         </div>
       </div>
     </div>`;
@@ -819,8 +827,8 @@ function renderStudioPipelineHtml() {
   return `
     <div>
       <!-- Kanban Header Bar -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-        <div style="font-size:12px;color:var(--t3)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px" data-tip="content_pipeline">
+        <div style="font-size:12px;color:var(--t3)" data-tip="pipeline_stages">
           Drag & drop cards between stages, or use stage shift arrows. Published videos auto-sync upon refresh.
         </div>
         <button class="btn btn-acc btn-sm" onclick="openAddPipelineCardModal()">

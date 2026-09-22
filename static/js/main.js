@@ -673,120 +673,72 @@ document.getElementById('cmdInp')?.addEventListener('keydown', e => {
   }
 });
 
-function openShortcutsModal() {
-  document.getElementById('shortcutsModal')?.classList.add('open');
+function openShortcutsModal(tab = 'shortcuts') {
+  document.getElementById('scModal')?.classList.add('open');
+  document.getElementById('scOvrl')?.classList.add('open');
+  switchHelpTab(tab);
 }
 
 function closeShortcutsModal() {
-  document.getElementById('shortcutsModal')?.classList.remove('open');
+  document.getElementById('scModal')?.classList.remove('open');
+  document.getElementById('scOvrl')?.classList.remove('open');
 }
 
-/* ── 09. Spotlight Product Tour Engine ────────────────────────────────────── */
-let tourCurrentStep = 0;
-const tourSteps = [
-  {
-    target: '#sec-hero',
-    lbl: 'Step 1 of 6 • Command Hero Strip',
-    title: 'Your Channel Pulse',
-    body: 'Monitor live sub targets, next milestone progress, and view velocity metrics in one unified strip.'
-  },
-  {
-    target: '#sec-yvf',
-    lbl: 'Step 2 of 6 • You vs Field',
-    title: 'Rank Ladder & Benchmarking',
-    body: 'Inspect your exact position across the tracked field with automated algorithmic insights.'
-  },
-  {
-    target: '#sec-drops',
-    lbl: 'Step 3 of 6 • Latest Drops',
-    title: 'Real-time Release Race',
-    body: 'See who is publishing what right now, ranked by instant 24h upload velocity.'
-  },
-  {
-    target: '#sec-radar',
-    lbl: 'Step 4 of 6 • Topic Intelligence',
-    title: 'Niche Topic Heatmap',
-    body: 'Discover surge topics, breakout trends, and which competitor owns what keyword niche.'
-  },
-  {
-    target: '#sec-timing',
-    lbl: 'Step 5 of 6 • Timing Heatmap',
-    title: 'Optimal Release Windows',
-    body: 'Find high-viewer activity time slots tailored to your audience to maximize drop performance.'
-  },
-  {
-    target: '#sec-hero',
-    lbl: 'Step 6 of 6 • Deep Dive Inspector',
-    title: 'Deep Channel Forensics',
-    body: 'Click any channel strip or leaderboard row to open 5-tab deep analytics and series detection.'
+function renderGlossaryList(query = '') {
+  const container = document.getElementById('glossaryTermsList');
+  if (!container || !window.GLOSSARY) return;
+
+  const q = (query || '').toLowerCase().trim();
+  const entries = Object.entries(window.GLOSSARY);
+
+  const filtered = q
+    ? entries.filter(([k, v]) =>
+        v.title.toLowerCase().includes(q) ||
+        v.p.toLowerCase().includes(q) ||
+        (v.category && v.category.toLowerCase().includes(q)) ||
+        (v.calc && v.calc.toLowerCase().includes(q))
+      )
+    : entries;
+
+  if (!filtered.length) {
+    container.innerHTML = `<div style="text-align:center;padding:24px 12px;color:var(--text-3);font-size:12px">No metrics or terms matching "${esc(query)}"</div>`;
+    return;
   }
-];
 
-function startSpotlightTour() {
-  tourCurrentStep = 0;
-  const overlay = document.getElementById('spotlightOverlay');
-  const card = document.getElementById('spotlightCard');
-  if (overlay) overlay.style.display = 'block';
-  if (card) card.style.display = 'block';
-  renderTourStep();
-}
+  const categories = {};
+  filtered.forEach(([key, term]) => {
+    const cat = term.category || 'General';
+    if (!categories[cat]) categories[cat] = [];
+    categories[cat].push({ key, ...term });
+  });
 
-function renderTourStep() {
-  const step = tourSteps[tourCurrentStep];
-  if (!step) return;
-
-  const targetEl = document.querySelector(step.target);
-  const cardEl = document.getElementById('spotlightCard');
-
-  const lblEl = document.getElementById('spotlightStepLbl');
-  const titleEl = document.getElementById('spotlightTitle');
-  const bodyEl = document.getElementById('spotlightBody');
-  const prevBtn = document.getElementById('tourPrevBtn');
-  const nextBtn = document.getElementById('tourNextBtn');
-
-  if (lblEl) lblEl.textContent = step.lbl;
-  if (titleEl) titleEl.textContent = step.title;
-  if (bodyEl) bodyEl.textContent = step.body;
-
-  if (prevBtn) prevBtn.style.display = tourCurrentStep === 0 ? 'none' : 'block';
-  if (nextBtn) nextBtn.textContent = tourCurrentStep === tourSteps.length - 1 ? 'Finish 🎉' : 'Next →';
-
-  if (targetEl && cardEl) {
-    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setTimeout(() => {
-      const rect = targetEl.getBoundingClientRect();
-      const cardWidth = Math.min(320, window.innerWidth - 24);
-      const cardLeft = Math.max(12, Math.min(window.innerWidth - cardWidth - 12, rect.left));
-      const cardTop = Math.max(70, Math.min(window.innerHeight - 240, rect.bottom + 12));
-      cardEl.style.width = cardWidth + 'px';
-      cardEl.style.top = cardTop + 'px';
-      cardEl.style.left = cardLeft + 'px';
-    }, 150);
+  let html = '';
+  for (const [catName, items] of Object.entries(categories)) {
+    html += `
+      <div style="margin-top:6px;margin-bottom:4px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:6px">${esc(catName)}</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${items.map(item => `
+            <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+                <strong style="color:var(--text-1);font-size:12.5px">${esc(item.title)}</strong>
+                <button class="ui-tip-link" onclick="closeShortcutsModal();window.openMetricSheet('${esc(item.key)}')" style="font-size:11px">
+                  View formula & guide →
+                </button>
+              </div>
+              <div style="color:var(--text-2);font-size:11.5px;line-height:1.45;margin-bottom:6px">${item.p}</div>
+              <div style="font-size:11px;color:var(--text-3);background:var(--surface-1);border:1px solid var(--border);border-radius:var(--r-xs);padding:4px 8px;font-family:var(--f-mono);overflow-x:auto">
+                ${esc(item.calc)}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
   }
-}
 
-function nextTourStep() {
-  if (tourCurrentStep < tourSteps.length - 1) {
-    tourCurrentStep++;
-    renderTourStep();
-  } else {
-    skipTour();
-  }
-}
-
-function prevTourStep() {
-  if (tourCurrentStep > 0) {
-    tourCurrentStep--;
-    renderTourStep();
-  }
-}
-
-function skipTour() {
-  const overlay = document.getElementById('spotlightOverlay');
-  const card = document.getElementById('spotlightCard');
-  if (overlay) overlay.style.display = 'none';
-  if (card) card.style.display = 'none';
-  try { localStorage.setItem('yt_tour_completed', '1'); } catch { }
+  container.innerHTML = html;
+  if (window.lucide) window.lucide.createIcons();
 }
 
 function switchHelpTab(tab) {
@@ -796,7 +748,12 @@ function switchHelpTab(tab) {
   const p1 = document.getElementById('helpPanelShortcuts');
   const p2 = document.getElementById('helpPanelGlossary');
   if (p1) p1.style.display = isShortcuts ? 'flex' : 'none';
-  if (p2) p2.style.display = !isShortcuts ? 'flex' : 'none';
+  if (p2) {
+    p2.style.display = !isShortcuts ? 'flex' : 'none';
+    if (!isShortcuts) {
+      renderGlossaryList(document.getElementById('glossarySearchInput')?.value || '');
+    }
+  }
 }
 
 /* ── W1.1 Section Scroll-Spy (Dots-Only Default, Focal Point Tracking) ──────── */

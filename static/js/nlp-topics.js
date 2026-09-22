@@ -436,13 +436,13 @@ async function renderTopicRadarPage() {
     <div style="margin-bottom:24px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:12px">
         <div>
-          <div style="font-size:16px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px">
+          <div style="font-size:16px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px" data-tip="topic_opportunities">
             <i data-lucide="sparkles" style="width:16px;height:16px;color:var(--accent)"></i>
             <span>Top High-Leverage Opportunities</span>
           </div>
           <div style="font-size:12px;color:var(--text-3);margin-top:2px">Prioritized topics with high viewer demand and untapped niche angles</div>
         </div>
-        <button class="btn btn-gh btn-sm" onclick="buildTopicCache(true);renderTopicRadarPage();">
+        <button class="btn btn-gh btn-sm" onclick="buildTopicCache(true);renderTopicRadarPage();" data-tip="reindex_topics">
           <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Re-index Topics
         </button>
       </div>
@@ -454,19 +454,19 @@ async function renderTopicRadarPage() {
             <div class="card" style="padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:12px">
               <div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-                  <div style="font-size:14px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(t.topic)}">
+                  <div style="font-size:14px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(t.topic)}" data-tip="topic_keyword">
                     #${i + 1} ${capWords(t.topic)}
                   </div>
-                  <span style="font-size:11px;font-weight:500;color:${t.quadrant === 'blue_ocean' ? 'var(--pos)' : 'var(--accent)'}">
+                  <span style="font-size:11px;font-weight:500;color:${t.quadrant === 'blue_ocean' ? 'var(--pos)' : 'var(--accent)'}" data-tip="untapped_status">
                     ${t.quadrant === 'blue_ocean' ? 'Untapped' : 'High Demand'}
                   </span>
                 </div>
                 <div style="font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:6px">
-                  <strong class="num" style="color:var(--text-1)">${fmtN(t.avgViews)}</strong> avg views
+                  <span data-tip="topic_avg_views"><strong class="num" style="color:var(--text-1)">${fmtN(t.avgViews)}</strong> avg views</span>
                   <span>·</span>
-                  <span>${t.n} competitor vids</span>
+                  <span data-tip="niche_frequency">${t.n} competitor vids</span>
                   <span>·</span>
-                  <span style="color:${myUploads > 0 ? 'var(--text-2)' : 'var(--accent)'}">${myUploads > 0 ? `${myUploads} by you` : '0 by you'}</span>
+                  <span data-tip="topic_coverage" style="color:${myUploads > 0 ? 'var(--text-2)' : 'var(--accent)'}">${myUploads > 0 ? `${myUploads} by you` : '0 by you'}</span>
                 </div>
               </div>
 
@@ -512,10 +512,10 @@ async function renderTopicRadarPage() {
           <input type="text" style="width:100%;padding:6px 10px 6px 32px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-1);font-size:12px;outline:none" placeholder="Search ${allTopicsList.length} niche topics…" value="${esc(radarSearchQuery)}" oninput="filterRadarTopics(this.value)">
         </div>
         <div style="display:flex;align-items:center;gap:6px">
-          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'all' ? 'active' : ''}" onclick="setRadarQuadrantFilter('all')">All (${allTopicsList.length})</button>
-          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'blue_ocean' ? 'active' : ''}" onclick="setRadarQuadrantFilter('blue_ocean')">Untapped</button>
-          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'red_ocean' ? 'active' : ''}" onclick="setRadarQuadrantFilter('red_ocean')">High Demand</button>
-          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'emerging' ? 'active' : ''}" onclick="setRadarQuadrantFilter('emerging')">Emerging</button>
+          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'all' ? 'active' : ''}" onclick="setRadarQuadrantFilter('all')" data-tip="quad_all">All (${allTopicsList.length})</button>
+          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'blue_ocean' ? 'active' : ''}" onclick="setRadarQuadrantFilter('blue_ocean')" data-tip="quad_untapped">Untapped</button>
+          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'red_ocean' ? 'active' : ''}" onclick="setRadarQuadrantFilter('red_ocean')" data-tip="quad_high_demand">High Demand</button>
+          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'emerging' ? 'active' : ''}" onclick="setRadarQuadrantFilter('emerging')" data-tip="quad_emerging">Emerging</button>
         </div>
       </div>
 
@@ -523,11 +523,11 @@ async function renderTopicRadarPage() {
       <table class="data-table">
         <thead>
           <tr>
-            <th style="min-width:180px">Topic</th>
-            <th class="num" style="min-width:110px">Avg Views ▾</th>
-            <th style="text-align:center;min-width:110px">Niche Frequency</th>
-            <th style="text-align:center;min-width:110px">Your Coverage</th>
-            <th style="text-align:center;min-width:110px">Status</th>
+            <th style="min-width:180px" data-tip="topic_keyword">Topic</th>
+            <th class="num" style="min-width:110px" data-tip="topic_avg_views">Avg Views ▾</th>
+            <th style="text-align:center;min-width:110px" data-tip="niche_frequency">Niche Frequency</th>
+            <th style="text-align:center;min-width:110px" data-tip="topic_coverage">Your Coverage</th>
+            <th style="text-align:center;min-width:110px" data-tip="untapped_status">Status</th>
             <th style="text-align:center;width:120px"></th>
           </tr>
         </thead>
@@ -537,18 +537,18 @@ async function renderTopicRadarPage() {
             return `
               <tr>
                 <td>
-                  <strong style="color:var(--text-1);font-weight:500">${capWords(t.topic)}</strong>
+                  <strong style="color:var(--text-1);font-weight:500" data-tip="topic_keyword">${capWords(t.topic)}</strong>
                 </td>
-                <td class="num" style="font-weight:500;color:var(--text-1)">
+                <td class="num" style="font-weight:500;color:var(--text-1)" data-tip="topic_avg_views">
                   ${fmtN(t.avgViews)}
                 </td>
-                <td style="text-align:center;color:var(--text-2)">
+                <td style="text-align:center;color:var(--text-2)" data-tip="niche_frequency">
                   ${t.n} drops
                 </td>
-                <td style="text-align:center;color:${myUploads > 0 ? 'var(--text-2)' : 'var(--accent)'}">
+                <td style="text-align:center;color:${myUploads > 0 ? 'var(--text-2)' : 'var(--accent)'}" data-tip="topic_coverage">
                   ${myUploads > 0 ? `${myUploads} videos` : '0 (Untapped)'}
                 </td>
-                <td style="text-align:center">
+                <td style="text-align:center" data-tip="untapped_status">
                   <span style="font-size:11px;color:${t.quadrant === 'blue_ocean' ? 'var(--pos)' : t.quadrant === 'red_ocean' ? 'var(--accent)' : 'var(--text-3)'}">
                     ${t.quadrant === 'blue_ocean' ? 'Opportunity' : t.quadrant === 'red_ocean' ? 'High Demand' : 'Emerging'}
                   </span>
@@ -558,7 +558,7 @@ async function renderTopicRadarPage() {
                     <button class="btn btn-gh btn-sm" style="padding:3px 8px;font-size:11px" onclick="openTitleLabWithTopic('${esc(t.topic)}')">
                       <i data-lucide="flask-conical" style="width:12px;height:12px"></i> Studio
                     </button>
-                    <button class="icon-btn" style="width:26px;height:26px" onclick="openAiTitleSynthesizer('${esc(t.topic)}')" title="Generate Titles">
+                    <button class="icon-btn" style="width:26px;height:26px" onclick="openAiTitleSynthesizer('${esc(t.topic)}')" title="Generate Titles" data-tip="ai_synthesizer">
                       <i data-lucide="sparkles" style="width:12px;height:12px"></i>
                     </button>
                   </div>

@@ -336,19 +336,14 @@
     </div>
 
     <!-- Panel 2: Metric Glossary -->
-    <div id="helpPanelGlossary" style="display:none;flex-direction:column;gap:12px;max-height:60vh;overflow-y:auto;font-size:12px">
-      <div class="glossary-item">
-        <div style="font-weight:700;color:var(--acc);margin-bottom:2px">Velocity (/day)</div>
-        <div style="color:var(--t2);line-height:1.4">Views accrued per day ($views / age$). Measures current virality velocity rather than lifetime cumulative total.</div>
+    <div id="helpPanelGlossary" style="display:none;flex-direction:column;gap:12px;max-height:65vh;font-size:12.5px">
+      <div style="position:relative;margin-bottom:6px">
+        <i data-lucide="search" style="width:13px;height:13px;color:var(--text-3);position:absolute;left:10px;top:50%;transform:translateY(-50%)"></i>
+        <input type="text" id="glossarySearchInput" placeholder="Search metrics, formulas, or concepts…"
+          style="width:100%;padding:7px 10px 7px 30px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-1);font-size:12px;outline:none"
+          oninput="renderGlossaryList(this.value)" />
       </div>
-      <div class="glossary-item">
-        <div style="font-weight:700;color:var(--up);margin-bottom:2px">Topic Momentum</div>
-        <div style="color:var(--t2);line-height:1.4">Ratio of recent average views to older historical views for a topic ($>1.2\times$ = surging trend).</div>
-      </div>
-      <div class="glossary-item">
-        <div style="font-weight:700;color:var(--warn);margin-bottom:2px">Topic Overlap (Affinity)</div>
-        <div style="color:var(--t2);line-height:1.4">Shared topic percentage comparing your catalog against a competitor's uploads.</div>
-      </div>
+      <div id="glossaryTermsList" style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;max-height:52vh;padding-right:4px"></div>
     </div>
   </div>
 
