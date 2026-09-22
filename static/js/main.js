@@ -816,7 +816,38 @@ function scrollToSection(id) {
 
 /* ── 10. Global Shortcuts & Init ──────────────────────────────────────────── */
 document.addEventListener('keydown', e => {
-  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+  if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+    if (e.key === 'Escape') {
+      document.activeElement.blur();
+    }
+    return;
+  }
+
+  if (e.key === '1') {
+    e.preventDefault();
+    sp('dash');
+    return;
+  }
+
+  if (e.key === '2') {
+    e.preventDefault();
+    sp('channels');
+    return;
+  }
+
+  if (e.key === '3') {
+    e.preventDefault();
+    sp('radar');
+    return;
+  }
+
+  if (e.key === '4') {
+    e.preventDefault();
+    sp('studio');
+    return;
+  }
+
+  if (e.key === '/') {
     e.preventDefault();
     sp('search');
     return;
@@ -828,19 +859,19 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  if (e.key === '?' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+  if (e.key === '?') {
     e.preventDefault();
     openShortcutsModal();
     return;
   }
 
-  if (e.key === '[' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+  if (e.key === '[') {
     e.preventDefault();
     setDensity('compact');
     return;
   }
 
-  if (e.key === ']' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+  if (e.key === ']') {
     e.preventDefault();
     setDensity('comfortable');
     return;
