@@ -58,10 +58,11 @@ function genNextBestAction(primary, allChannels) {
   const cand1 = {
     id: 'nba_timing_topic',
     type: 'Timing Synergy',
-    icon: 'schedule',
-    title: topTopic ? `Drop "${topTopic}" in your Peak Slot` : 'Peak Publishing Window',
-    sub: bestSlots.length ? `${bestSlots[0].day} @ ${bestSlots[0].hour}:00 · High audience receptivity` : 'High weekend viewer surge window detected',
-    actionText: '→ Pipeline',
+    icon: 'sparkles',
+    title: topTopic ? `Drop "${topTopic}" in your Peak Slot` : 'Peak Publishing Window Detected',
+    sub: bestSlots.length ? `Audience is most receptive ${bestSlots[0].day} at ${bestSlots[0].hour}:00.` : 'High viewer surge window detected across your niche cohort.',
+    whyLink: `openDeepDive('${primary?.id || ""}', 'timing')`,
+    actionText: 'Plan in Studio',
     actionFn: `addNBAToPipeline('${esc(topTopic || "Peak Slot Upload")}', 'Timing Synergy', 'nba_timing_topic')`
   };
 
@@ -69,12 +70,13 @@ function genNextBestAction(primary, allChannels) {
   const gapTopic = hotTopics.find(t => !t.channelCounts?.[primary?.id] && t.n >= 2);
   const cand2 = {
     id: 'nba_gap_attack',
-    type: 'Gap Attack',
-    icon: 'radar',
-    title: gapTopic ? `Unclaimed Field Topic: "${gapTopic.name}"` : 'Topic Gap Attack Opportunity',
+    type: 'Topic Gap',
+    icon: 'sparkles',
+    title: gapTopic ? `Unclaimed Niche Topic: "${gapTopic.name}"` : 'Topic Gap Attack Opportunity',
     sub: 'Competitors are gaining traction on this topic while your catalog has 0 coverage.',
-    actionText: '→ Pipeline',
-    actionFn: `addNBAToPipeline('${esc(gapTopic?.name || "Topic Gap")}', 'Gap Attack', 'nba_gap_attack')`
+    whyLink: `sp('topics')`,
+    actionText: 'Plan in Studio',
+    actionFn: `addNBAToPipeline('${esc(gapTopic?.name || "Topic Gap")}', 'Topic Gap', 'nba_gap_attack')`
   };
 
   // Priority 3: Cadence Alert
@@ -83,21 +85,23 @@ function genNextBestAction(primary, allChannels) {
   const daysSince = lastVid ? Math.floor((Date.now() - new Date(lastVid.published_at || lastVid.date).getTime()) / 864e5) : 0;
   const cand3 = {
     id: 'nba_cadence_alert',
-    type: 'Cadence Optimizer',
-    icon: 'timer',
-    title: daysSince >= 7 ? `${daysSince}d Since Last Upload` : 'Maintain Upload Cadence',
-    sub: daysSince >= 7 ? 'Field upload velocity is outpacing your current release rhythm.' : 'You are sustaining steady momentum across your niche cohort.',
-    actionText: '→ Pipeline',
-    actionFn: `addNBAToPipeline('Next High-Impact Upload', 'Cadence Optimizer', 'nba_cadence_alert')`
+    type: 'Cadence Rhythm',
+    icon: 'sparkles',
+    title: daysSince >= 7 ? `Upload overdue (${daysSince}d since last drop)` : 'Maintain Upload Rhythm',
+    sub: daysSince >= 7 ? 'Cohort upload velocity is outpacing your current release cadence.' : 'You are sustaining steady momentum across your niche cohort.',
+    whyLink: `openDeepDive('${primary?.id || ""}', 'overview')`,
+    actionText: 'Plan in Studio',
+    actionFn: `addNBAToPipeline('Next High-Impact Upload', 'Cadence Rhythm', 'nba_cadence_alert')`
   };
 
   // Priority 4: Evergreen Fallback
   const fallback = {
     id: 'nba_evergreen',
-    type: 'Next Best Action',
-    icon: 'auto_awesome',
-    title: 'Maintain Channel Momentum',
-    sub: 'Plan your next title concept in Studio to keep your audience engaged.',
+    type: 'Title Optimization',
+    icon: 'sparkles',
+    title: 'Plan next high-leverage title in Studio',
+    sub: 'Test title concepts and keyword formulations against niche benchmarks.',
+    whyLink: `sp('studio')`,
     actionText: 'Open Studio',
     actionFn: `sp('studio')`
   };
@@ -133,9 +137,9 @@ async function renderDash() {
   if (!primary) {
     el.innerHTML = `
       <div class="empty card rev in" style="padding:48px 24px;text-align:center;max-width:540px;margin:40px auto">
-        <div class="empty-ico" style="width:48px;height:48px;border-radius:50%;background:var(--bg-3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><i data-lucide="tv" style="width:24px;height:24px;color:var(--t2)"></i></div>
-        <h3 style="font-family:var(--f-disp);font-size:18px;font-weight:700;color:var(--t1);margin-bottom:8px">No Tracked Channels Yet</h3>
-        <p style="color:var(--t3);font-size:13px;line-height:1.5;margin-bottom:20px">Add your primary YouTube channel or competitor channels to unlock real-time forensics and gap intelligence.</p>
+        <div class="empty-ico" style="width:48px;height:48px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><i data-lucide="tv" style="width:24px;height:24px;color:var(--text-2)"></i></div>
+        <h3 style="font-size:16px;font-weight:600;color:var(--text-1);margin-bottom:8px">No Tracked Channels Yet</h3>
+        <p style="color:var(--text-3);font-size:13px;line-height:1.5;margin-bottom:20px">Add your primary YouTube channel or competitor channels to benchmark performance and detect topic overlap.</p>
         <button class="btn btn-acc" onclick="sp('channels')"><i data-lucide="plus" style="width:14px;height:14px"></i> Add Channels</button>
       </div>`;
     if (window.lucide) window.lucide.createIcons();
@@ -144,144 +148,146 @@ async function renderDash() {
 
   const primaryEnrich = await enrich(primary.id) || {};
   
-  // Background enrich competitor channels so topic radar & competitor feed populate smoothly
+  // Background enrich competitor channels so topic radar populates smoothly
   all.forEach(c => {
     if (c.id !== primary.id && !_enrichCache[c.id]) {
       enrich(c.id).then(() => {
         buildTopicCache();
-        loadDashboardCompetitorDrops(primary.id);
       }).catch(() => {});
     }
   });
 
   const subRaw = primary.subscribers_raw || 0;
-  const stones = [1e3, 5e3, 10e3, 25e3, 50e3, 100e3, 250e3, 500e3, 1e6, 2e6, 5e6, 10e6, 50e6, 100e6];
-  const nextMilestone = stones.find(s => s > subRaw) || subRaw;
-  const msPct = nextMilestone > subRaw ? Math.min(99, Math.round((subRaw / nextMilestone) * 100)) : 100;
+  const totSubs = all.reduce((s, c) => s + (c.subscribers_raw || 0), 0);
+  const myShare = (totSubs > 0) ? (((subRaw) / totSubs) * 100).toFixed(1) + '%' : '—';
   
   const sortedSubs = [...all].sort((a, b) => (b.subscribers_raw || 0) - (a.subscribers_raw || 0));
   const subRank = sortedSubs.findIndex(c => c.id === primary.id) + 1;
-  const engRate = primaryEnrich.engagement ?? 0;
-  const engGaugePct = Math.min(100, Math.round((engRate / 10) * 100));
+
+  const vids = primaryEnrich.vids || [];
+  const lastVid = vids[0] || primaryEnrich.latestVideo;
+  const daysSince = lastVid ? Math.floor((Date.now() - new Date(lastVid.published_at || lastVid.date).getTime()) / 864e5) : 0;
+  const now = Date.now();
+  const vids30d = vids.filter(v => (now - new Date(v.published_at || v.date).getTime()) <= 30 * 864e5).length;
 
   // Next Best Action prescription
   const nba = genNextBestAction(primary, all);
 
-  // 1. Executive Hero Banner
+  // 1. Executive Hero Header
   const heroHtml = `
-    <div class="dash-hero-banner rev">
-      <div class="dash-hero-left" onclick="openDeepDive('${esc(primary.id)}')">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openDeepDive('${esc(primary.id)}')">
         ${primary.logo_url
-          ? `<img class="dash-hero-avatar" src="${esc(proxyImg(primary.logo_url))}" alt="">`
-          : `<div class="dash-hero-avatar-fb">${(primary.name || '?')[0].toUpperCase()}</div>`}
-        <div class="dash-hero-info">
-          <div class="dash-hero-title-row">
-            <span class="dash-hero-name">${esc(primary.name)}</span>
-            <span class="badge bdg-gd">Primary Channel</span>
+          ? `<img src="${esc(proxyImg(primary.logo_url))}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" alt="">`
+          : `<div style="width:40px;height:40px;border-radius:50%;background:var(--surface-3);color:var(--text-1);font-weight:600;display:flex;align-items:center;justify-content:center;font-size:15px">${(primary.name || '?')[0].toUpperCase()}</div>`}
+        <div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px;font-weight:600;color:var(--text-1)">${esc(primary.name)}</span>
+            <span style="font-size:11px;color:var(--accent);font-weight:500">(Primary)</span>
           </div>
-          <div class="dash-hero-meta">
-            ${primary.handle ? `<span>${esc(primary.handle)}</span> <span>•</span>` : ''}
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px">
+            ${primary.handle ? `<span>${esc(primary.handle)}</span> · ` : ''}
             <span>Rank #${subRank} of ${all.length} in cohort</span>
-            <span>•</span>
-            <span class="card-prov" onclick="event.stopPropagation();refreshOne('${primary.id}').then(()=>renderDash())">Live Synced</span>
           </div>
         </div>
       </div>
 
-      <div class="dash-hero-nba">
-        <div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--r-s);background:rgba(59,130,246,0.12);color:var(--acc);flex-shrink:0">
-          <i data-lucide="sparkles" style="width:16px;height:16px"></i>
-        </div>
-        <div class="dash-hero-nba-content">
-          <div class="dash-hero-nba-tag">Strategic Prescription · ${esc(nba.type)}</div>
-          <div class="dash-hero-nba-text" title="${esc(nba.title)}">${esc(nba.title)}</div>
-        </div>
-        <button class="btn btn-acc btn-sm" style="flex-shrink:0;padding:5px 10px;font-size:11px" onclick="event.stopPropagation();${nba.actionFn}">
-          ${esc(nba.actionText)}
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-gh btn-sm" onclick="refreshOne('${primary.id}').then(()=>renderDash())">
+          <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Sync
+        </button>
+        <button class="btn btn-gh btn-sm" onclick="openDeepDive('${esc(primary.id)}')">
+          <i data-lucide="compass" style="width:13px;height:13px"></i> Channel Deep Dive
         </button>
       </div>
     </div>`;
 
-  // 2. Executive KPI Grid (4 Metrics)
+  // 2. Next-step recommendation Card
+  const nbaHtml = `
+    <div class="card" style="padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:var(--surface-1);border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:12px;min-width:0">
+        <div style="width:32px;height:32px;border-radius:var(--r-sm);background:rgba(102,114,245,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="sparkles" style="width:16px;height:16px"></i>
+        </div>
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:500;color:var(--text-1);display:flex;align-items:center;gap:8px">
+            <span>${esc(nba.title)}</span>
+            <a href="javascript:void(0)" onclick="${nba.whyLink}" style="font-size:11.5px;color:var(--accent);text-decoration:underline">Why?</a>
+          </div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px">${esc(nba.sub)}</div>
+        </div>
+      </div>
+      <button class="btn btn-acc btn-sm" style="flex-shrink:0" onclick="${nba.actionFn}">
+        <i data-lucide="arrow-right" style="width:13px;height:13px"></i>
+        ${esc(nba.actionText)}
+      </button>
+    </div>`;
+
+  // 3. 4 KPI Grid (Subscribers, 30d Views, Upload Cadence, Niche Share)
   const kpiHtml = `
-    <div class="dash-kpi-grid rev" style="--i:1">
+    <div class="dash-kpi-grid" style="margin-bottom:24px">
       <!-- KPI 1: Subscribers -->
-      <div class="kpi-card">
+      <div class="kpi-card" data-tip="subscribers">
         <div class="kpi-hdr">
           <span>Subscribers</span>
-          <i data-lucide="users" style="width:14px;height:14px;color:var(--t3)"></i>
+          <i data-lucide="users" style="width:14px;height:14px;color:var(--text-3)"></i>
         </div>
-        <div class="kpi-val count-val" data-val="${primary.subscribers_raw || 0}">${esc(primary.subscribers)}</div>
+        <div class="kpi-val">${esc(primary.subscribers)}</div>
         <div class="kpi-foot">
-          <div style="flex:1;margin-right:10px">
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-bottom:3px">
-              <span>Next Target: ${fmtN(nextMilestone)}</span>
-              <span>${msPct}%</span>
-            </div>
-            <div class="gauge-bar" style="height:4px"><div class="gauge-fill" style="width:${msPct}%"></div></div>
-          </div>
+          <span>Rank #${subRank} of ${all.length} in cohort</span>
         </div>
       </div>
 
-      <!-- KPI 2: Total Views -->
-      <div class="kpi-card">
+      <!-- KPI 2: Total Views / 30d Velocity -->
+      <div class="kpi-card" data-tip="views_velocity">
         <div class="kpi-hdr">
           <span>Total Views</span>
-          <i data-lucide="eye" style="width:14px;height:14px;color:var(--t3)"></i>
+          <i data-lucide="eye" style="width:14px;height:14px;color:var(--text-3)"></i>
         </div>
-        <div class="kpi-val count-val" data-val="${primary.total_views_raw || 0}">${esc(primary.total_views)}</div>
+        <div class="kpi-val">${esc(primary.total_views)}</div>
         <div class="kpi-foot">
-          <span style="color:var(--t3)">30-day velocity delta</span>
-          <span>${fmtDelta(primaryEnrich.momDelta || 0)}</span>
+          <span style="color:${(primaryEnrich.momDelta || 0) >= 0 ? 'var(--pos)' : 'var(--neg)'}">${fmtDelta(primaryEnrich.momDelta || 0)} 30d velocity</span>
         </div>
       </div>
 
-      <!-- KPI 3: Avg Views per Upload -->
-      <div class="kpi-card">
+      <!-- KPI 3: Upload Cadence -->
+      <div class="kpi-card" data-tip="cadence">
         <div class="kpi-hdr">
-          <span>Avg Views / Video</span>
-          <i data-lucide="bar-chart-2" style="width:14px;height:14px;color:var(--t3)"></i>
+          <span>Upload Cadence</span>
+          <i data-lucide="clock" style="width:14px;height:14px;color:var(--text-3)"></i>
         </div>
-        <div class="kpi-val count-val" data-val="${primary.avg_views_raw || 0}">${esc(primary.avg_views)}</div>
+        <div class="kpi-val">${daysSince === 0 ? 'Today' : `${daysSince}d ago`}</div>
         <div class="kpi-foot">
-          <span style="color:var(--t3)">Channel View Efficiency</span>
-          <span class="badge bdg-dim" style="font-size:10px">Niche Benchmark</span>
+          <span>${vids30d} ${vids30d === 1 ? 'upload' : 'uploads'} in last 30 days</span>
         </div>
       </div>
 
-      <!-- KPI 4: Audience Engagement -->
-      <div class="kpi-card">
+      <!-- KPI 4: Niche Share -->
+      <div class="kpi-card" data-tip="niche_share">
         <div class="kpi-hdr">
-          <span>Audience Engagement</span>
-          <i data-lucide="zap" style="width:14px;height:14px;color:var(--t3)"></i>
+          <span>Niche Share</span>
+          <i data-lucide="pie-chart" style="width:14px;height:14px;color:var(--text-3)"></i>
         </div>
-        <div class="kpi-val">${engRate}%</div>
+        <div class="kpi-val">${myShare}</div>
         <div class="kpi-foot">
-          <div style="flex:1;margin-right:10px">
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-bottom:3px">
-              <span>Active Response</span>
-              <span class="badge bdg-dim">${engRate >= 4 ? 'High' : 'Healthy'}</span>
-            </div>
-            <div class="gauge-bar" style="height:4px"><div class="gauge-fill" style="width:${engGaugePct}%;background:var(--acc)"></div></div>
-          </div>
+          <span>of cohort combined audience</span>
         </div>
       </div>
     </div>`;
 
-  // 3. Interactive Growth Trajectory Curve (Chart.js)
+  // 4. Growth Trajectory Curve (Chart.js)
   const chartHtml = `
-    <div class="dash-chart-card rev" style="--i:2">
+    <div class="dash-chart-card">
       <div class="dash-chart-hdr">
         <div class="dash-chart-title">
-          <i data-lucide="trending-up" style="width:16px;height:16px;color:var(--acc)"></i>
-          <span>30-Day Performance Trajectory</span>
+          <i data-lucide="trending-up" style="width:16px;height:16px;color:var(--accent)"></i>
+          <span>Performance Trajectory</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <div class="race-seg">
             <button class="race-seg-btn ${currentChartMetric === 'views' ? 'on' : ''}" onclick="toggleDashChartMetric('views')">Views Velocity</button>
             <button class="race-seg-btn ${currentChartMetric === 'cadence' ? 'on' : ''}" onclick="toggleDashChartMetric('cadence')">Upload Cadence</button>
           </div>
-          <span class="card-prov" onclick="refreshOne('${primary.id}').then(()=>renderDash())">Sync Curve</span>
         </div>
       </div>
       <div class="chart-canvas-wrap">
@@ -289,62 +295,33 @@ async function renderDash() {
       </div>
     </div>`;
 
-  // 4. 2-Column Activity Forensics Split
+  // 5. Recent Uploads Forensics
   const activityHtml = `
-    <div class="dash-activity-grid rev" style="--i:3">
-      <!-- Left Column: Your Recent Uploads Forensics -->
-      <div class="activity-col">
-        <div class="activity-col-hdr">
-          <div class="activity-col-title">
-            <i data-lucide="play-circle" style="width:15px;height:15px;color:var(--acc)"></i>
-            <span>Your Recent Uploads</span>
-          </div>
-          <button class="btn btn-gh btn-sm" onclick="openDeepDive('${esc(primary.id)}')" style="font-size:11px;padding:3px 8px">
-            Inspect All <i data-lucide="arrow-right" style="width:12px;height:12px"></i>
-          </button>
+    <div class="card" style="padding:20px;margin-bottom:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid var(--border);margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <i data-lucide="play-circle" style="width:16px;height:16px;color:var(--accent)"></i>
+          <span style="font-size:14px;font-weight:600;color:var(--text-1)">Recent Uploads</span>
         </div>
-        <div class="video-forensic-list" id="dashRecentUploads">
-          <div style="display:flex;flex-direction:column;gap:8px;padding:8px 0">
-            <div class="skel" style="height:48px;border-radius:var(--r-m)"></div>
-            <div class="skel" style="height:48px;border-radius:var(--r-m)"></div>
-            <div class="skel" style="height:48px;border-radius:var(--r-m)"></div>
-          </div>
-        </div>
+        <button class="btn btn-gh btn-sm" onclick="openDeepDive('${esc(primary.id)}', 'videos')">
+          All Videos <i data-lucide="arrow-right" style="width:12px;height:12px"></i>
+        </button>
       </div>
-
-      <!-- Right Column: Competitor Drops Radar Feed -->
-      <div class="activity-col">
-        <div class="activity-col-hdr">
-          <div class="activity-col-title">
-            <i data-lucide="radar" style="width:15px;height:15px;color:var(--warn)"></i>
-            <span>Competitor Activity Feed</span>
-          </div>
-          <button class="btn btn-gh btn-sm" onclick="sp('channels')" style="font-size:11px;padding:3px 8px">
-            Competitor Grid <i data-lucide="arrow-right" style="width:12px;height:12px"></i>
-          </button>
-        </div>
-        <div class="competitor-drop-list" id="dashCompetitorDrops">
-          <div style="display:flex;flex-direction:column;gap:8px;padding:8px 0">
-            <div class="skel" style="height:48px;border-radius:var(--r-m)"></div>
-            <div class="skel" style="height:48px;border-radius:var(--r-m)"></div>
-            <div class="skel" style="height:48px;border-radius:var(--r-m)"></div>
-          </div>
+      <div id="dashRecentUploads">
+        <div style="display:flex;flex-direction:column;gap:8px;padding:8px 0">
+          <div class="skel" style="height:44px;border-radius:var(--r-sm)"></div>
+          <div class="skel" style="height:44px;border-radius:var(--r-sm)"></div>
+          <div class="skel" style="height:44px;border-radius:var(--r-sm)"></div>
         </div>
       </div>
     </div>`;
 
-  el.innerHTML = heroHtml + kpiHtml + chartHtml + activityHtml;
+  el.innerHTML = heroHtml + nbaHtml + kpiHtml + chartHtml + activityHtml;
 
   if (window.lucide) window.lucide.createIcons();
 
-  document.querySelectorAll('.count-val').forEach(valEl => {
-    countUp(valEl, valEl.dataset.val);
-  });
-
   renderOverviewGrowthChart(primaryEnrich, primary);
   loadDashboardRecentUploads(primary.id);
-  loadDashboardCompetitorDrops(primary.id);
-  setupScrollReveal();
 }
 
 function toggleDashChartMetric(metric) {
@@ -1209,44 +1186,43 @@ async function loadDashboardRecentUploads(primaryId) {
       const ratio = avgViews > 0 ? (vc / avgViews) : 1;
       let badgeHtml = '';
       if (ratio >= 1.3) {
-        badgeHtml = `<span class="badge bdg-gr" style="font-size:9.5px;padding:1px 6px">▲ ${(ratio).toFixed(1)}× avg</span>`;
+        badgeHtml = `<span style="font-size:11px;color:var(--pos);font-weight:500">+${((ratio - 1) * 100).toFixed(0)}% vs avg</span>`;
       } else if (ratio <= 0.7) {
-        const collision = detectCollisionForVideo(v, all, primaryId);
-        if (collision) {
-          badgeHtml = `<span class="badge bdg-re" style="font-size:9.5px;padding:1px 6px" title="Collision with ${esc(collision.rivalCh)}">⚡ Rival Conflict</span>`;
-        } else {
-          badgeHtml = `<span class="badge bdg-dim" style="font-size:9.5px;padding:1px 6px">▼ ${(ratio).toFixed(1)}× avg</span>`;
-        }
+        badgeHtml = `<span style="font-size:11px;color:var(--neg);font-weight:500">-${((1 - ratio) * 100).toFixed(0)}% vs avg</span>`;
       } else {
-        badgeHtml = `<span class="badge bdg-dim" style="font-size:9.5px;padding:1px 6px">~ Benchmark</span>`;
+        badgeHtml = `<span style="font-size:11px;color:var(--text-3)">~ Average</span>`;
       }
 
       return `
-        <div class="video-forensic-card">
-          <a href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" style="flex-shrink:0">
-            <img class="video-card-thumb" src="${esc(proxyImg(v.thumb || v.thumbnail_url || ''))}" alt="" onerror="this.style.opacity='.3'">
-          </a>
-          <div class="video-card-body">
-            <a class="video-card-title" href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" title="${esc(v.title)}">
-              ${esc(v.title)}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1">
+            <a href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" style="flex-shrink:0">
+              <img src="${esc(proxyImg(v.thumb || v.thumbnail_url || ''))}" style="width:72px;height:40px;border-radius:4px;object-fit:cover;background:var(--surface-2)" alt="" onerror="this.style.opacity='.3'">
             </a>
-            <div class="video-card-meta">
-              <strong style="color:var(--t1)">${fmtN(vc)} views</strong>
-              <span>•</span>
-              ${badgeHtml}
-              <span>•</span>
-              <span>${ago(v.published_at || v.date)}</span>
+            <div style="min-width:0">
+              <a href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" style="font-size:13px;font-weight:500;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;text-decoration:none" title="${esc(v.title)}">
+                ${esc(v.title)}
+              </a>
+              <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;display:flex;align-items:center;gap:6px">
+                <span class="num" style="color:var(--text-2);font-weight:500">${fmtN(vc)} views</span>
+                <span>·</span>
+                ${badgeHtml}
+                <span>·</span>
+                <span>${ago(v.published_at || v.date)}</span>
+              </div>
             </div>
           </div>
-          <a class="icon-btn" href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" title="Watch on YouTube" style="flex-shrink:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center">
-            <i data-lucide="external-link" style="width:13px;height:13px"></i>
-          </a>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <a class="icon-btn" href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" title="Watch on YouTube" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center">
+              <i data-lucide="external-link" style="width:13px;height:13px"></i>
+            </a>
+          </div>
         </div>`;
     }).join('');
 
     if (window.lucide) window.lucide.createIcons();
   } catch {
-    el.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:24px 0;text-align:center">Could not load recent uploads.</div>';
+    el.innerHTML = '<div style="color:var(--text-3);font-size:12px;padding:24px 0;text-align:center">Could not load recent uploads.</div>';
   }
 }
 

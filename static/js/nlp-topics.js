@@ -389,6 +389,7 @@ function openTitleLabWithTopic(topic) {
 
 let radarSearchQuery = '';
 let radarFilterQuadrant = 'all';
+let radarDisplayLimit = 15;
 
 async function renderTopicRadarPage() {
   const el = document.getElementById('radarMain');
@@ -409,9 +410,9 @@ async function renderTopicRadarPage() {
   if (!_topicCache.topics.size) {
     el.innerHTML = `
       <div class="empty card rev in" style="padding:48px 24px;text-align:center;max-width:540px;margin:40px auto">
-        <div class="spin" style="width:32px;height:32px;margin:0 auto 16px;border-color:var(--acc) transparent transparent transparent"></div>
-        <h3 style="font-family:var(--f-disp);font-size:18px;font-weight:700;color:var(--t1);margin-bottom:8px">Analyzing Topic Intelligence</h3>
-        <p style="color:var(--t3);font-size:13px;line-height:1.5">Extracting semantic tokens, RPI benchmarks, and field saturation across active channels…</p>
+        <div class="spin" style="width:32px;height:32px;margin:0 auto 16px;border-color:var(--accent) transparent transparent transparent"></div>
+        <h3 style="font-size:16px;font-weight:600;color:var(--text-1);margin-bottom:8px">Analyzing Topic Intelligence</h3>
+        <p style="color:var(--text-3);font-size:13px;line-height:1.5">Extracting semantic tokens, view velocity, and field coverage across active channels…</p>
       </div>`;
     setTimeout(() => {
       buildTopicCache(true);
@@ -423,140 +424,171 @@ async function renderTopicRadarPage() {
   const gapsData = computeTopicGaps(primary?.id);
   const gaps = gapsData.gaps || [];
 
-  // 1. High-Impact Topic Gap Attack Hero
-  const gapHeroHtml = `
-    <div class="topic-gap-hero rev">
-      <div class="topic-gap-hdr">
-        <div class="topic-gap-title">
-          <i data-lucide="sparkles" style="width:18px;height:18px;color:var(--acc)"></i>
-          <span>High-Impact Blue Ocean Gaps in Your Field</span>
-          <span class="badge bdg-dim" style="font-size:10px;color:var(--me)">Untapped Moats</span>
+  // Top Ranked Opportunities (8 max)
+  const allTopicsList = [..._topicCache.topics.values()];
+  const topOpportunities = [...allTopicsList]
+    .filter(t => t.n >= 2 && (t.quadrant === 'blue_ocean' || t.quadrant === 'red_ocean' || t.shrunkenRpi >= 1.2))
+    .sort((a, b) => (b.blueOceanScore || 0) - (a.blueOceanScore || 0) || (b.avgViews || 0) - (a.avgViews || 0))
+    .slice(0, 8);
+
+  // 1. Top Opportunities Section
+  const topOppHtml = `
+    <div style="margin-bottom:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:16px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px">
+            <i data-lucide="sparkles" style="width:16px;height:16px;color:var(--accent)"></i>
+            <span>Top High-Leverage Opportunities</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px">Prioritized topics with high viewer demand and untapped niche angles</div>
         </div>
-        <span class="card-prov" onclick="buildTopicCache(true);renderTopicRadarPage();">Re-index Field</span>
+        <button class="btn btn-gh btn-sm" onclick="buildTopicCache(true);renderTopicRadarPage();">
+          <i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Re-index Topics
+        </button>
       </div>
-      
-      ${gaps.length > 0 ? `
-        <div class="topic-gap-grid">
-          ${gaps.slice(0, 3).map(g => `
-            <div class="gap-attack-card">
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px">
+        ${topOpportunities.map((t, i) => {
+          const myUploads = _topicCache.perChannel.get(primary?.id)?.get(t.topic)?.n || 0;
+          return `
+            <div class="card" style="padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:12px">
               <div>
-                <div class="gap-attack-topic">${capWords(g.topic)}</div>
-                <div class="gap-attack-meta">
-                  <span>Avg ~<strong>${fmtN(g.fieldAvg)}</strong> views</span>
-                  <span>•</span>
-                  <span>${g.fieldN} competitor drops</span>
-                  <span>•</span>
-                  <span style="color:var(--me);font-weight:600">0 uploads by you</span>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+                  <div style="font-size:14px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(t.topic)}">
+                    #${i + 1} ${capWords(t.topic)}
+                  </div>
+                  <span style="font-size:11px;font-weight:500;color:${t.quadrant === 'blue_ocean' ? 'var(--pos)' : 'var(--accent)'}">
+                    ${t.quadrant === 'blue_ocean' ? 'Untapped' : 'High Demand'}
+                  </span>
+                </div>
+                <div style="font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:6px">
+                  <strong class="num" style="color:var(--text-1)">${fmtN(t.avgViews)}</strong> avg views
+                  <span>·</span>
+                  <span>${t.n} competitor vids</span>
+                  <span>·</span>
+                  <span style="color:${myUploads > 0 ? 'var(--text-2)' : 'var(--accent)'}">${myUploads > 0 ? `${myUploads} by you` : '0 by you'}</span>
                 </div>
               </div>
-              <button class="btn btn-acc btn-sm" onclick="openTitleLabWithTopic('${esc(g.topic)}')">
-                <i data-lucide="flask-conical" style="width:13px;height:13px"></i> Test in Title Lab
-              </button>
-            </div>
-          `).join('')}
-        </div>
-      ` : `
-        <div style="padding:16px;text-align:center;color:var(--t3);font-size:12.5px;border:1px dashed var(--line-1);border-radius:var(--r-s)">
-          Your channel has broad coverage across active competitor topics. Explore the full index below to find emerging angles.
-        </div>
-      `}
+
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--border)">
+                <div style="display:flex;align-items:center;gap:4px">
+                  ${t.channels.slice(0, 3).map(chId => {
+                    const ch = all.find(c => c.id === chId);
+                    if (!ch) return '';
+                    return ch.logo_url
+                      ? `<img src="${esc(proxyImg(ch.logo_url))}" title="${esc(ch.name)}" style="width:20px;height:20px;border-radius:50%;object-fit:cover">`
+                      : `<div title="${esc(ch.name)}" style="width:20px;height:20px;border-radius:50%;background:var(--surface-3);font-size:9px;font-weight:600;display:flex;align-items:center;justify-content:center">${(ch.name || '?')[0]}</div>`;
+                  }).join('')}
+                  ${t.channels.length > 3 ? `<span style="font-size:11px;color:var(--text-3)">+${t.channels.length - 3}</span>` : ''}
+                </div>
+                <button class="btn btn-acc btn-sm" style="padding:4px 10px;font-size:11.5px" onclick="openTitleLabWithTopic('${esc(t.topic)}')">
+                  <i data-lucide="flask-conical" style="width:12px;height:12px"></i> Plan in Studio
+                </button>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
     </div>`;
 
-  // 2. Topic Filter & Search Toolbar
-  let allTopicsList = [..._topicCache.topics.values()];
+  // 2. Filtered Topic Catalog Exploration Table
+  let filteredCatalog = [...allTopicsList];
   if (radarSearchQuery) {
-    allTopicsList = allTopicsList.filter(t => t.topic.toLowerCase().includes(radarSearchQuery.toLowerCase()));
+    filteredCatalog = filteredCatalog.filter(t => t.topic.toLowerCase().includes(radarSearchQuery.toLowerCase()));
   }
   if (radarFilterQuadrant !== 'all') {
-    allTopicsList = allTopicsList.filter(t => t.quadrant === radarFilterQuadrant);
+    filteredCatalog = filteredCatalog.filter(t => t.quadrant === radarFilterQuadrant);
   }
 
-  // Sort by hot score or views
-  allTopicsList.sort((a, b) => (b.avgViews || 0) - (a.avgViews || 0));
+  filteredCatalog.sort((a, b) => (b.avgViews || 0) - (a.avgViews || 0));
+  const displayedTopics = filteredCatalog.slice(0, radarDisplayLimit);
+  const hasMore = filteredCatalog.length > radarDisplayLimit;
 
-  const toolbarHtml = `
-    <div class="bench-toolbar rev" style="--i:1">
-      <div class="bench-search-box">
-        <i data-lucide="search" style="width:14px;height:14px;color:var(--t3)"></i>
-        <input type="text" placeholder="Search topics in your niche…" value="${esc(radarSearchQuery)}" oninput="filterRadarTopics(this.value)">
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <div class="race-seg">
-          <button class="race-seg-btn ${radarFilterQuadrant === 'all' ? 'on' : ''}" onclick="setRadarQuadrantFilter('all')">All (${_topicCache.topics.size})</button>
-          <button class="race-seg-btn ${radarFilterQuadrant === 'blue_ocean' ? 'on' : ''}" onclick="setRadarQuadrantFilter('blue_ocean')">Blue Ocean</button>
-          <button class="race-seg-btn ${radarFilterQuadrant === 'red_ocean' ? 'on' : ''}" onclick="setRadarQuadrantFilter('red_ocean')">High Demand</button>
-          <button class="race-seg-btn ${radarFilterQuadrant === 'emerging' ? 'on' : ''}" onclick="setRadarQuadrantFilter('emerging')">Emerging</button>
+  const catalogHtml = `
+    <div class="card" style="padding:0;overflow:hidden">
+      <!-- Table Filter Toolbar -->
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div class="bench-search-box" style="flex:1;max-width:300px;position:relative">
+          <i data-lucide="search" style="width:14px;height:14px;color:var(--text-3);position:absolute;left:10px;top:50%;transform:translateY(-50%)"></i>
+          <input type="text" style="width:100%;padding:6px 10px 6px 32px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-1);font-size:12px;outline:none" placeholder="Search ${allTopicsList.length} niche topics…" value="${esc(radarSearchQuery)}" oninput="filterRadarTopics(this.value)">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'all' ? 'active' : ''}" onclick="setRadarQuadrantFilter('all')">All (${allTopicsList.length})</button>
+          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'blue_ocean' ? 'active' : ''}" onclick="setRadarQuadrantFilter('blue_ocean')">Untapped</button>
+          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'red_ocean' ? 'active' : ''}" onclick="setRadarQuadrantFilter('red_ocean')">High Demand</button>
+          <button class="btn btn-gh btn-sm ${radarFilterQuadrant === 'emerging' ? 'active' : ''}" onclick="setRadarQuadrantFilter('emerging')">Emerging</button>
         </div>
       </div>
+
+      <!-- Data Table -->
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="min-width:180px">Topic</th>
+            <th class="num" style="min-width:110px">Avg Views ▾</th>
+            <th style="text-align:center;min-width:110px">Niche Frequency</th>
+            <th style="text-align:center;min-width:110px">Your Coverage</th>
+            <th style="text-align:center;min-width:110px">Status</th>
+            <th style="text-align:center;width:120px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${displayedTopics.map(t => {
+            const myUploads = _topicCache.perChannel.get(primary?.id)?.get(t.topic)?.n || 0;
+            return `
+              <tr>
+                <td>
+                  <strong style="color:var(--text-1);font-weight:500">${capWords(t.topic)}</strong>
+                </td>
+                <td class="num" style="font-weight:500;color:var(--text-1)">
+                  ${fmtN(t.avgViews)}
+                </td>
+                <td style="text-align:center;color:var(--text-2)">
+                  ${t.n} drops
+                </td>
+                <td style="text-align:center;color:${myUploads > 0 ? 'var(--text-2)' : 'var(--accent)'}">
+                  ${myUploads > 0 ? `${myUploads} videos` : '0 (Untapped)'}
+                </td>
+                <td style="text-align:center">
+                  <span style="font-size:11px;color:${t.quadrant === 'blue_ocean' ? 'var(--pos)' : t.quadrant === 'red_ocean' ? 'var(--accent)' : 'var(--text-3)'}">
+                    ${t.quadrant === 'blue_ocean' ? 'Opportunity' : t.quadrant === 'red_ocean' ? 'High Demand' : 'Emerging'}
+                  </span>
+                </td>
+                <td style="text-align:center">
+                  <div style="display:inline-flex;align-items:center;gap:6px">
+                    <button class="btn btn-gh btn-sm" style="padding:3px 8px;font-size:11px" onclick="openTitleLabWithTopic('${esc(t.topic)}')">
+                      <i data-lucide="flask-conical" style="width:12px;height:12px"></i> Studio
+                    </button>
+                    <button class="icon-btn" style="width:26px;height:26px" onclick="openAiTitleSynthesizer('${esc(t.topic)}')" title="Generate Titles">
+                      <i data-lucide="sparkles" style="width:12px;height:12px"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+
+      ${hasMore ? `
+        <div style="padding:14px;text-align:center;border-top:1px solid var(--border)">
+          <button class="btn btn-gh btn-sm" onclick="radarDisplayLimit += 20; renderTopicRadarPage()">
+            Load More Topics (${filteredCatalog.length - radarDisplayLimit} remaining)
+          </button>
+        </div>` : ''}
     </div>`;
 
-  // 3. Topic Cards Grid
-  const gridHtml = `
-    <div class="topic-card-grid rev" style="--i:2">
-      ${allTopicsList.map(t => {
-        const isMine = t.channels.includes(primary?.id);
-        const myUploads = _topicCache.perChannel.get(primary?.id)?.get(t.topic)?.n || 0;
-        let badgeHtml = '<span class="badge bdg-dim" style="font-size:9.5px">Emerging</span>';
-        if (t.quadrant === 'blue_ocean') {
-          badgeHtml = '<span class="badge bdg-gr" style="font-size:9.5px"><span style="display:inline-block;width:4.5px;height:4.5px;border-radius:50%;background:#34d399;margin-right:2px"></span>Opportunity</span>';
-        } else if (t.quadrant === 'red_ocean') {
-          badgeHtml = '<span class="badge bdg-gd" style="font-size:9.5px">High Demand</span>';
-        } else if (t.quadrant === 'saturated') {
-          badgeHtml = '<span class="badge bdg-dim" style="font-size:9.5px">Saturated</span>';
-        }
-
-        return `
-          <div class="topic-opp-card">
-            <div>
-              <div class="topic-opp-hdr">
-                <div class="topic-opp-name">${capWords(t.topic)}</div>
-                ${badgeHtml}
-              </div>
-              <div class="topic-opp-stats">
-                <div><strong>${fmtN(t.avgViews)}</strong> avg views</div>
-                <div>•</div>
-                <div><strong>${t.n}</strong> niche videos</div>
-                <div>•</div>
-                <div>${myUploads > 0 ? `<span style="color:var(--up)">${myUploads} by you</span>` : `<span style="color:var(--t3)">0 by you</span>`}</div>
-              </div>
-            </div>
-
-            <div class="topic-opp-foot">
-              <div style="display:flex;align-items:center;gap:4px">
-                ${t.channels.slice(0, 4).map(chId => {
-                  const ch = all.find(c => c.id === chId);
-                  if (!ch) return '';
-                  return ch.logo_url
-                    ? `<img src="${esc(proxyImg(ch.logo_url))}" title="${esc(ch.name)}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;border:1px solid var(--line-2)">`
-                    : `<div title="${esc(ch.name)}" style="width:20px;height:20px;border-radius:50%;background:var(--bg-3);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center">${(ch.name || '?')[0]}</div>`;
-                }).join('')}
-                ${t.channels.length > 4 ? `<span style="font-size:10px;color:var(--t3)">+${t.channels.length - 4}</span>` : ''}
-              </div>
-
-              <div style="display:flex;gap:6px">
-                <button class="btn btn-gh btn-sm" style="padding:4px 8px;font-size:11px" onclick="openTitleLabWithTopic('${esc(t.topic)}')">
-                  <i data-lucide="flask-conical" style="width:12px;height:12px"></i> Studio
-                </button>
-                <button class="icon-btn" style="width:26px;height:26px" onclick="openAiTitleSynthesizer('${esc(t.topic)}')" title="Generate Titles">
-                  <i data-lucide="sparkles" style="width:12px;height:12px"></i>
-                </button>
-              </div>
-            </div>
-          </div>`;
-      }).join('')}
-    </div>`;
-
-  el.innerHTML = gapHeroHtml + toolbarHtml + gridHtml;
+  el.innerHTML = topOppHtml + catalogHtml;
   if (window.lucide) window.lucide.createIcons();
 }
 
 function filterRadarTopics(query) {
   radarSearchQuery = query || '';
+  radarDisplayLimit = 15;
   renderTopicRadarPage();
 }
 
 function setRadarQuadrantFilter(q) {
   radarFilterQuadrant = q;
+  radarDisplayLimit = 15;
   renderTopicRadarPage();
 }
 

@@ -140,7 +140,7 @@ function onTitleLabInput(val) {
 
   // Update Score Badge & Dial
   const scoreNumEl = document.getElementById('tlScoreNum');
-  const scoreBadgeEl = document.getElementById('tlScoreBadge');
+  const scoreRatingEl = document.getElementById('tlScoreRating');
   const lenCountEl = document.getElementById('tlLenCount');
   const lenFillEl = document.getElementById('tlLenFill');
   const meterTopicEl = document.getElementById('tlMeterTopic');
@@ -150,15 +150,16 @@ function onTitleLabInput(val) {
   const feedbackEl = document.getElementById('tlFeedback');
 
   if (scoreNumEl) scoreNumEl.textContent = res.score;
-  if (scoreBadgeEl) {
-    scoreBadgeEl.textContent = res.score >= 85 ? '🔥 Elite Concept' : res.score >= 70 ? '🟢 Strong Title' : res.score >= 50 ? '🟡 Moderate' : '🔴 Needs Polish';
-    scoreBadgeEl.className = 'badge ' + (res.score >= 85 ? 'bdg-gr' : res.score >= 70 ? 'bdg-pr' : res.score >= 50 ? 'bdg-gd' : 'bdg-rd');
+  if (scoreRatingEl) {
+    const ratingText = res.score >= 85 ? 'Elite' : res.score >= 70 ? 'Strong' : res.score >= 50 ? 'Fair' : 'Needs Work';
+    const ratingColor = res.score >= 70 ? 'var(--pos)' : res.score >= 50 ? 'var(--warn)' : 'var(--neg)';
+    scoreRatingEl.innerHTML = `<span style="color:${ratingColor};font-weight:500">${ratingText}</span>`;
   }
   if (lenCountEl) lenCountEl.textContent = `${res.len} / 60 chars`;
   if (lenFillEl) {
     const pct = Math.min(100, Math.round((res.len / 80) * 100));
     lenFillEl.style.width = pct + '%';
-    lenFillEl.style.background = (res.len >= 40 && res.len <= 60) ? 'var(--up)' : (res.len >= 30 && res.len <= 70) ? 'var(--warn)' : 'var(--down)';
+    lenFillEl.style.background = (res.len >= 40 && res.len <= 60) ? 'var(--pos)' : (res.len >= 30 && res.len <= 70) ? 'var(--warn)' : 'var(--neg)';
   }
   if (meterTopicEl) meterTopicEl.style.width = Math.round((res.topicScore / 35) * 100) + '%';
   if (meterHookEl) meterHookEl.style.width = Math.round((res.hookScore / 25) * 100) + '%';
@@ -666,161 +667,143 @@ function renderStudioLabHtml() {
   const ideas = generateStudioIdeas();
   const filteredIdeas = pipelineIdeaFilter === 'all' ? ideas : ideas.filter(i => i.type === pipelineIdeaFilter);
 
-  // Pre-fill seed topic from top blue ocean topic if available
-  const topTopics = [..._topicCache.topics.values()].sort((a, b) => (b.blueOceanScore || 0) - (a.blueOceanScore || 0));
-  const suggestedSeed = topTopics[0]?.topic || 'video editing';
+  const ratingText = res.score >= 85 ? 'Elite' : res.score >= 70 ? 'Strong' : res.score >= 50 ? 'Fair' : 'Needs Work';
+  const ratingColor = res.score >= 70 ? 'var(--pos)' : res.score >= 50 ? 'var(--warn)' : 'var(--neg)';
 
   return `
-    <div style="display:grid;grid-template-columns:1fr;gap:22px">
+    <div style="display:grid;grid-template-columns:1fr;gap:20px">
       <!-- Title Lab Card -->
-      <div class="card" style="padding:22px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <div style="width:32px;height:32px;border-radius:var(--r-s);background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;color:var(--acc)">
-              <i data-lucide="flask-conical" style="width:16px;height:16px"></i>
+      <div class="card" style="padding:22px;background:var(--surface-1);border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:15px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px">
+              <i data-lucide="flask-conical" style="width:16px;height:16px;color:var(--accent)"></i>
+              <span>Title Lab Real-Time Scorer</span>
             </div>
-            <div>
-              <div style="font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--t1)">Title Lab Real-Time Scorer</div>
-              <div style="font-size:11px;color:var(--t3)">Live algorithmic scoring based on your topic engine, CTR formulas, and length bounds.</div>
-            </div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px">Algorithmic scoring based on keyword demand, search hooks, and title length.</div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <button class="btn btn-acc btn-sm" onclick="openAiTitleSynthesizer('', titleLabDraft)">
-              <i data-lucide="sparkles" style="width:13px;height:13px"></i> AI Synthesize
-            </button>
-            <span id="tlScoreBadge" class="badge ${res.score >= 85 ? 'bdg-gr' : res.score >= 70 ? 'bdg-pr' : res.score >= 50 ? 'bdg-gd' : 'bdg-rd'}">
-              ${res.score >= 85 ? 'Elite Concept' : res.score >= 70 ? 'Strong Title' : res.score >= 50 ? 'Moderate' : 'Needs Polish'}
-            </span>
-            <div style="font-family:var(--f-mono);font-size:24px;font-weight:800;color:var(--t1)" id="tlScoreNum">${res.score}</div>
-            <span style="font-size:12px;color:var(--t3)">/100</span>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <div style="font-size:26px;font-weight:700;color:var(--text-1);font-variant-numeric:tabular-nums" id="tlScoreNum">${res.score}</div>
+              <span style="font-size:13px;color:var(--text-3)">/100</span>
+              <span id="tlScoreRating" style="margin-left:4px"><span style="color:${ratingColor};font-weight:500">${ratingText}</span></span>
+            </div>
           </div>
         </div>
 
         <!-- Input Box -->
-        <div style="position:relative;margin-bottom:12px">
+        <div style="margin-bottom:12px">
           <input type="text" id="titleLabInput" value="${esc(titleLabDraft)}"
-            style="width:100%;padding:12px 14px;font-size:14px;font-weight:600;background:var(--bg-3);border:1.5px solid var(--line-2);border-radius:var(--r-m);color:var(--t1);outline:none;transition:border-color var(--d-1)"
+            style="width:100%;padding:10px 14px;font-size:14px;font-weight:500;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-1);outline:none"
             placeholder="Type your draft video title here…"
             oninput="onTitleLabInput(this.value)" />
         </div>
 
         <!-- Character Meter & Feedback -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:11px;color:var(--t3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:11.5px;color:var(--text-3)">
           <span id="tlFeedback">${res.lenFeedback}</span>
-          <span id="tlLenCount" class="mono">${res.len} / 60 chars</span>
+          <span id="tlLenCount" class="num">${res.len} / 60 chars</span>
         </div>
-        <div style="width:100%;height:4px;background:var(--bg-3);border-radius:2px;overflow:hidden;margin-bottom:16px">
-          <div id="tlLenFill" style="height:100%;width:${Math.min(100, Math.round((res.len / 80) * 100))}%;background:${res.len >= 40 && res.len <= 60 ? 'var(--up)' : res.len >= 30 && res.len <= 70 ? 'var(--warn)' : 'var(--down)'};transition:width .2s, background .2s"></div>
+        <div style="width:100%;height:4px;background:var(--surface-3);border-radius:2px;overflow:hidden;margin-bottom:16px">
+          <div id="tlLenFill" style="height:100%;width:${Math.min(100, Math.round((res.len / 80) * 100))}%;background:${res.len >= 40 && res.len <= 60 ? 'var(--pos)' : res.len >= 30 && res.len <= 70 ? 'var(--warn)' : 'var(--neg)'};transition:width .2s"></div>
         </div>
 
         <!-- 4 Factor Grid -->
         <div class="tl-factors-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
-          <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:flex;align-items:center;gap:4px">
-              <i data-lucide="ruler" style="width:11px;height:11px"></i> Length (25 max)
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px">
+            <div style="font-size:11px;font-weight:500;color:var(--text-3);margin-bottom:4px">
+              Length (${res.lenScore}/25)
             </div>
-            <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
-              <div id="tlMeterLen" style="height:100%;width:${Math.round((res.lenScore / 25) * 100)}%;background:var(--acc);transition:width .2s"></div>
-            </div>
-          </div>
-          <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:flex;align-items:center;gap:4px">
-              <i data-lucide="target" style="width:11px;height:11px"></i> Topic Match (35 max)
-            </div>
-            <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
-              <div id="tlMeterTopic" style="height:100%;width:${Math.round((res.topicScore / 35) * 100)}%;background:var(--up);transition:width .2s"></div>
+            <div style="width:100%;height:3px;background:var(--surface-3);border-radius:2px;overflow:hidden;margin-top:6px">
+              <div id="tlMeterLen" style="height:100%;width:${Math.round((res.lenScore / 25) * 100)}%;background:var(--accent);transition:width .2s"></div>
             </div>
           </div>
-          <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:flex;align-items:center;gap:4px">
-              <i data-lucide="zap" style="width:11px;height:11px"></i> Hook & Format (25 max)
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px">
+            <div style="font-size:11px;font-weight:500;color:var(--text-3);margin-bottom:4px">
+              Topic Match (${res.topicScore}/35)
             </div>
-            <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
-              <div id="tlMeterHook" style="height:100%;width:${Math.round((res.hookScore / 25) * 100)}%;background:var(--warn);transition:width .2s"></div>
+            <div style="width:100%;height:3px;background:var(--surface-3);border-radius:2px;overflow:hidden;margin-top:6px">
+              <div id="tlMeterTopic" style="height:100%;width:${Math.round((res.topicScore / 35) * 100)}%;background:var(--accent);transition:width .2s"></div>
             </div>
           </div>
-          <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-s);padding:10px">
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:4px;display:flex;align-items:center;gap:4px">
-              <i data-lucide="layout" style="width:11px;height:11px"></i> Structure (15 max)
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px">
+            <div style="font-size:11px;font-weight:500;color:var(--text-3);margin-bottom:4px">
+              Hook & Format (${res.hookScore}/25)
             </div>
-            <div style="width:100%;height:4px;background:var(--bg-1);border-radius:2px;overflow:hidden;margin-top:6px">
-              <div id="tlMeterStruct" style="height:100%;width:${Math.round((res.structScore / 15) * 100)}%;background:var(--me);transition:width .2s"></div>
+            <div style="width:100%;height:3px;background:var(--surface-3);border-radius:2px;overflow:hidden;margin-top:6px">
+              <div id="tlMeterHook" style="height:100%;width:${Math.round((res.hookScore / 25) * 100)}%;background:var(--accent);transition:width .2s"></div>
+            </div>
+          </div>
+          <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px">
+            <div style="font-size:11px;font-weight:500;color:var(--text-3);margin-bottom:4px">
+              Structure (${res.structScore}/15)
+            </div>
+            <div style="width:100%;height:3px;background:var(--surface-3);border-radius:2px;overflow:hidden;margin-top:6px">
+              <div id="tlMeterStruct" style="height:100%;width:${Math.round((res.structScore / 15) * 100)}%;background:var(--accent);transition:width .2s"></div>
             </div>
           </div>
         </div>
 
         <!-- Missing High-Momentum Tokens -->
         <div style="margin-bottom:16px">
-          <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--t3);margin-bottom:8px">
-            Trending Topic Tokens in Field (Click to Append):
+          <div style="font-size:11.5px;color:var(--text-3);margin-bottom:8px">
+            Trending topic tokens in niche (click to append):
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${res.missingHotTokens.length ? res.missingHotTokens.map(tok => `
-              <button class="chip chip-btn" onclick="appendTokenToTitle('${esc(tok.topic)}')">
-                + ${esc(tok.topic)} <span style="color:var(--up);margin-left:4px">▲${(tok.momentum || 1).toFixed(1)}×</span>
-              </button>`).join('') : '<span style="font-size:11px;color:var(--t3)">All key trending niche topics covered!</span>'}
+              <button class="btn btn-gh btn-sm" style="padding:3px 8px;font-size:11px" onclick="appendTokenToTitle('${esc(tok.topic)}')">
+                + ${esc(tok.topic)}
+              </button>`).join('') : '<span style="font-size:11.5px;color:var(--text-3)">All key trending niche topics covered.</span>'}
           </div>
         </div>
 
         <!-- Actions -->
-        <div style="display:flex;gap:10px;padding-top:14px;border-top:1px solid var(--line-1);flex-wrap:wrap">
-          <button class="btn btn-acc" onclick="openAiTitleSynthesizer('', titleLabDraft)">
-            <i data-lucide="sparkles" style="width:14px;height:14px"></i> Synthesize with AI
+        <div style="display:flex;gap:8px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap">
+          <button class="btn btn-acc btn-sm" onclick="sendTitleLabToPipeline()">
+            <i data-lucide="plus" style="width:13px;height:13px"></i> Send to Pipeline
           </button>
-          <button class="btn btn-gh" onclick="sendTitleLabToPipeline()">
-            <i data-lucide="plus" style="width:14px;height:14px"></i> Send to Content Pipeline
+          <button class="btn btn-gh btn-sm" onclick="openAiTitleSynthesizer('', titleLabDraft)">
+            <i data-lucide="sparkles" style="width:13px;height:13px"></i> AI Synthesizer
           </button>
-          <button class="btn btn-gh" onclick="copyTitleLabText()">
-            <i data-lucide="copy" style="width:14px;height:14px"></i> Copy Title
+          <button class="btn btn-gh btn-sm" onclick="copyTitleLabText()">
+            <i data-lucide="copy" style="width:13px;height:13px"></i> Copy Title
           </button>
         </div>
       </div>
 
       <!-- Algorithmic Idea Generator Card -->
-      <div class="card" style="padding:22px;background:var(--bg-2);border:1px solid var(--line-1);border-radius:var(--r-l)">
+      <div class="card" style="padding:22px;background:var(--surface-1);border:1px solid var(--border)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <div style="width:32px;height:32px;border-radius:var(--r-s);background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;color:var(--warn)">
-              <i data-lucide="lightbulb" style="width:16px;height:16px"></i>
+          <div>
+            <div style="font-size:15px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:8px">
+              <i data-lucide="lightbulb" style="width:16px;height:16px;color:var(--accent)"></i>
+              <span>Algorithmic Concept Generator</span>
             </div>
-            <div>
-              <div style="font-family:var(--f-disp);font-size:15px;font-weight:700;color:var(--t1)">Algorithmic Concept Generator</div>
-              <div style="font-size:11px;color:var(--t3)">Pre-tested formulas synthesizing your moats, untapped field gaps, and trending velocity spikes.</div>
-            </div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px">Formulas synthesizing your moats, untapped field gaps, and trending velocity spikes.</div>
           </div>
         </div>
 
         <!-- Idea Grid -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:14px">
-          ${filteredIdeas.map(idea => {
-            const st = scoreTone(idea.score);
-            return `
-              <div style="background:var(--bg-3);border:1px solid var(--line-1);border-radius:var(--r-m);padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;transition:border-color var(--d-1)">
-                <div>
-                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-                    <span class="badge bdg-dim" style="font-size:9.5px;padding:2px 8px">
-                      ${idea.formula}
-                    </span>
-                    <span class="badge ${st.badge}" style="font-family:var(--f-mono);font-size:10px;font-weight:700">
-                      ${idea.score}% Score
-                    </span>
-                  </div>
-                  <div style="font-size:13px;font-weight:700;color:var(--t1);line-height:1.4;margin-bottom:6px">${esc(idea.title)}</div>
-                  <div style="font-size:10.5px;color:var(--t3);line-height:1.4">${esc(idea.reason)}</div>
+          ${filteredIdeas.map(idea => `
+            <div class="card" style="background:var(--surface-2);border:1px solid var(--border);padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:12px">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <span style="font-size:11px;color:var(--text-3)">${idea.formula}</span>
+                  <span class="num" style="font-size:11px;font-weight:500;color:var(--accent)">${idea.score}% Match</span>
                 </div>
-                <div style="display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line-1)">
-                  <button class="btn btn-acc btn-sm" style="flex:1" onclick="openAiTitleSynthesizer('${esc(idea.topic)}', '${esc(idea.title)}')">
-                    <i data-lucide="sparkles" style="width:12px;height:12px"></i> AI Title
-                  </button>
-                  <button class="btn btn-gh btn-sm" onclick="sendIdeaToPipeline('${esc(idea.title)}', '${esc(idea.topic)}', ${idea.score})">
-                    <i data-lucide="plus" style="width:12px;height:12px"></i> Pipeline
-                  </button>
-                  <button class="icon-btn" onclick="useIdeaInTitleLab('${esc(idea.title)}')" title="Test this idea in Title Lab">
-                    <i data-lucide="flask-conical" style="width:12px;height:12px"></i>
-                  </button>
-                </div>
-              </div>`;
-          }).join('')}
+                <div style="font-size:13px;font-weight:500;color:var(--text-1);line-height:1.4;margin-bottom:6px">${esc(idea.title)}</div>
+                <div style="font-size:11px;color:var(--text-3);line-height:1.4">${esc(idea.reason)}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--border)">
+                <button class="btn btn-acc btn-sm" style="flex:1" onclick="sendIdeaToPipeline('${esc(idea.title)}', '${esc(idea.topic)}', ${idea.score})">
+                  <i data-lucide="plus" style="width:12px;height:12px"></i> Pipeline
+                </button>
+                <button class="btn btn-gh btn-sm" onclick="useIdeaInTitleLab('${esc(idea.title)}')" title="Test this idea in Title Lab">
+                  <i data-lucide="flask-conical" style="width:12px;height:12px"></i> Test
+                </button>
+              </div>
+            </div>`).join('')}
         </div>
       </div>
     </div>`;

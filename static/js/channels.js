@@ -74,11 +74,11 @@ async function renderChannels() {
           <tr>
             <th style="width:48px;text-align:center">#</th>
             <th style="min-width:200px">Channel</th>
-            <th class="sortable num" onclick="setChSort('subscribers_raw')" style="min-width:110px">Subscribers ▾</th>
-            <th class="sortable num" onclick="setChSort('avg_views_raw')">Avg Views ▾</th>
-            <th class="sortable num" onclick="setChSort('total_views_raw')">Total Views ▾</th>
-            <th style="text-align:center;width:100px">Last 30 Days</th>
-            <th class="sortable" onclick="setChSort('threat_score')" style="text-align:center;width:100px">Overlap ▾</th>
+            <th class="sortable num" onclick="setChSort('subscribers_raw')" data-tip="subscribers" style="min-width:110px">Subscribers ▾</th>
+            <th class="sortable num" onclick="setChSort('avg_views_raw')" data-tip="avg_views" style="min-width:110px">Avg Views ▾</th>
+            <th class="sortable num" onclick="setChSort('total_views_raw')" style="min-width:110px">Total Views ▾</th>
+            <th style="text-align:center;width:100px" data-tip="views_velocity">Last 30 Days</th>
+            <th class="sortable" onclick="setChSort('threat_score')" data-tip="threat_overlap" style="text-align:center;width:100px">Overlap ▾</th>
             <th style="text-align:center;width:48px"></th>
           </tr>
         </thead>
@@ -87,7 +87,8 @@ async function renderChannels() {
         </tbody>
       </table>
     </div>
-    ${renderFieldPulseRow()}`;
+    ${renderFieldPulseRow()}
+    ${renderCompetitorActivityFeed()}`;
 
   if (window.lucide) window.lucide.createIcons();
 
@@ -360,6 +361,85 @@ function renderFieldPulseRow() {
         <strong style="color:var(--text-1);font-weight:500;margin-left:4px">${esc(quietest?.name || '—')}</strong>
         <span style="color:var(--text-3);font-size:12px;margin-left:4px">(${maxDays > 0 && maxDays < 900 ? maxDays + 'd ago' : 'inactive'})</span>
       </div>
+    </div>`;
+}
+
+function renderCompetitorActivityFeed() {
+  const competitors = all.filter(c => !c.is_primary);
+  if (!competitors.length) return '';
+
+  const drops = [];
+  competitors.forEach(ch => {
+    const en = _enrichCache[ch.id];
+    if (en && en.vids && en.vids.length > 0) {
+      en.vids.forEach(vid => {
+        drops.push({
+          ch,
+          vid,
+          published: new Date(vid.published_at || vid.date || 0).getTime()
+        });
+      });
+    }
+  });
+
+  drops.sort((a, b) => b.published - a.published);
+  const topDrops = drops.slice(0, 8);
+
+  return `
+    <div class="card" style="margin-top:20px;padding:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <i data-lucide="radio" style="width:16px;height:16px;color:var(--accent)"></i>
+          <span style="font-size:14px;font-weight:600;color:var(--text-1)">Recent Competitor Drops</span>
+        </div>
+        <span style="font-size:12px;color:var(--text-3)">Latest videos across tracked niche</span>
+      </div>
+
+      ${!topDrops.length ? `
+        <div style="color:var(--text-3);font-size:12.5px;padding:24px 0;text-align:center">
+          Loading competitor telemetry…
+        </div>` : `
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${topDrops.map(item => {
+            const v = item.vid;
+            const ch = item.ch;
+            const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
+            const pub = item.published;
+            const days = Math.max(0.1, (Date.now() - pub) / 864e5);
+            const vpd = Math.round(vc / days);
+
+            return `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)">
+                <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1">
+                  <a href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" style="flex-shrink:0">
+                    <img src="${esc(proxyImg(v.thumb || v.thumbnail_url || ''))}" style="width:72px;height:40px;border-radius:4px;object-fit:cover;background:var(--surface-2)" alt="" onerror="this.style.opacity='.3'">
+                  </a>
+                  <div style="min-width:0">
+                    <a href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" style="font-size:13px;font-weight:500;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;text-decoration:none" title="${esc(v.title)}">
+                      ${esc(v.title)}
+                    </a>
+                    <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;display:flex;align-items:center;gap:6px">
+                      <span style="color:var(--text-2);font-weight:500;cursor:pointer" onclick="openDeepDive('${esc(ch.id)}')">${esc(ch.name)}</span>
+                      <span>·</span>
+                      <span class="num">${fmtN(vc)} views</span>
+                      <span>·</span>
+                      <span style="color:var(--accent);font-weight:500">+${fmtN(vpd)}/d</span>
+                      <span>·</span>
+                      <span>${ago(v.published_at || v.date)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                  <button class="icon-btn" onclick="openDeepDive('${esc(ch.id)}')" title="Inspect Channel" style="width:28px;height:28px">
+                    <i data-lucide="compass" style="width:13px;height:13px"></i>
+                  </button>
+                  <a class="icon-btn" href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" title="Watch on YouTube" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center">
+                    <i data-lucide="external-link" style="width:13px;height:13px"></i>
+                  </a>
+                </div>
+              </div>`;
+          }).join('')}
+        </div>`}
     </div>`;
 }
 

@@ -125,3 +125,164 @@
   color: var(--text-2);
   vertical-align: middle;
 }
+
+/* ── 03. Tooltip Primitive (L1 Progressive Disclosure) ─────────────────────── */
+.ui-tooltip {
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  padding: 10px 14px;
+  max-width: 280px;
+  font-family: var(--f-ui);
+  animation: fadeIn 0.12s var(--ease) forwards;
+}
+
+.ui-tip-header {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+
+.ui-tip-body {
+  font-size: 11.5px;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+
+.ui-tip-footer {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ui-tip-link {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--f-ui);
+}
+
+.ui-tip-link:hover {
+  text-decoration: underline;
+}
+
+/* ── 04. Detail Sheet Drawer (L2 Progressive Disclosure) ───────────────────── */
+.ui-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1500;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-2) var(--ease);
+}
+
+.ui-sheet-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ui-sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 440px;
+  max-width: 100vw;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+  z-index: 1501;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform var(--dur-2) var(--ease);
+  font-family: var(--f-ui);
+}
+
+.ui-sheet.open {
+  transform: translateX(0);
+}
+
+.ui-sheet-header {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ui-sheet-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 0;
+}
+
+.ui-sheet-sub {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.ui-sheet-body {
+  padding: 22px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ui-sheet-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ui-sheet-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ui-sheet-text {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.ui-sheet-code {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  color: var(--accent);
+  overflow-x: auto;
+}
+
+.ui-sheet-action-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-1);
+  line-height: 1.45;
+}

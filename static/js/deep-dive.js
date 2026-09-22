@@ -164,65 +164,67 @@ async function renderDDOverview(ch) {
         <div class="dd-kpi-strip">
           <div class="tile">
             <span class="lbl">Subscribers</span>
-            <span class="val gold count-val" data-val="${ch.subscribers_raw || 0}">${esc(ch.subscribers)}</span>
-            <span class="foot">${sparkSVG(en.sp30, 75, 18, 'var(--me)')}</span>
+            <span class="val num" data-val="${ch.subscribers_raw || 0}">${esc(ch.subscribers)}</span>
+            <span class="foot">${sparkSVG(en.sp30, 75, 18, 'var(--accent)')}</span>
           </div>
           <div class="tile">
             <span class="lbl">Total Views</span>
-            <span class="val count-val" data-val="${ch.total_views_raw || 0}">${esc(ch.total_views)}</span>
-            <span class="foot">${fmtDelta(en.momDelta || 0)}</span>
+            <span class="val num" data-val="${ch.total_views_raw || 0}">${esc(ch.total_views)}</span>
+            <span class="foot" style="color:${(en.momDelta || 0) >= 0 ? 'var(--pos)' : 'var(--neg)'}">${fmtDelta(en.momDelta || 0)}</span>
           </div>
           <div class="tile">
             <span class="lbl">Avg Views</span>
-            <span class="val count-val" data-val="${ch.avg_views_raw || 0}">${esc(ch.avg_views)}</span>
-            <span class="foot"><span style="font-size:10px;color:var(--t3)">per video</span></span>
+            <span class="val num" data-val="${ch.avg_views_raw || 0}">${esc(ch.avg_views)}</span>
+            <span class="foot"><span style="font-size:11px;color:var(--text-3)">per upload</span></span>
           </div>
           <div class="tile">
             <span class="lbl">Subs ÷ Views</span>
-            <span class="val">${audienceRatio !== null ? audienceRatio + '%' : '—'}</span>
-            <span class="foot"><span style="font-size:10px;color:var(--t3)">audience ratio</span></span>
+            <span class="val num">${audienceRatio !== null ? audienceRatio + '%' : '—'}</span>
+            <span class="foot"><span style="font-size:11px;color:var(--text-3)">audience ratio</span></span>
           </div>
         </div>
 
         <!-- Pulse card -->
-        <div class="dd-pulse-card">
-          <div class="sect-lbl" style="margin:0">
-            <span class="msi">show_chart</span> 90-Day Upload Pulse
+        <div class="dd-pulse-card" style="background:var(--surface-1);border:1px solid var(--border);border-radius:var(--r-md);padding:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:13px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:6px">
+              <i data-lucide="activity" style="width:15px;height:15px;color:var(--accent)"></i>
+              <span>90-Day Upload Pulse</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-3)">${thisMonthVids.length} uploads this month</div>
           </div>
           ${pulseSvg}
-          <div class="dd-this-month-row">
-            <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3);letter-spacing:.06em">This Month</span>
-            <span class="badge bdg-pr">${thisMonthVids.length} uploads</span>
-            ${thisMonthViews > 0 ? `<span class="badge bdg-dim">${fmtN(thisMonthViews)} views</span>` : ''}
-            ${bestThisMonth ? `<span style="font-size:11px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1" title="${esc(bestThisMonth.title)}">Best: ${esc(bestThisMonth.title)}</span>` : '<span style="font-size:11px;color:var(--t3)">No uploads yet this month</span>'}
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;font-size:12px;color:var(--text-3);padding-top:10px;border-top:1px solid var(--border)">
+            <span>Recent views: <strong class="num" style="color:var(--text-1)">${fmtN(thisMonthViews)}</strong></span>
+            ${bestThisMonth ? `<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px" title="${esc(bestThisMonth.title)}">Top: <strong style="color:var(--text-2)">${esc(bestThisMonth.title)}</strong></span>` : ''}
           </div>
         </div>
 
         <!-- Top Videos -->
-        <div class="card">
-          <div class="sect-lbl" style="margin:0 0 10px 0">
-            <span class="msi">star</span> Top Performing Videos
+        <div class="card" style="padding:18px">
+          <div style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+            <i data-lucide="trending-up" style="width:15px;height:15px;color:var(--accent)"></i>
+            <span>Top Performing Videos</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;flex-direction:column;gap:8px">
             ${top5.map((v, i) => {
-    const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
-    const eng = calcEngagementRate(v.like_count, v.comment_count, v.view_count ?? v.views_raw);
-    const pct = maxTopViews > 0 ? Math.max(4, Math.round(vc / maxTopViews * 100)) : 4;
-    return `
-              <a href="${esc(v.url)}" target="_blank" rel="noopener" class="dd-top-vid-row">
-                <span style="font-family:var(--f-mono);font-size:10.5px;font-weight:700;color:var(--t3)">#${i + 1}</span>
-                <img src="${esc(v.thumb || '')}" style="width:72px;height:40px;border-radius:4px;object-fit:cover" alt="">
-                <div style="min-width:0">
-                  <div class="dd-top-vid-title">${esc(v.title)}</div>
-                  <div class="dd-top-vid-meta">${ago(v.published_at || v.date)}</div>
-                </div>
-                <div class="dd-vrow-views-wrap">
-                  <div class="dd-top-vid-views">${fmtN(vc)}</div>
-                  <div class="dd-vrow-vsbar-track"><div class="dd-vrow-vsbar-fill" style="width:${pct}%;background:${col}"></div></div>
-                </div>
-                ${eng !== null ? `<span class="badge ${eng >= 4 ? 'bdg-gr' : 'bdg-dim'}">${eng}%</span>` : '<span></span>'}
-              </a>`;
-  }).join('')}
+              const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
+              const eng = calcEngagementRate(v.like_count, v.comment_count, v.view_count ?? v.views_raw);
+              const pct = maxTopViews > 0 ? Math.max(4, Math.round(vc / maxTopViews * 100)) : 4;
+              return `
+                <a href="${esc(v.url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);text-decoration:none">
+                  <span style="font-size:12px;color:var(--text-3);width:20px;text-align:center">#${i + 1}</span>
+                  <img src="${esc(proxyImg(v.thumb || ''))}" style="width:72px;height:40px;border-radius:4px;object-fit:cover;background:var(--surface-2)" alt="">
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:500;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title)}</div>
+                    <div style="font-size:11px;color:var(--text-3);margin-top:2px">${ago(v.published_at || v.date)}</div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0">
+                    <div class="num" style="font-size:13px;font-weight:500;color:var(--text-1)">${fmtN(vc)}</div>
+                    ${eng !== null ? `<span style="font-size:11px;color:var(--text-3)">${eng}% eng</span>` : ''}
+                  </div>
+                </a>`;
+            }).join('')}
           </div>
         </div>
       </div>
@@ -230,89 +232,61 @@ async function renderDDOverview(ch) {
       <!-- RIGHT column -->
       <div class="dd-overview-right">
         <!-- About card -->
-        <div class="card" style="gap:12px">
-          <div class="sect-lbl" style="margin:0">
-            <span class="msi">info</span> About Channel
+        <div class="card" style="padding:18px;gap:12px">
+          <div style="font-size:13px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:6px">
+            <i data-lucide="info" style="width:15px;height:15px;color:var(--accent)"></i>
+            <span>About Channel</span>
           </div>
-          <p style="font-size:12px;color:var(--t2);line-height:1.6;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden">
+          <p style="font-size:12.5px;color:var(--text-2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden">
             ${esc(ch.description || 'No description available for this channel.')}
           </p>
-          <div style="display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--line-1);font-size:11.5px">
-            <div style="display:flex;justify-content:space-between"><span style="color:var(--t3)">Country</span><span>${esc(ch.country || 'Global')}</span></div>
-            <div style="display:flex;justify-content:space-between"><span style="color:var(--t3)">Joined</span><span>${ch.created || '—'}</span></div>
-            <div style="display:flex;justify-content:space-between"><span style="color:var(--t3)">Channel ID</span><span class="mono" style="font-size:10.5px">${esc(ch.id)}</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--border);font-size:12px">
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-3)">Country</span><span>${esc(ch.country || 'Global')}</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-3)">Joined</span><span>${ch.created || '—'}</span></div>
           </div>
           <a href="https://www.youtube.com/${esc(ch.handle || 'channel/' + ch.id)}" target="_blank" rel="noopener" class="btn btn-gh btn-sm" style="width:100%;margin-top:4px">
-            Open on YouTube ↗
+            <i data-lucide="external-link" style="width:13px;height:13px"></i> Open on YouTube
           </a>
         </div>
 
-        <!-- Health card (fills void under About) -->
-        <div class="dd-health-card">
-          <div class="sect-lbl" style="margin:0">
-            <span class="msi">monitor_heart</span> Channel Health
+        <!-- Health card -->
+        <div class="card" style="padding:18px;gap:12px">
+          <div style="font-size:13px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:6px">
+            <i data-lucide="heart-pulse" style="width:15px;height:15px;color:var(--accent)"></i>
+            <span>Channel Health & Forensics</span>
           </div>
 
-          <div class="dd-health-row">
-            <span class="dd-health-label"><span class="msi" style="font-size:15px">favorite</span> Engagement Rate</span>
-            <span class="dd-health-val" style="color:${engRate >= 4 ? 'var(--up)' : engRate >= 2 ? 'var(--warn)' : 'var(--t2)'}">${engRate > 0 ? engRate + '%' : '—'}</span>
-          </div>
-          ${engRate > 0 ? `
-          <div class="gauge-bar" style="margin:-4px 0 4px"><div class="gauge-fill" style="width:${engGaugePct}%;background:linear-gradient(90deg,${col},var(--up))"></div></div>
-          ` : ''}
+          <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="color:var(--text-3)">Engagement Rate</span>
+              <span class="num" style="font-weight:500;color:${engRate >= 4 ? 'var(--pos)' : 'var(--text-1)'}">${engRate > 0 ? engRate + '%' : '—'}</span>
+            </div>
 
-          <div class="dd-health-row">
-            <span class="dd-health-label"><span class="msi" style="font-size:15px">upload</span> Cadence</span>
-            <span class="dd-health-val">${cadenceStr}</span>
-          </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="color:var(--text-3)">Upload Cadence</span>
+              <span class="num" style="font-weight:500;color:var(--text-1)">${cadenceStr}</span>
+            </div>
 
-          <div class="dd-health-row">
-            <span class="dd-health-label"><span class="msi" style="font-size:15px">local_fire_department</span> Upload Streak</span>
-            <span class="dd-health-val" style="color:${(en.streak || 0) >= 3 ? 'var(--up)' : 'var(--t1)'}">
-              ${(en.streak || 0) > 0 ? en.streak + ' week' + ((en.streak || 0) !== 1 ? 's' : '') : '—'}
-            </span>
-          </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="color:var(--text-3)">Upload Streak</span>
+              <span class="num" style="font-weight:500;color:var(--text-1)">${(en.streak || 0) > 0 ? en.streak + ' week' + ((en.streak || 0) !== 1 ? 's' : '') : '—'}</span>
+            </div>
 
-          <div class="dd-health-row">
-            <span class="dd-health-label"><span class="msi" style="font-size:15px">groups</span> Audience Ratio</span>
-            <span class="dd-health-val">${audienceRatio !== null ? audienceRatio + '%' : '—'}</span>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="color:var(--text-3)">Total Videos</span>
+              <span class="num" style="font-weight:500;color:var(--text-1)">${esc(ch.total_videos || '—')}</span>
+            </div>
           </div>
-          <div style="font-size:10px;color:var(--t3);margin-top:-8px">subs ÷ total views</div>
-
-          <div class="dd-health-row" style="margin-top:4px">
-            <span class="dd-health-label"><span class="msi" style="font-size:15px">video_library</span> Total Videos</span>
-            <span class="dd-health-val">${esc(ch.total_videos || '—')}</span>
-          </div>
-
-          <!-- Phase 8 Competitive Traits -->
-          ${(() => {
-      const primaryId = (all.find(c => c.is_primary) || all[0])?.id;
-      const threat = calcThreatScore(ch.id, primaryId);
-      const eg = calcEvergreenFingerprint(allVids);
-      return `
-            <div style="padding-top:10px;margin-top:8px;border-top:1px solid var(--line-1);display:flex;flex-direction:column;gap:8px">
-              <div class="dd-health-row">
-                <span class="dd-health-label"><span class="msi" style="font-size:15px">${eg.icon}</span> Catalog Strategy</span>
-                <span class="badge ${eg.type === 'evergreen' ? 'bdg-gr' : eg.type === 'hype' ? 'bdg-rd' : 'bdg-dim'}">${eg.label}</span>
-              </div>
-              ${ch.id !== primaryId ? `
-              <div class="dd-health-row">
-                <span class="dd-health-label"><span class="msi" style="font-size:15px">swords</span> Threat Overlap</span>
-                <span class="badge ${threat.score >= 50 ? 'bdg-rd' : threat.score >= 25 ? 'bdg-gd' : 'bdg-dim'}">⚔️ ${threat.score}% affinity</span>
-              </div>` : ''}
-            </div>`;
-    })()}
         </div>
       </div>
     </div>`;
 
-  panel.querySelectorAll('.count-val').forEach(v => countUp(v, v.dataset.val));
-  panel.querySelectorAll('.rev').forEach(r => r.classList.add('in'));
+  if (window.lucide) window.lucide.createIcons();
 }
 
 function buildPulseChart(vids, col) {
   if (!vids || !vids.length) {
-    return '<div style="padding:20px;text-align:center;color:var(--t3);font-size:12px">No video data to chart.</div>';
+    return '<div style="padding:20px;text-align:center;color:var(--text-3);font-size:12px">No video data to chart.</div>';
   }
 
   // Group by week (last 13 weeks = ~91 days)
@@ -320,7 +294,6 @@ function buildPulseChart(vids, col) {
   const weeks = 13;
   const weekMs = 7 * 864e5;
   const buckets = Array.from({ length: weeks }, (_, i) => ({
-    label: '',
     count: 0,
     startMs: now - (weeks - i) * weekMs
   }));
@@ -333,33 +306,31 @@ function buildPulseChart(vids, col) {
   });
 
   const maxC = Math.max(...buckets.map(b => b.count), 1);
-  const W = 600, H = 80, padL = 10, padR = 10, padT = 8, padB = 4;
+  const W = 600, H = 64, padL = 4, padR = 4, padT = 6, padB = 4;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
-  const bW = Math.floor(plotW / weeks) - 3;
-
-  const gradId = 'pulseGrad_' + Math.abs(hash(col));
+  const bW = Math.floor(plotW / weeks) - 4;
 
   let bars = '';
   buckets.forEach((b, i) => {
-    const h = b.count > 0 ? Math.max(6, Math.round((b.count / maxC) * plotH)) : 2;
+    const h = b.count > 0 ? Math.max(6, Math.round((b.count / maxC) * plotH)) : 3;
     const x = padL + i * (plotW / weeks);
     const y = padT + plotH - h;
-    const opacity = b.count > 0 ? 0.7 + (b.count / maxC) * 0.3 : 0.15;
-    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bW}" height="${h}" rx="2" fill="${col}" opacity="${opacity.toFixed(2)}"
-      data-tip="${b.count} upload${b.count !== 1 ? 's' : ''} (week ${i + 1})" style="cursor:pointer"/>`;
+    const opacity = b.count > 0 ? 0.8 : 0.2;
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bW}" height="${h}" rx="2" fill="var(--accent)" opacity="${opacity}"
+      title="${b.count} upload${b.count !== 1 ? 's' : ''} (week ${i + 1})" style="cursor:pointer"/>`;
   });
 
-  const svgHtml = `
-    <div style="width:100%;overflow:hidden;border-radius:var(--r-s);background:var(--bg-3);padding:6px">
+  return `
+    <div style="width:100%;overflow:hidden;border-radius:var(--r-sm);background:var(--surface-2);padding:10px">
       <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block;overflow:visible">
         ${bars}
-        <text x="${padL}" y="${H}" font-size="8" fill="var(--t3)" font-family="DM Sans">13 weeks ago</text>
-        <text x="${W - padR}" y="${H}" text-anchor="end" font-size="8" fill="var(--t3)" font-family="DM Sans">now</text>
       </svg>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-top:6px">
+        <span>13 weeks ago</span>
+        <span>Today</span>
+      </div>
     </div>`;
-
-  return svgHtml;
 }
 
 /* ── Deep Dive Tab 2: Videos (Rebuilt) ────────────────────────────────────── */
