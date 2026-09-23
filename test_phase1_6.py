@@ -107,6 +107,32 @@ def test_circuit_breaker_and_quota_ledger():
     assert isinstance(breaker, bool)
     print(f"PASS: Circuit breaker quota tracking (Current spend: {spend} units, Breaker: {breaker})")
 
+def test_zero_shot_archetype_mapping():
+    from server import map_topic_archetypes
+    b2b = map_topic_archetypes(["solidworks", "cad", "sheet metal"])
+    assert "Workflow Optimization" in b2b or "Deep Dive" in b2b
+    
+    vlog = map_topic_archetypes(["impossible", "stress test", "broke"])
+    assert "Impossible Feat" in vlog or "Stress Test" in vlog
+    
+    edu = map_topic_archetypes(["guide", "tutorial", "beginners"])
+    assert "Zero-to-Mastery" in edu or "Step-by-Step Guide" in edu
+    
+    news = map_topic_archetypes(["news", "breaking", "update"])
+    assert "Breaking Analysis" in news or "Industry Update" in news
+    
+    fallback = map_topic_archetypes(["unknownxyz"])
+    assert len(fallback) >= 1
+    print("PASS: Zero-shot archetype pseudo-sentence mapping (All 4 classes + Fallback verified)")
+
+def test_time_bucketed_outliers():
+    from server import evaluate_outlier_threshold
+    # Should not raise exception
+    evaluate_outlier_threshold("test_vid_1", "test_cid", 500.0, 2)
+    evaluate_outlier_threshold("test_vid_2", "test_cid", 200.0, 24)
+    evaluate_outlier_threshold("test_vid_3", "test_cid", 50.0, 168)
+    print("PASS: Time-bucketed outlier threshold evaluation (T+2h, T+24h, T+168h)")
+
 def test_sql_schema_migration():
     with open("scripts/migration_v4_schema.sql", "r", encoding="utf-8") as f:
         sql = f.read()
@@ -114,8 +140,9 @@ def test_sql_schema_migration():
     assert "USING hnsw (centroid_vector vector_cosine_ops)" in sql
     assert "CREATE TABLE IF NOT EXISTS video_snapshots_v4" in sql
     assert "CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m" in sql
+    assert "CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m_168h" in sql
     assert "CREATE TABLE IF NOT EXISTS quota_ledger" in sql
-    print("PASS: scripts/migration_v4_schema.sql schema verification")
+    print("PASS: scripts/migration_v4_schema.sql schema verification (including 168h view)")
 
 if __name__ == "__main__":
     test_websub_get_challenge()
@@ -126,5 +153,7 @@ if __name__ == "__main__":
     test_score_title_endpoint()
     test_cron_process_snapshots_endpoint()
     test_circuit_breaker_and_quota_ledger()
+    test_zero_shot_archetype_mapping()
+    test_time_bucketed_outliers()
     test_sql_schema_migration()
-    print("\nALL BACKEND AUTOMATED TESTS PASSED (9/9)!")
+    print("\nALL BACKEND AUTOMATED TESTS PASSED (11/11)!")

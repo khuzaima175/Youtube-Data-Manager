@@ -67,8 +67,8 @@ CREATE TABLE IF NOT EXISTS video_snapshots_2026_10 PARTITION OF video_snapshots_
 CREATE INDEX IF NOT EXISTS idx_v_snap_vid ON video_snapshots_v4(video_id);
 CREATE INDEX IF NOT EXISTS idx_v_snap_ch_age ON video_snapshots_v4(channel_id, age_hours);
 
--- 5. Time-Windowed Velocity-to-Maturity (V2M) Materialized View
--- Includes 23.0h to 25.0h tolerance window to absorb cron scheduling jitter
+-- 5. Time-Windowed Velocity-to-Maturity (V2M) Materialized Views
+-- 5.1 T+24h View (23.0h to 25.0h tolerance window to absorb cron scheduling jitter)
 CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m AS
 SELECT 
     channel_id,
@@ -82,6 +82,21 @@ WHERE age_hours BETWEEN 23.0 AND 25.0
 GROUP BY channel_id;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_cb_v2m_cid ON channel_baselines_v2m(channel_id);
+
+-- 5.2 T+168h (Day 7) View (164.0h to 172.0h capture window to absorb day-7 jitter)
+CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m_168h AS
+SELECT 
+    channel_id,
+    COUNT(DISTINCT video_id) as sample_count,
+    percentile_cont(0.50) WITHIN GROUP (ORDER BY velocity_per_hour) as median_velocity_168h,
+    percentile_cont(0.95) WITHIN GROUP (ORDER BY velocity_per_hour) as p95_velocity_168h,
+    AVG(velocity_per_hour) as avg_velocity_168h,
+    NOW() as refreshed_at
+FROM video_snapshots_v4
+WHERE age_hours BETWEEN 164.0 AND 172.0
+GROUP BY channel_id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cb_v2m_168h_cid ON channel_baselines_v2m_168h(channel_id);
 
 -- 6. Quota Ledger Table for Circuit Breakers
 CREATE TABLE IF NOT EXISTS quota_ledger (

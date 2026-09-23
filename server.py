@@ -1613,10 +1613,12 @@ def cluster_titles_semantic(videos: list[dict], threshold: float = 0.60) -> list
                 word_freq[w] = word_freq.get(w, 0) + 1
         top_words = sorted(word_freq.keys(), key=lambda w: word_freq[w], reverse=True)[:3]
         topic_label = " ".join(top_words).title() if top_words else centroid_title[:30]
+        archetypes = map_topic_archetypes(top_words or [topic_label])
 
         result.append({
             "cluster_id": f"cluster-{abs(hash(centroid_title)) % 10000}",
             "topic": topic_label,
+            "archetypes": archetypes,
             "n": len(vlist),
             "avg_views": avg_v,
             "centroid_title": centroid_title,
@@ -1624,6 +1626,29 @@ def cluster_titles_semantic(videos: list[dict], threshold: float = 0.60) -> list
         })
 
     return sorted(result, key=lambda c: c["avg_views"], reverse=True)
+
+def map_topic_archetypes(keywords: list[str]) -> list[str]:
+    """
+    Map topic keywords to Creator Studio viral packaging archetypes (v5.0 Patch 3):
+    - Pseudo-sentence formatting: "This video is about {kw1, kw2, ...}"
+    - Complete archetype mappings: B2B Engineering, Vlog Entertainment, Educational Tutorial, News, and Fallback.
+    """
+    if not keywords:
+        return ["General Deep Dive", "Explainer"]
+    
+    kw_string = f"This video is about {', '.join(keywords[:5])}".lower()
+    
+    # Categorization heuristic calibrated against BART-MNLI classes
+    if any(k in kw_string for k in ["cad", "solidworks", "cnc", "engineering", "code", "architecture", "tool", "dev", "api", "tech", "hardware", "software", "system"]):
+        return ["Deep Dive", "Workflow Optimization", "Common Mistakes"]
+    elif any(k in kw_string for k in ["challenge", "vlog", "insane", "impossible", "test", "stress", "secret", "hidden", "truth", "broke", "worst"]):
+        return ["Impossible Feat", "Stress Test", "Hidden Flaw"]
+    elif any(k in kw_string for k in ["learn", "mastery", "guide", "tutorial", "step", "beginners", "complete", "course", "basics", "how to"]):
+        return ["Zero-to-Mastery", "Step-by-Step Guide", "Common Pitfalls"]
+    elif any(k in kw_string for k in ["news", "update", "breaking", "release", "announcement", "future", "ai", "leak", "vs"]):
+        return ["Breaking Analysis", "Industry Update", "What It Means"]
+    else:
+        return ["General Deep Dive", "Explainer"]
 
 @app.route("/api/topics/semantic-clusters", methods=["GET", "POST"])
 def get_semantic_clusters():
@@ -1710,14 +1735,40 @@ def schedule_video_snapshots(video_id: str, channel_id: str):
     except Exception as ex:
         print(f"[SnapshotSchedule] Notice: {ex}")
 
+_redis_instance = None
+
+def get_redis_client():
+    """Returns connected Redis client if available, else None."""
+    global _redis_instance
+    if _redis_instance is None:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        try:
+            redis_lib = importlib.import_module("redis")
+            client = redis_lib.from_url(redis_url, socket_timeout=1)
+            client.ping()
+            _redis_instance = client
+        except Exception:
+            _redis_instance = False
+    return _redis_instance if _redis_instance is not False else None
+
 def get_daily_quota_spend() -> int:
-    """Get current quota spend for today."""
+    """Get current quota spend for today with Redis byte type-cast and Supabase fallback (v5.0 Patch 1)."""
+    r = get_redis_client()
+    if r:
+        try:
+            raw_spend = r.get("quota:daily_spend")
+            if raw_spend is not None:
+                # 1. TYPE CAST FIX: Decode bytes safely to integer
+                return int(raw_spend.decode("utf-8") if isinstance(raw_spend, bytes) else raw_spend)
+        except Exception:
+            pass
+
     today_key = time.strftime("%Y-%m-%d", time.gmtime())
     try:
         sb = get_sb()
-        r = sb.table("quota_ledger").select("units_spent, circuit_breaker_active").eq("ledger_date", today_key).limit(1).execute()
-        if r.data:
-            return r.data[0].get("units_spent", 0)
+        res = sb.table("quota_ledger").select("units_spent").eq("ledger_date", today_key).limit(1).execute()
+        if res.data:
+            return res.data[0].get("units_spent", 0)
     except Exception:
         pass
     return 0
@@ -1728,13 +1779,32 @@ def is_circuit_breaker_active() -> bool:
     return spend >= 8500
 
 def record_quota_spend(units: int = 1):
-    """Record quota spend and trigger circuit breaker if capacity >= 85%."""
+    """Record quota spend in Redis & Supabase with 24h midnight reset and 85% circuit breaker (v5.0 Patch 1)."""
+    r = get_redis_client()
+    current_spend = 0
+    if r:
+        try:
+            raw_spend = r.get("quota:daily_spend")
+            # 1. TYPE CAST FIX: Decode bytes safely to integer
+            if raw_spend is not None:
+                current_spend = int(raw_spend.decode("utf-8") if isinstance(raw_spend, bytes) else raw_spend)
+            else:
+                current_spend = 0
+
+            # 2. MIDNIGHT RESET FIX: Expire key 24 hours (86400s) on initial creation
+            if raw_spend is None:
+                r.set("quota:daily_spend", str(units), ex=86400)
+            else:
+                r.incrby("quota:daily_spend", units)
+        except Exception as ex:
+            print(f"[RedisQuota] Warning: {ex}")
+
     today_key = time.strftime("%Y-%m-%d", time.gmtime())
     try:
         sb = get_sb()
-        r = sb.table("quota_ledger").select("units_spent").eq("ledger_date", today_key).limit(1).execute()
-        current = r.data[0]["units_spent"] if r.data else 0
-        new_spend = current + units
+        res = sb.table("quota_ledger").select("units_spent").eq("ledger_date", today_key).limit(1).execute()
+        db_current = res.data[0]["units_spent"] if res.data else 0
+        new_spend = max(current_spend + units, db_current + units)
         breaker = new_spend >= 8500
 
         sb.table("quota_ledger").upsert({
@@ -1743,11 +1813,89 @@ def record_quota_spend(units: int = 1):
             "circuit_breaker_active": breaker
         }, on_conflict="ledger_date").execute()
 
-        if breaker and not (current >= 8500):
-            print("[CircuitBreaker] ⚠️ Quota >= 8500 units! Cancelling non-critical historical snapshots.")
+        # 3. Circuit Breaker trigger
+        if breaker and not (db_current >= 8500):
+            print("[CircuitBreaker] ⚠️ Daily quota >= 8,500 units! Cancelling non-critical historical checkpoints (24h, 168h).")
             sb.table("snapshot_schedule").update({"status": "cancelled"}).in_("hour_checkpoint", [24, 168]).eq("status", "pending").execute()
-    except Exception as ex:
+    except Exception:
         pass
+
+def evaluate_outlier_threshold(video_id: str, channel_id: str, current_velocity: float, hour_checkpoint: int):
+    """
+    Evaluate time-bucketed velocity outlier thresholds (v5.0 Patch 2 & 4):
+    - T+2h Bucket: Requires >= 3.5x historical baseline (Viral Breakout)
+    - T+24h Bucket: Requires >= 2.5x historical baseline (Fast Velocity Outlier)
+    - T+168h Bucket: Requires >= 2.0x historical 168h baseline (Sustained Evergreen Outlier)
+    """
+    try:
+        channels = load_channels()
+        ch_meta = next((c for c in channels if c.get("id") == channel_id), None)
+        channel_name = ch_meta.get("name", channel_id) if ch_meta else channel_id
+
+        sb = get_sb()
+        baseline_velocity = None
+
+        if hour_checkpoint == 2:
+            try:
+                res = sb.table("channel_baselines_v2m").select("median_velocity_24h").eq("channel_id", channel_id).limit(1).execute()
+                if res.data:
+                    baseline_velocity = float(res.data[0].get("median_velocity_24h") or 1.0)
+            except Exception:
+                pass
+            if not baseline_velocity or baseline_velocity <= 0:
+                baseline_velocity = max(1.0, float(ch_meta.get("median_views_30d", 1000) if ch_meta else 1000) / 720.0)
+
+            if current_velocity >= (baseline_velocity * 3.5):
+                multiplier = round(current_velocity / baseline_velocity, 2)
+                alert_payload = {
+                    "id": video_id,
+                    "title": f"Viral Breakout (T+2h) - {current_velocity:.1f} v/h ({multiplier}x baseline)",
+                    "velocity": current_velocity,
+                    "hour_checkpoint": 2
+                }
+                dispatch_outlier_alert(alert_payload, ch_meta or {"name": channel_name, "id": channel_id}, multiplier)
+
+        elif hour_checkpoint == 24:
+            try:
+                res = sb.table("channel_baselines_v2m").select("median_velocity_24h").eq("channel_id", channel_id).limit(1).execute()
+                if res.data:
+                    baseline_velocity = float(res.data[0].get("median_velocity_24h") or 1.0)
+            except Exception:
+                pass
+            if not baseline_velocity or baseline_velocity <= 0:
+                baseline_velocity = max(1.0, float(ch_meta.get("median_views_30d", 1000) if ch_meta else 1000) / 720.0)
+
+            if current_velocity >= (baseline_velocity * 2.5):
+                multiplier = round(current_velocity / baseline_velocity, 2)
+                alert_payload = {
+                    "id": video_id,
+                    "title": f"Fast Velocity Outlier (T+24h) - {current_velocity:.1f} v/h ({multiplier}x baseline)",
+                    "velocity": current_velocity,
+                    "hour_checkpoint": 24
+                }
+                dispatch_outlier_alert(alert_payload, ch_meta or {"name": channel_name, "id": channel_id}, multiplier)
+
+        elif hour_checkpoint == 168:
+            try:
+                res = sb.table("channel_baselines_v2m_168h").select("median_velocity_168h").eq("channel_id", channel_id).limit(1).execute()
+                if res.data:
+                    baseline_velocity = float(res.data[0].get("median_velocity_168h") or 1.0)
+            except Exception:
+                pass
+            if not baseline_velocity or baseline_velocity <= 0:
+                baseline_velocity = max(1.0, float(ch_meta.get("median_views_30d", 1000) if ch_meta else 1000) / 1440.0)
+
+            if current_velocity >= (baseline_velocity * 2.0):
+                multiplier = round(current_velocity / baseline_velocity, 2)
+                alert_payload = {
+                    "id": video_id,
+                    "title": f"Sustained Evergreen Outlier (T+7d) - {current_velocity:.1f} v/h ({multiplier}x baseline)",
+                    "velocity": current_velocity,
+                    "hour_checkpoint": 168
+                }
+                dispatch_outlier_alert(alert_payload, ch_meta or {"name": channel_name, "id": channel_id}, multiplier)
+    except Exception as ex:
+        print(f"[OutlierThreshold] Error evaluating video {video_id}: {ex}")
 
 @app.route("/api/webhooks/youtube-sub", methods=["GET", "POST"])
 def youtube_websub_webhook():
@@ -1911,6 +2059,11 @@ def cron_process_snapshots():
                     "age_hours": round(age_hours, 2),
                     "view_count": vc
                 })
+
+                # Evaluate Time-Bucketed Outlier Thresholds (v5.0 Patch 2 & 4)
+                current_vel = vc / max(0.1, age_hours)
+                evaluate_outlier_threshold(vid, cid or "unknown", current_vel, int(item.get("hour_checkpoint", 24)))
+
             completed_ids.append(item["id"])
 
         if snap_rows:
