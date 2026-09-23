@@ -2194,6 +2194,79 @@ def subscribe_channel_websub(channel_id: str, hub_url: str = "https://pubsubhubb
         print(f"[WebSub] Subscription error for {channel_id}: {ex}")
         return False
 
+def poll_channels_fallback(max_videos_per_channel: int = 5) -> dict:
+    """
+    Hybrid Discovery Engine: Polling Fallback.
+    Protects against Google WebSub notification loss, delivery delays (Issue #554905105),
+    or subscription 503/429 failures by periodically polling the uploads playlist for tracked channels.
+    Costs 1 quota unit per channel poll.
+    """
+    if is_circuit_breaker_active():
+        return {"success": True, "circuit_breaker": True, "discovered": 0, "channels_polled": 0}
+
+    channels = load_channels()
+    if not channels:
+        return {"success": True, "discovered": 0, "channels_polled": 0}
+
+    discovered = []
+    channels_polled = 0
+
+    for ch in channels:
+        if is_circuit_breaker_active():
+            break
+        cid = ch.get("id")
+        if not cid:
+            continue
+
+        # Derived uploads playlist ID from channel ID ('UC...' -> 'UU...')
+        uploads_pid = f"UU{cid[2:]}" if cid.startswith("UC") else cid
+
+        try:
+            yt = get_yt()
+            record_quota_spend(1)
+            channels_polled += 1
+            pl = yt.playlistItems().list(
+                part="snippet",
+                playlistId=uploads_pid,
+                maxResults=max_videos_per_channel
+            ).execute()
+
+            for item in pl.get("items", []):
+                snippet = item.get("snippet", {})
+                vid_id = snippet.get("resourceId", {}).get("videoId")
+                title = snippet.get("title", "New Drop")
+                published_at = snippet.get("publishedAt", "")
+
+                if vid_id and not db_video_exists(vid_id):
+                    print(f"[HybridDiscovery] Fallback polling discovered missing drop! Video: {vid_id} ({title}) by Channel: {cid}")
+                    discovered.append({
+                        "id": vid_id,
+                        "channel_id": cid,
+                        "title": title,
+                        "published_at": published_at
+                    })
+                    # Ingest single video and queue snapshots
+                    threading.Thread(
+                        target=_process_websub_drop,
+                        args=(vid_id, cid, title, published_at, True),
+                        daemon=True
+                    ).start()
+        except Exception as ex:
+            print(f"[HybridDiscovery] Polling warning for {cid}: {ex}")
+
+    return {
+        "success": True,
+        "channels_polled": channels_polled,
+        "discovered_count": len(discovered),
+        "discovered_videos": discovered
+    }
+
+@app.route("/api/cron/poll-channels-fallback", methods=["GET", "POST"])
+def cron_poll_channels_fallback():
+    """Triggered by cron (every 15-30m) to catch any uploads dropped or delayed by Google WebSub."""
+    res = poll_channels_fallback()
+    return jsonify(res)
+
 
 # ── Phase 5: Outlier Radar Webhook System ─────────────────────────────────────
 

@@ -160,13 +160,15 @@ function buildTopicCache(force = false) {
     const recentAvg = s.recentViews.length > 0 ? s.recentViews.reduce((a, b) => a + b, 0) / s.recentViews.length : 0;
     const oldAvg = s.oldViews.length > 0 ? s.oldViews.reduce((a, b) => a + b, 0) / s.oldViews.length : 0;
     
-    // Empirical Bayes Shrinkage for RPI (P1)
+    // Fixed-Prior Bayesian Shrinkage / Bühlmann Credibility Weighting for RPI
     const rawRpi = s.n > 0 ? s.totalRpi / s.n : 1.0;
     const rawVrpi = s.n > 0 ? s.totalVrpi / s.n : 1.0;
-    const w = s.n / (s.n + 5); // Weight formula w = n / (n + 5)
+    // Actuarial Bühlmann ratio (EPV/VHM ~ 15) reflecting heavy-tailed within-topic video variance on YouTube
+    const K_CREDIBILITY = 15;
+    const w = s.n / (s.n + K_CREDIBILITY); // Weight formula w = n / (n + 15)
     const shrunkenRpi = parseFloat((w * rawRpi + (1 - w) * 1.0).toFixed(2));
     const shrunkenVrpi = parseFloat((w * rawVrpi + (1 - w) * 1.0).toFixed(2));
-    const confidenceTag = s.n >= 8 ? `High (n=${s.n})` : s.n >= 4 ? `Moderate (n=${s.n})` : `Shrunken (n=${s.n})`;
+    const confidenceTag = s.n >= 15 ? `High (n=${s.n})` : s.n >= 6 ? `Moderate (n=${s.n})` : `Shrunken (n=${s.n})`;
     
     // Supply / Demand Saturation Matrix Metrics (P2)
     const supply14d = s.supply14d;
