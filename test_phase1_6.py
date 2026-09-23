@@ -80,10 +80,51 @@ def test_cron_outliers():
     assert data.get("success") is True
     print("PASS: Cron outlier checker scanner")
 
+def test_score_title_endpoint():
+    client = app.test_client()
+    resp = client.post("/api/intelligence/score-title", json={"title": "How SolidWorks 2026 Solves Sheet Metal K-Factor (Full Guide)"})
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+    data = resp.get_json()
+    assert data.get("success") is True
+    assert data.get("score") > 70
+    assert data.get("is_hook_before_fold") is True
+    assert "visible_title" in data
+    print(f"PASS: /api/intelligence/score-title endpoint (Score: {data.get('score')})")
+
+def test_cron_process_snapshots_endpoint():
+    client = app.test_client()
+    resp = client.post("/api/cron/process-snapshots")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data.get("success") is True
+    print("PASS: /api/cron/process-snapshots endpoint")
+
+def test_circuit_breaker_and_quota_ledger():
+    from server import get_daily_quota_spend, is_circuit_breaker_active, record_quota_spend
+    spend = get_daily_quota_spend()
+    assert isinstance(spend, int)
+    breaker = is_circuit_breaker_active()
+    assert isinstance(breaker, bool)
+    print(f"PASS: Circuit breaker quota tracking (Current spend: {spend} units, Breaker: {breaker})")
+
+def test_sql_schema_migration():
+    with open("scripts/migration_v4_schema.sql", "r", encoding="utf-8") as f:
+        sql = f.read()
+    assert "CREATE TABLE IF NOT EXISTS snapshot_schedule" in sql
+    assert "USING hnsw (centroid_vector vector_cosine_ops)" in sql
+    assert "CREATE TABLE IF NOT EXISTS video_snapshots_v4" in sql
+    assert "CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m" in sql
+    assert "CREATE TABLE IF NOT EXISTS quota_ledger" in sql
+    print("PASS: scripts/migration_v4_schema.sql schema verification")
+
 if __name__ == "__main__":
     test_websub_get_challenge()
     test_websub_post_xml()
     test_semantic_clusters()
     test_webhook_settings()
     test_cron_outliers()
-    print("\nALL BACKEND AUTOMATED TESTS PASSED (5/5)!")
+    test_score_title_endpoint()
+    test_cron_process_snapshots_endpoint()
+    test_circuit_breaker_and_quota_ledger()
+    test_sql_schema_migration()
+    print("\nALL BACKEND AUTOMATED TESTS PASSED (9/9)!")

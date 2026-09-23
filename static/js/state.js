@@ -7,11 +7,18 @@ const ICON_FONT = 'Material Symbols Rounded';
 const isMac = /Mac|iPhone|iPad/i.test(navigator.userAgent || navigator.platform || '');
 const kbdShortcutText = isMac ? '⌘K' : 'Ctrl K';
 
-/* ── 00.1 Reactive Vanilla JS Event Store (Phase 6) ───────────────────────── */
-class ReactiveStore {
+/* ── 00.1 Deep-Reactive Engine (v4.0 Spec: WeakMap Proxy + rAF Batching) ─── */
+class DeepReactiveStore {
   constructor(initialState = {}) {
     this._state = { ...initialState };
     this._listeners = new Map();
+    this._proxyCache = new WeakMap();
+    this._dirtyKeys = new Set();
+    this._oldValues = new Map();
+    this._isRenderScheduled = false;
+
+    // Create identity-stable root deep proxy
+    this.proxy = this._createDeepProxy(this._state, '');
   }
 
   get(key) {
@@ -19,10 +26,7 @@ class ReactiveStore {
   }
 
   set(key, val) {
-    const oldVal = this._state[key];
-    if (oldVal === val) return;
-    this._state[key] = val;
-    this._emit(key, val, oldVal);
+    this.proxy[key] = val;
   }
 
   subscribe(key, fn) {
@@ -34,21 +38,114 @@ class ReactiveStore {
     };
   }
 
-  _emit(key, val, oldVal) {
-    const subs = this._listeners.get(key);
-    if (subs) {
-      subs.forEach(fn => {
-        try { fn(val, oldVal); } catch (err) { console.error(`[appState] Listener error for ${key}:`, err); }
-      });
+  _scheduleRender(key, oldVal) {
+    if (!this._dirtyKeys.has(key)) {
+      this._dirtyKeys.add(key);
+      if (!this._oldValues.has(key)) {
+        this._oldValues.set(key, oldVal);
+      }
     }
-    try {
-      window.dispatchEvent(new CustomEvent(`appstate:${key}`, { detail: { value: val, oldValue: oldVal } }));
-      window.dispatchEvent(new CustomEvent('appstate:change', { detail: { key, value: val, oldValue: oldVal } }));
-    } catch { }
+
+    if (!this._isRenderScheduled) {
+      this._isRenderScheduled = true;
+      const defer = typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+        ? window.requestAnimationFrame.bind(window)
+        : (fn) => setTimeout(fn, 16);
+
+      defer(() => this._flushBatchedUpdates());
+    }
+  }
+
+  _flushBatchedUpdates() {
+    this._isRenderScheduled = false;
+    const dirty = Array.from(this._dirtyKeys);
+    const oldVals = new Map(this._oldValues);
+    this._dirtyKeys.clear();
+    this._oldValues.clear();
+
+    for (const key of dirty) {
+      const val = this._state[key];
+      const oldVal = oldVals.get(key);
+
+      // Notify direct subscribers
+      const subs = this._listeners.get(key);
+      if (subs) {
+        subs.forEach(fn => {
+          try { fn(val, oldVal); } catch (err) { console.error(`[appState] Listener error for ${key}:`, err); }
+        });
+      }
+
+      // Legacy & Phase 6 Event Bridging
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        try {
+          window.dispatchEvent(new CustomEvent(`appstate:${key}`, { detail: { value: val, oldValue: oldVal } }));
+        } catch { }
+      }
+    }
+
+    if (dirty.length > 0 && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      try {
+        window.dispatchEvent(new CustomEvent('appstate:change', { detail: { dirtyKeys: dirty } }));
+      } catch { }
+    }
+  }
+
+  _createDeepProxy(target, path = '') {
+    if (target === null || typeof target !== 'object') {
+      return target;
+    }
+
+    // WeakMap identity cache ensures appState.a.b === appState.a.b
+    if (this._proxyCache.has(target)) {
+      return this._proxyCache.get(target);
+    }
+
+    const self = this;
+    const proxy = new Proxy(target, {
+      get(t, prop, receiver) {
+        if (typeof prop === 'symbol') return Reflect.get(t, prop, receiver);
+        // Expose store helper methods on root proxy if invoked
+        if (path === '' && (prop === 'get' || prop === 'set' || prop === 'subscribe')) {
+          return self[prop].bind(self);
+        }
+
+        const val = Reflect.get(t, prop, receiver);
+        if (val !== null && typeof val === 'object') {
+          const nextPath = path ? `${path}.${String(prop)}` : String(prop);
+          return self._createDeepProxy(val, nextPath);
+        }
+        return val;
+      },
+
+      set(t, prop, value, receiver) {
+        if (typeof prop === 'symbol') return Reflect.set(t, prop, value, receiver);
+        const oldVal = t[prop];
+        if (oldVal === value && !Array.isArray(t)) return true;
+
+        const rootKey = path ? path.split('.')[0] : String(prop);
+        const result = Reflect.set(t, prop, value, receiver);
+
+        self._scheduleRender(rootKey, oldVal);
+        return result;
+      },
+
+      deleteProperty(t, prop) {
+        if (typeof prop === 'symbol') return Reflect.deleteProperty(t, prop);
+        const oldVal = t[prop];
+        const rootKey = path ? path.split('.')[0] : String(prop);
+        const result = Reflect.deleteProperty(t, prop);
+
+        self._scheduleRender(rootKey, oldVal);
+        return result;
+      }
+    });
+
+    this._proxyCache.set(target, proxy);
+    return proxy;
   }
 }
 
-const _appStore = new ReactiveStore({
+const _appStore = new DeepReactiveStore({
   activeChannel: null,
   selectedTopic: null,
   titleLabDraft: 'How EUV Lithography Works: The Secret to 2nm Chips (Explained)',
@@ -58,20 +155,7 @@ const _appStore = new ReactiveStore({
   themeAccent: 'cyan'
 });
 
-const appState = new Proxy(_appStore, {
-  get(target, prop) {
-    if (typeof prop === 'symbol') return Reflect.get(target, prop);
-    if (prop in target && typeof target[prop] === 'function') {
-      return target[prop].bind(target);
-    }
-    return target.get(prop);
-  },
-  set(target, prop, value) {
-    target.set(prop, value);
-    return true;
-  }
-});
-
+const appState = _appStore.proxy;
 window.appState = appState;
 
 /* ── Global State ─────────────────────────────────────────────────────────── */

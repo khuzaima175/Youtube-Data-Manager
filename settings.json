@@ -1,6 +1,6 @@
 {
-  "webhook_url": "",
+  "webhook_url": "https://discord.com/api/webhooks/dummy/sample",
   "platform": "discord",
-  "min_vrpi": 2.5,
+  "min_vrpi": 3.0,
   "enabled": false
 }

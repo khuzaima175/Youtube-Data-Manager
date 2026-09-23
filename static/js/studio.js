@@ -161,6 +161,37 @@ function scoreTitle(title) {
   };
 }
 
+let _titleLabAbortCtrl = null;
+
+async function syncTitleIntelligenceAsync(title) {
+  if (!title || !title.trim()) return;
+  if (_titleLabAbortCtrl) {
+    try { _titleLabAbortCtrl.abort(); } catch { }
+  }
+  _titleLabAbortCtrl = new AbortController();
+  const signal = _titleLabAbortCtrl.signal;
+
+  try {
+    const res = await fetch('/api/intelligence/score-title', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title.trim() }),
+      signal
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.success && titleLabDraft === title) {
+      const scoreNumEl = document.getElementById('tlScoreNum');
+      if (scoreNumEl && data.score) {
+        // Smoothly blend AI verified score
+        scoreNumEl.title = `AI Verified Score: ${data.score}/100`;
+      }
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+  }
+}
+
 function onTitleLabInput(val) {
   titleLabDraft = val;
   const res = scoreTitle(val);
@@ -222,6 +253,9 @@ function onTitleLabInput(val) {
     mobileHookDiagEl.innerHTML = `<i data-lucide="${iconName}" style="width:14px;height:14px;flex-shrink:0"></i><span>${msg}</span>`;
     if (window.lucide) window.lucide.createIcons();
   }
+
+  // Trigger non-blocking async backend verification with network cancellation
+  syncTitleIntelligenceAsync(val);
 }
 
 function appendTokenToTitle(token) {

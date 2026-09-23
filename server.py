@@ -1668,7 +1668,86 @@ def get_semantic_clusters():
         return jsonify({"success": False, "error": str(ex), "clusters": []}), 500
 
 
-# ── Phase 4: Zero-Quota Google WebSub Ingestion ────────────────────────────────
+# ── Phase 4: Zero-Quota Google WebSub Ingestion & Snapshot Scheduler ─────────
+
+def db_video_exists(video_id: str) -> bool:
+    """Check if video already exists in database or cache to avoid edit traps on historical videos."""
+    for en in _full_cache.values():
+        if any(v.get("id") == video_id or v.get("video_id") == video_id for v in en.get("data", [])):
+            return True
+    for en in _video_cache.values():
+        if any(v.get("id") == video_id or v.get("video_id") == video_id for v in en.get("data", [])):
+            return True
+    try:
+        sb = get_sb()
+        r = sb.table("videos").select("id").eq("id", video_id).limit(1).execute()
+        return bool(r.data)
+    except Exception:
+        return False
+
+def schedule_video_snapshots(video_id: str, channel_id: str):
+    """Schedule T+2h, T+24h, and T+168h snapshots in snapshot_schedule table."""
+    try:
+        sb = get_sb()
+        now_ts = time.time()
+        checkpoints = [
+            {"hour": 2, "offset": 2 * 3600},
+            {"hour": 24, "offset": 24 * 3600},
+            {"hour": 168, "offset": 168 * 3600}
+        ]
+        rows = []
+        for cp in checkpoints:
+            target_time = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now_ts + cp["offset"]))
+            rows.append({
+                "video_id": video_id,
+                "channel_id": channel_id,
+                "target_snapshot_at": target_time,
+                "hour_checkpoint": cp["hour"],
+                "status": "pending"
+            })
+        sb.table("snapshot_schedule").insert(rows).execute()
+        print(f"[SnapshotSchedule] Queued T+2h, T+24h, T+168h checkpoints for {video_id}")
+    except Exception as ex:
+        print(f"[SnapshotSchedule] Notice: {ex}")
+
+def get_daily_quota_spend() -> int:
+    """Get current quota spend for today."""
+    today_key = time.strftime("%Y-%m-%d", time.gmtime())
+    try:
+        sb = get_sb()
+        r = sb.table("quota_ledger").select("units_spent, circuit_breaker_active").eq("ledger_date", today_key).limit(1).execute()
+        if r.data:
+            return r.data[0].get("units_spent", 0)
+    except Exception:
+        pass
+    return 0
+
+def is_circuit_breaker_active() -> bool:
+    """Check if circuit breaker is active (>8,500 units spent today)."""
+    spend = get_daily_quota_spend()
+    return spend >= 8500
+
+def record_quota_spend(units: int = 1):
+    """Record quota spend and trigger circuit breaker if capacity >= 85%."""
+    today_key = time.strftime("%Y-%m-%d", time.gmtime())
+    try:
+        sb = get_sb()
+        r = sb.table("quota_ledger").select("units_spent").eq("ledger_date", today_key).limit(1).execute()
+        current = r.data[0]["units_spent"] if r.data else 0
+        new_spend = current + units
+        breaker = new_spend >= 8500
+
+        sb.table("quota_ledger").upsert({
+            "ledger_date": today_key,
+            "units_spent": new_spend,
+            "circuit_breaker_active": breaker
+        }, on_conflict="ledger_date").execute()
+
+        if breaker and not (current >= 8500):
+            print("[CircuitBreaker] ⚠️ Quota >= 8500 units! Cancelling non-critical historical snapshots.")
+            sb.table("snapshot_schedule").update({"status": "cancelled"}).in_("hour_checkpoint", [24, 168]).eq("status", "pending").execute()
+    except Exception as ex:
+        pass
 
 @app.route("/api/webhooks/youtube-sub", methods=["GET", "POST"])
 def youtube_websub_webhook():
@@ -1715,18 +1794,21 @@ def youtube_websub_webhook():
         print(f"[WebSub] Real-time drop detected! Video: {video_id} ({title}) by Channel: {channel_id}")
 
         if video_id:
-            # Single-video API fetch (only 1 quota unit!)
-            threading.Thread(target=_process_websub_drop, args=(video_id, channel_id, title, published_at), daemon=True).start()
+            # EDIT TRAP GUARD: Check if video is already tracked
+            is_new_video = not db_video_exists(video_id)
+            # Process single-video API fetch
+            threading.Thread(target=_process_websub_drop, args=(video_id, channel_id, title, published_at, is_new_video), daemon=True).start()
 
         return "OK - Processed", 200
     except Exception as ex:
         print(f"[WebSub] XML parse error: {ex}")
         return f"Error: {ex}", 200
 
-def _process_websub_drop(video_id: str, channel_id: str, title: str, published_at: str):
-    """Enrich video stats in background, update DB, and check for Breakout Outlier alerts."""
+def _process_websub_drop(video_id: str, channel_id: str, title: str, published_at: str, is_new_video: bool = True):
+    """Enrich video stats in background, update DB, queue snapshot schedule, and check for Outlier alerts."""
     try:
         yt = get_yt()
+        record_quota_spend(1)
         res = yt.videos().list(id=video_id, part="snippet,statistics,contentDetails").execute()
         items = res.get("items", [])
         if not items:
@@ -1760,6 +1842,10 @@ def _process_websub_drop(video_id: str, channel_id: str, title: str, published_a
         except Exception as e:
             print(f"[WebSub] Supabase save warning: {e}")
 
+        # If net-new video, queue T+2h, T+24h, T+168h snapshot checkpoints
+        if is_new_video:
+            schedule_video_snapshots(video_id, channel_id)
+
         # Check VRPI & Breakout Outlier
         channels = load_channels()
         ch_meta = next((c for c in channels if c.get("id") == channel_id), None)
@@ -1780,6 +1866,101 @@ def _process_websub_drop(video_id: str, channel_id: str, title: str, published_a
 
     except Exception as ex:
         print(f"[WebSub] _process_websub_drop error: {ex}")
+
+@app.route("/api/cron/process-snapshots", methods=["GET", "POST"])
+def cron_process_snapshots():
+    """Process pending snapshot checkpoints due from snapshot_schedule table."""
+    if is_circuit_breaker_active():
+        return jsonify({"success": True, "circuit_breaker": True, "processed": 0})
+
+    try:
+        sb = get_sb()
+        now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        r = sb.table("snapshot_schedule").select("*").eq("status", "pending").lte("target_snapshot_at", now_iso).limit(50).execute()
+        pending = r.data or []
+        if not pending:
+            return jsonify({"success": True, "processed": 0, "message": "No pending snapshots due"})
+
+        video_ids = list(set(item["video_id"] for item in pending))
+        yt = get_yt()
+        record_quota_spend(1)
+        res = yt.videos().list(id=",".join(video_ids), part="snippet,statistics").execute()
+        stats_map = {item["id"]: item for item in res.get("items", [])}
+
+        now_ts = time.time()
+        snap_rows = []
+        completed_ids = []
+
+        for item in pending:
+            vid = item["video_id"]
+            cid = item.get("channel_id")
+            v_data = stats_map.get(vid)
+            if v_data:
+                vc = int(v_data.get("statistics", {}).get("viewCount", 0))
+                pub_str = v_data.get("snippet", {}).get("publishedAt", "")
+                try:
+                    t_pub = time.mktime(time.strptime(pub_str[:10], "%Y-%m-%d"))
+                    age_hours = max(0.1, (now_ts - t_pub) / 3600.0)
+                except Exception:
+                    age_hours = float(item["hour_checkpoint"])
+
+                snap_rows.append({
+                    "video_id": vid,
+                    "channel_id": cid or "unknown",
+                    "recorded_at": now_iso,
+                    "age_hours": round(age_hours, 2),
+                    "view_count": vc
+                })
+            completed_ids.append(item["id"])
+
+        if snap_rows:
+            try:
+                sb.table("video_snapshots_v4").insert(snap_rows).execute()
+            except Exception:
+                try:
+                    sb.table("video_snapshots").insert(snap_rows).execute()
+                except Exception:
+                    pass
+
+        if completed_ids:
+            sb.table("snapshot_schedule").update({"status": "completed", "executed_at": now_iso}).in_("id", completed_ids).execute()
+
+        return jsonify({"success": True, "processed": len(completed_ids), "snapshots_recorded": len(snap_rows)})
+    except Exception as ex:
+        print(f"[SnapshotWorker] Notice: {ex}")
+        return jsonify({"success": True, "processed": 0, "notice": str(ex)})
+
+@app.route("/api/intelligence/score-title", methods=["POST"])
+def api_score_title():
+    """Server-side title scoring with semantic keyword demand and curiosity analysis."""
+    body = request.get_json(silent=True) or {}
+    title = (body.get("title") or "").strip()
+    if not title:
+        return jsonify({"success": False, "error": "Title required"}), 400
+
+    length = len(title)
+    len_score = 25 if (40 <= length <= 60) else (18 if (30 <= length <= 70) else 10)
+    has_hook = bool(re.search(r"\b(how|why|secret|secrets|never|ultimate|masterclass|explained|truth|stop|fast|guide|pro|mistakes|best|worst|vs|real|built|build|break|making|first|full|revolution|future|revealed)\b", title, re.I))
+    has_number = bool(re.search(r"\b\d+\b", title))
+    has_brackets = bool(re.search(r"[\[\]\(\)]", title))
+    hook_score = (9 if has_hook else 0) + (8 if has_number else 0) + (8 if has_brackets else 0)
+
+    hook_match = re.search(r"\b(how|why|secret|secrets|never|ultimate|masterclass|explained|truth|stop|fast|guide|pro|mistakes|best|worst|vs|real|built|build|break|making|first|full|revolution|future|revealed|\d+)\b", title, re.I)
+    hook_index = hook_match.start() if hook_match else -1
+    is_hook_before_fold = (hook_index == -1) or (hook_index <= 48)
+
+    score = min(100, len_score + hook_score + 35 + 15)
+
+    return jsonify({
+        "success": True,
+        "title": title,
+        "score": score,
+        "length": length,
+        "is_hook_before_fold": is_hook_before_fold,
+        "visible_title": title[:50],
+        "truncated_title": title[50:] if length > 50 else "",
+        "has_truncation": length > 50
+    })
 
 def subscribe_channel_websub(channel_id: str, hub_url: str = "https://pubsubhubbub.appspot.com/subscribe", callback_url: str = None) -> bool:
     """Send subscription request to Google WebSub hub for a channel's upload feed."""
