@@ -1,6 +1,6 @@
 # ⚡ YT Tracker — YouTube Competitive Intelligence & Growth Studio (v5.0)
 
-A production-grade, full-spectrum competitive intelligence platform and creator workflow suite for YouTube creators. Built with a calm, disciplined **Linear / Raycast-grade dark workspace aesthetic** (`#0b0c0e` dark surfaces, desaturated indigo `#6672f5` accent, tabular typography, Lucide vector icons), a modular **Flask & Vanilla ES6+ JS** architecture, cloud PostgreSQL persistence via **Supabase** with `pgvector` & `HNSW` indexing, and a **zero-quota Google WebSub real-time ingestion engine**.
+A production-grade, full-spectrum competitive intelligence platform and creator workflow suite for YouTube creators. Built with a calm, disciplined **Linear / Raycast-grade dark workspace aesthetic** (`#0b0c0e` dark surfaces, desaturated indigo `#6672f5` accent, tabular typography, Lucide vector icons), a modular **Flask & Vanilla ES6+ JS** architecture, cloud PostgreSQL persistence via **Supabase** with `pgvector` & `HNSW` indexing, and a **zero-quota discovery & push-based real-time ingestion engine** via Google WebSub.
 
 ---
 
@@ -8,18 +8,18 @@ A production-grade, full-spectrum competitive intelligence platform and creator 
 
 ```mermaid
 graph TD
-    A[YouTube Platform Drops] -->|Google WebSub Atom XML Push: 0 Quota| B[WebSub Webhook Listener]
+    A[YouTube Platform Drops] -->|Google WebSub Atom XML Push: 0 Polling Quota| B[WebSub Webhook Listener]
     B -->|Edit-Trap Guard: db_video_exists| C[Single-Video Ingest: 1 Quota Unit]
     C -->|Queue Milestones| D[(snapshot_schedule: T+2h, T+24h, T+168h)]
     D -->|50-ID Batches: 1 Unit| E[Snapshot Schedule Worker]
     E -->|Range Partitioned| F[(video_snapshots_v4)]
     F -->|23-25h & 164-172h Tolerance Windows| G[Materialized Baselines v2m & 168h]
     G -->|Decoupled Concurrent Refresh RPC| G
-    E -->|Time-Bucketed Thresholds| H[Time-Bucketed Outlier Radar]
+    E -->|Time-Bucketed Checkpoints: 0 Decay| H[Time-Bucketed Outlier Radar]
     H -->|2h >= 3.5x · 24h >= 2.5x · 7d >= 2.0x| I[Discord & Slack Webhooks]
-    C -->|FastEmbed: all-MiniLM-L6-v2| J[(Supabase HNSW pgvector)]
+    C -->|FastEmbed: all-MiniLM-L6-v2| J[(Supabase HNSW pgvector: m=16, ef=64)]
     J -->|Cosine Distance Clustering| K[Semantic Topic Radar & Opportunity Matrix]
-    K -->|Blue Ocean & Bayes Shrinkage| L[Next Best Action Engine]
+    K -->|Blue Ocean & Fixed-Prior Bayes Shrinkage| L[Next Best Action Engine]
     L -->|5 Viral Packaging Archetypes| M[Creator Studio & Title Lab]
     M -->|AbortController Request Cancellation| N[Mobile Feed Simulator: 120px & 50-Char Fold]
 ```
@@ -65,14 +65,17 @@ Where:
 
 ---
 
-### 3. Empirical Bayes Shrinkage (Noise & Small-Sample Filtering)
-Raw average views or raw RPI can be heavily distorted by small sample sizes (e.g. a topic with only 1 upload that went viral for unrelated reasons). YT Tracker eliminates this noise by applying **Empirical Bayes Shrinkage**, pulling low-sample topic scores toward the global prior mean ($1.0\times$):
+### 3. Fixed-Prior Bayesian Shrinkage (Credibility Weighting)
+Raw average views or raw RPI can be heavily distorted by small sample sizes (e.g. a topic with only 1 upload that went viral for unrelated reasons). YT Tracker eliminates this noise by applying a **Fixed-Prior Bayesian Shrinkage** (conjugate normal-normal update / Bühlmann credibility weighting), pulling low-sample topic scores toward the global neutral prior mean ($\mu_0 = 1.0\times$):
 
-$$\text{RPI}_{\text{shrunken}} = w \cdot \text{RPI}_{\text{raw}} + (1 - w) \cdot 1.0, \quad \text{where } w = \frac{n}{n + 5}$$
+$$\text{RPI}_{\text{shrunken}} = w \cdot \text{RPI}_{\text{raw}} + (1 - w) \cdot \mu_0, \quad \text{where } w = \frac{n}{n + n_0}, \quad \mu_0 = 1.0, \quad n_0 = 5$$
 
-- When $n = 1$, $w = \frac{1}{6} \approx 0.17$ (heavily shrunk to prevent false positives).
+> **Statistical Note**: Hardcoding the neutral prior ($\mu_0 = 1.0$, $n_0 = 5$) provides robust, deterministic stabilization across small competitor cohorts without requiring iterative empirical hyperparameter re-fitting on sparse topic distributions.
+
+- When $n = 1$, $w = \frac{1}{6} \approx 0.17$ (heavily shrunk toward $1.0\times$ baseline).
+- When $n = 5$, $w = \frac{5}{10} = 0.50$ (equal weight to empirical data and prior).
 - When $n = 20$, $w = \frac{20}{25} = 0.80$ (high statistical confidence).
-- As $n \to \infty$, $w \to 1.0$ (converges to pure empirical RPI).
+- As $n \to \infty$, $w \to 1.0$ (converges purely to empirical $\text{RPI}_{\text{raw}}$).
 
 ---
 
@@ -117,60 +120,58 @@ The Title Lab provides real-time scoring (0–100) and optimization feedback:
 
 ## ⚡ Statistical & Time-Series Engine
 
-### 1. Velocity-Weighted RPI ($\text{VRPI}$) with Age Decay
-$$\text{Video Velocity } V = \frac{\text{Current Views}}{\max(0.04, \text{Days Published})}$$
+### 1. Dual Velocity Paradigm: Milestone Checkpoints vs. Catalog VRPI
+YT Tracker separates real-time breakout detection from historical catalog ranking to avoid mathematical double-penalties on evergreen videos:
+
+#### A. Real-Time Milestone Checkpoint Velocity (Outlier Radar)
+Evaluated at specific snapshot checkpoints ($T+2\text{h}$, $T+24\text{h}$, $T+168\text{h}$) **without arbitrary age decay**, comparing pure point-in-time velocity against age-matched historical tolerance windows:
+- **T+2h Viral Breakout**: Requires $\ge 3.5\times$ channel median velocity.
+- **T+24h Velocity Surge**: Requires $\ge 2.5\times$ channel median velocity.
+- **T+168h (Day 7) Sustained Evergreen**: Requires $\ge 2.0\times$ historical 168h baseline computed via `channel_baselines_v2m_168h` (8-hour tolerance window: `age_hours BETWEEN 164.0 AND 172.0`).
+
+#### B. Catalog Relative Performance Index ($\text{VRPI}$)
+Used in the Competitors drops feed to highlight fresh uploads with high momentum:
+
+$$\text{Daily Video Velocity } V = \frac{\text{Current Views}}{\max(0.04, \text{Days Published})}$$
 
 $$\text{Daily Baseline Velocity } V_{\text{base}} = \max\left(1, \frac{\text{Channel 30-Day Median Views}}{30}\right)$$
 
 $$\text{Raw VRPI} = \frac{V}{V_{\text{base}}}$$
 
-$$\text{Age Decay Factor} = \begin{cases} 1.0 & \text{if } \text{Age} \le 7\text{ days} \\ \frac{1}{\sqrt{1 + (\text{Age} - 7) / 21}} & \text{if } \text{Age} > 7\text{ days} \end{cases}$$
-
-$$\text{VRPI} = \text{Raw VRPI} \cdot \text{Age Decay Factor}$$
-
-- 🔥 **Breakout Outliers**: Fresh uploads ($\le 14\text{d}$) surging at $\text{VRPI} \ge 2.5\times$ baseline velocity.
-- ⚡ **Velocity Spikes**: Uploads with $1.5\times \le \text{VRPI} < 2.5\times$.
+- 🔥 **Breakout Outliers**: Fresh uploads ($\le 14\text{d}$) surging at $\text{Raw VRPI} \ge 2.5\times$ baseline velocity.
+- ⚡ **Activity Feed Sorting**: Applies smooth publication age dampening ($\text{Age Decay} = \frac{1}{\sqrt{1 + (\text{Age} - 7) / 21}}$ for $\text{Age} > 7\text{d}$) exclusively to sort recent momentum in the activity feed while preserving pure un-decayed metrics for analytics.
 
 ---
 
-### 2. Time-Bucketed Milestone Thresholds & 168h Baselines
-- **T+2h Viral Breakout**: Requires $\ge 3.5\times$ channel median velocity.
-- **T+24h Velocity Surge**: Requires $\ge 2.5\times$ channel median velocity.
-- **T+168h (Day 7) Sustained Evergreen**: Requires $\ge 2.0\times$ historical 168h baseline computed via `channel_baselines_v2m_168h` (8-hour tolerance window: `age_hours BETWEEN 164.0 AND 172.0`).
+## 🛡️ Production Hardening & Architectural Details (v5.0)
 
----
+### 🔧 1. Daylight Saving Time (DST) & Pacific Time Quota Ledger
+- **Architecture**: YouTube API quota strictly resets at Midnight US Pacific Time.
+- **Implementation**: The backend uses Python 3.9+ `zoneinfo.ZoneInfo("America/Los_Angeles")` to dynamically calculate exact-second TTLs and date strings (`quota:spend:YYYY-MM-DD-PT`), automatically handling PST (UTC-8) and PDT (UTC-7) transitions without drift.
 
-## 🛡️ Production Hardening & Bug Fixes (v5.0)
+### 🔧 2. HNSW Vector Indexing (`pgvector`)
+- **Architecture**: FastEmbed produces 384-dimensional dense embeddings (`sentence-transformers/all-MiniLM-L6-v2`).
+- **Implementation**: Indexed in Supabase PostgreSQL via **HNSW** (`USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)`). Unlike IVFFlat, HNSW requires **no offline clustering/training phase**, supporting dynamic, continuous video ingestion.
 
-During v5.0 development, seven critical distributed systems and operational bugs were audited and permanently resolved:
+### 🔧 3. Batch 429 & Transient Error Protection
+- **Architecture**: Network drops or temporary rate limits must never corrupt queue states.
+- **Implementation**: In `process-snapshots`, HTTP 429, 403, and 500 responses keep records in `pending` for retry. Only verified `200 OK` API responses with missing video IDs transition records to `deleted_or_privatized`.
 
-### 🔧 Fix 1: Pacific Time Midnight Quota Ledger (Drift-Free)
-- **Problem**: YouTube API quota strictly resets at Midnight Pacific Time (`America/Los_Angeles`). Rolling 24-hour keys caused ledger drift and quota exhaustion.
-- **Solution**: Quota keys are formatted with the current Pacific Date string (`quota:spend:YYYY-MM-DD-PT`) and dynamically set with the exact number of seconds remaining until the next PT Midnight reset.
+### 🔧 4. 85% Circuit Breaker with Baseline Immunity
+- **Architecture**: Quota conservation must never bias longitudinal historical tracking.
+- **Implementation**: At $\ge 8,500$ units spent, non-essential background channel backfills are throttled, but critical T+24h and T+168h baseline snapshots and all frontend UI routes remain 100% operational, guaranteeing **zero survivorship bias**.
 
-### 🔧 Fix 2: Batch 429 & Transient Error Protection (Anti-Wipeout)
-- **Problem**: Temporary YouTube API 429/403/500 errors could cause the batch snapshot processor to misinterpret empty responses as deleted videos.
-- **Solution**: The snapshot worker strictly keeps records in `pending` on transient errors. Only verified `200 OK` API responses with missing video IDs transition records to `deleted_or_privatized`.
+### 🔧 5. Decoupled Non-Blocking Materialized View Refreshes
+- **Architecture**: Heavy analytical aggregations must not block fast snapshot collection.
+- **Implementation**: `REFRESH MATERIALIZED VIEW CONCURRENTLY` is decoupled from the 5-minute snapshot worker into `/api/cron/refresh-baselines` (hourly off-peak cron) backed by `UNIQUE INDEX` on `channel_id`. (Roadmap: incremental rollup triggers for multi-tenant enterprise scale).
 
-### 🔧 Fix 3: 85% Circuit Breaker with Baseline Immunity
-- **Problem**: Hitting API limits should not corrupt historical time-series analytics.
-- **Solution**: At $\ge 8,500$ quota units, non-essential background channel backfills are throttled, but T+24h and T+168h baseline snapshots and all frontend UI routes remain 100% operational, guaranteeing **zero survivorship bias**.
+### 🔧 6. Zero-Quota Discovery & 1-Unit Push Ingestion
+- **Architecture**: Google WebSub (PubSubHubbub) push notifications eliminate continuous polling overhead (saving 100+ quota units daily per channel).
+- **Implementation**: When a drop occurs, WebSub delivers an Atom XML payload for 0 quota units, prompting a targeted single-video API fetch (1 unit) with an edit-trap deduplication check (`db_video_exists`).
 
-### 🔧 Fix 4: Strict FastEmbed Embedding Isolation
-- **Problem**: Silent fallbacks from 384-d dense embeddings to n-gram heuristics corrupt vector databases.
-- **Solution**: FastEmbed is strictly enforced. If unavailable, vector endpoints return a clean `503 Service Unavailable` rather than polluting Supabase pgvector collections with invalid embeddings.
-
-### 🔧 Fix 5: Decoupled Non-Blocking Materialized View Refresh
-- **Problem**: Heavyweight `REFRESH MATERIALIZED VIEW CONCURRENTLY` in 5-minute snapshot workers caused database lock contention and query timeouts.
-- **Solution**: Materialized view refreshes are decoupled into a dedicated `/api/cron/refresh-baselines` cron route and backed by a `UNIQUE INDEX` on `channel_id` for zero-downtime concurrent execution.
-
-### 🔧 Fix 6: Memory-Safe Deep Reactive Store
-- **Problem**: Nested object proxies in frontend state engines can lose object identity or trigger unbatched DOM redraw thrashing.
-- **Solution**: [`static/js/state.js`](file:///g:/Important%20Projects/Youtube%20Data%20Manager/static/js/state.js) uses a `WeakMap` identity cache with `requestAnimationFrame` 60fps batching and `appstate:${key}` CustomEvents broadcasting both `value` and `oldValue`.
-
-### 🔧 Fix 7: Windows Console Charset Guard
-- **Problem**: Non-ASCII Unicode emoji in terminal logging caused `charmap`/`cp1252` `UnicodeEncodeError` crashes on Windows hosts.
-- **Solution**: Standardized on clean ASCII logging tags (`[CRITICAL]`, `[WARNING]`, `[INFO]`) throughout the backend.
+### 🔧 7. Memory-Safe State Management & Reactive Store
+- **Architecture**: Zero-build Vanilla ES6+ architecture for maximum deployment portability.
+- **Implementation**: Built with a `WeakMap` identity cache and `requestAnimationFrame` 60fps batching in [`static/js/state.js`](file:///g:/Important%20Projects/Youtube%20Data%20Manager/static/js/state.js), broadcasting `appstate:${key}` CustomEvents with both `value` and `oldValue`. *(Roadmap: Fine-grained Signals compilation).*
 
 ---
 
@@ -198,7 +199,7 @@ Youtube-Data-Manager/
 │
 ├── scripts/
 │   ├── migration_v4_schema.sql # PostgreSQL schema (HNSW vector index, partitions, 168h view, RPC)
-│   ├── migration_pgvector.sql  # Supabase pgvector extension & IVFFlat cosine index
+│   ├── migration_pgvector.sql  # Supabase pgvector extension & HNSW cosine index (m=16, ef=64)
 │   └── schema_v2.sql           # Baseline relational schema
 │
 ├── static/
@@ -247,10 +248,10 @@ Youtube-Data-Manager/
 
 - **Backend**: Python 3.9+ / Flask / Gunicorn
 - **Embeddings & NLP**: FastEmbed (`sentence-transformers/all-MiniLM-L6-v2`) on CPU
-- **Database & Vector Search**: Supabase (Cloud PostgreSQL) + `pgvector` HNSW Cosine Similarity Indexing
+- **Database & Vector Search**: Supabase (Cloud PostgreSQL) + `pgvector` HNSW Cosine Similarity Indexing (`m=16, ef=64`)
 - **Database Range Partitioning**: Native PostgreSQL partitioning by `recorded_at` (`video_snapshots_v4`)
 - **Frontend Architecture**: Vanilla HTML5, Modular CSS3 (Obsidian Dark Tokens, Linear Indigo `#6672f5`), Deep Reactive ES6+ Proxy Store (`WeakMap` + `requestAnimationFrame`)
-- **Real-Time Drop Ingestion**: Google WebSub (PubSubHubbub Atom Feeds) — **0 Quota Cost**
+- **Real-Time Drop Discovery**: Google WebSub (PubSubHubbub Atom Feeds) — **0 Quota Polling Cost**
 - **Quota Accounting**: Pacific Time Midnight Redis Ledger (`quota:spend:YYYY-MM-DD-PT`) with 85% Circuit Breaker
 - **Charting & Visualizations**: Chart.js 4.x (Linear curves, subtle gradient fills), SVG Sparklines
 - **Icons**: Lucide Icons (vector SVG)
@@ -292,6 +293,7 @@ PORT=5000
 ### 3. Run Database Migrations
 In your Supabase SQL Editor, execute:
 1. [`scripts/migration_v4_schema.sql`](file:///g:/Important%20Projects/Youtube%20Data%20Manager/scripts/migration_v4_schema.sql) (HNSW vector indexing, `snapshot_schedule`, partitions, materialized views, RPC refresh procedure).
+2. [`scripts/migration_pgvector.sql`](file:///g:/Important%20Projects/Youtube%20Data%20Manager/scripts/migration_pgvector.sql) (HNSW cosine similarity index on video embeddings).
 
 ### 4. Run Automated Test Suite
 ```bash

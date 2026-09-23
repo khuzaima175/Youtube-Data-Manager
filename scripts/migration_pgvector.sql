@@ -8,11 +8,11 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- 2. Add 384-dimensional embedding column for sentence-transformers / FastEmbed
 ALTER TABLE videos ADD COLUMN IF NOT EXISTS embedding vector(384);
 
--- 3. Create IVFFlat cosine similarity index for sub-millisecond nearest-neighbor search
+-- 3. Create HNSW cosine similarity index for sub-millisecond nearest-neighbor search (No training step required)
 CREATE INDEX IF NOT EXISTS idx_videos_embedding 
   ON videos 
-  USING ivfflat (embedding vector_cosine_ops) 
-  WITH (lists = 100);
+  USING hnsw (embedding vector_cosine_ops) 
+  WITH (m = 16, ef_construction = 64);
 
 -- 4. Cosine similarity search RPC function for vector matching
 CREATE OR REPLACE FUNCTION match_videos(

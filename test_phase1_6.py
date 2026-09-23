@@ -155,15 +155,19 @@ def test_refresh_baselines_endpoint():
 
 def test_sql_schema_migration():
     with open("scripts/migration_v4_schema.sql", "r", encoding="utf-8") as f:
-        sql = f.read()
-    assert "CREATE TABLE IF NOT EXISTS snapshot_schedule" in sql
-    assert "USING hnsw (centroid_vector vector_cosine_ops)" in sql
-    assert "CREATE TABLE IF NOT EXISTS video_snapshots_v4" in sql
-    assert "CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m" in sql
-    assert "CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m_168h" in sql
-    assert "CREATE TABLE IF NOT EXISTS quota_ledger" in sql
-    assert "CREATE OR REPLACE FUNCTION refresh_channel_baselines()" in sql
-    print("PASS: scripts/migration_v4_schema.sql schema verification (including 168h view & refresh procedure)")
+        sql_v4 = f.read()
+    assert "CREATE TABLE IF NOT EXISTS snapshot_schedule" in sql_v4
+    assert "USING hnsw (centroid_vector vector_cosine_ops)" in sql_v4
+    assert "CREATE TABLE IF NOT EXISTS video_snapshots_v4" in sql_v4
+    assert "CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m" in sql_v4
+    assert "CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m_168h" in sql_v4
+    assert "CREATE TABLE IF NOT EXISTS quota_ledger" in sql_v4
+    assert "CREATE OR REPLACE FUNCTION refresh_channel_baselines()" in sql_v4
+    
+    with open("scripts/migration_pgvector.sql", "r", encoding="utf-8") as f:
+        sql_pgv = f.read()
+    assert "USING hnsw (embedding vector_cosine_ops)" in sql_pgv
+    print("PASS: scripts/migration_v4_schema.sql & migration_pgvector.sql HNSW schema verification")
 
 if __name__ == "__main__":
     test_websub_get_challenge()
