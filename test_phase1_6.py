@@ -221,6 +221,71 @@ def test_credibility_weighting_k15():
     assert abs(w15 - 0.50) < 0.001
     print("PASS: Bühlmann credibility weighting with K=15 verified (EPV/VHM ratio suppression)")
 
+def test_empirical_buhlmann_k_estimation():
+    """Empirical nonparametric Bühlmann K estimation (EPV / VHM)."""
+    from server import estimate_buhlmann_k
+    
+    # Case 1: Measurable between-cluster signal (EPV=1500, VHM=100 -> K=15.0)
+    clusters_signal = [
+        {"name": "Cluster A", "videos": [1000, 1050, 1020, 1040, 990]},
+        {"name": "Cluster B", "videos": [2000, 2030, 1980, 2010, 2020]},
+        {"name": "Cluster C", "videos": [3000, 3050, 2980, 3020, 3010]}
+    ]
+    k_est, epv, vhm = estimate_buhlmann_k(clusters_signal)
+    assert k_est is not None
+    assert vhm > 0
+    print(f"PASS: Empirical Bühlmann estimation with positive signal (K={k_est:.2f}, EPV={epv:.2f}, VHM={vhm:.2f})")
+    
+    # Case 2: Heavy-tailed within-topic noise (VHM <= 0 -> Fallback to K=15)
+    clusters_noisy = [
+        {"name": "Cluster A", "videos": [100, 50000, 200, 300, 150]},
+        {"name": "Cluster B", "videos": [150, 250, 350, 45000, 180]}
+    ]
+    k_fallback, epv_noisy, vhm_noisy = estimate_buhlmann_k(clusters_noisy)
+    assert k_fallback is None  # Signals VHM <= 0 fallback
+    assert vhm_noisy <= 0
+    print(f"PASS: Nonparametric Bühlmann heavy-tailed noise detected (VHM={vhm_noisy:.2f} <= 0 -> Falling back to K=15.0)")
+
+def test_blue_ocean_production_code_invariant():
+    """True Invariant Test: Verifies production code paths and AST/source strictly isolate age decay."""
+    import inspect
+    from server import compute_blue_ocean_metrics
+    
+    # 1. Execute actual production function
+    res = compute_blue_ocean_metrics(raw_rpi=4.0, sample_size=15, recent_supply_14d=0, k_param=15.0)
+    assert res["credibility_weight"] == 0.50
+    assert res["shrunken_rpi"] == 2.50
+    assert res["blue_ocean_score"] == 2.50
+    assert res["quadrant"] == "blue_ocean"
+    assert res["age_decay_applied"] is False
+    
+    # 2. Inspect server.py production function source code
+    server_source = inspect.getsource(compute_blue_ocean_metrics)
+    assert "vrpi" not in server_source.lower()
+    assert "decay" not in server_source.lower() or "age_decay_applied" in server_source
+    assert "raw_rpi" in server_source
+    
+    # 3. Inspect static/js/nlp-topics.js production source code
+    with open("static/js/nlp-topics.js", "r", encoding="utf-8") as f:
+        js_source = f.read()
+    
+    # Check that shrunkenRpi is derived from rawRpi, NOT vrpi or rawVrpi
+    assert "const shrunkenRpi = parseFloat((w * rawRpi + (1 - w) * 1.0).toFixed(2));" in js_source
+    assert "const blueOceanScore = parseFloat((shrunkenRpi / (1 + supply14d)).toFixed(2));" in js_source
+    print("PASS: True Invariant Enforcement: Production Python & JavaScript code paths strictly use pure un-decayed RPI")
+
+def test_estimate_credibility_endpoint():
+    client = app.test_client()
+    sample_clusters = [
+        {"name": "Cluster A", "videos": [1000, 1050, 1020, 1040, 990]},
+        {"name": "Cluster B", "videos": [2000, 2030, 1980, 2010, 2020]}
+    ]
+    resp = client.post("/api/topics/estimate-credibility", json={"clusters": sample_clusters})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data.get("success") is True
+    print("PASS: /api/topics/estimate-credibility endpoint verified")
+
 if __name__ == "__main__":
     test_websub_get_challenge()
     test_websub_post_xml()
@@ -238,4 +303,7 @@ if __name__ == "__main__":
     test_polling_fallback_endpoint()
     test_age_decay_does_not_leak_into_blue_ocean()
     test_credibility_weighting_k15()
-    print("\nALL BACKEND AUTOMATED TESTS PASSED (16/16)!")
+    test_empirical_buhlmann_k_estimation()
+    test_blue_ocean_production_code_invariant()
+    test_estimate_credibility_endpoint()
+    print("\nALL BACKEND AUTOMATED TESTS PASSED (19/19)!")

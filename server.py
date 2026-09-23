@@ -1683,6 +1683,101 @@ def get_semantic_clusters():
         print(f"[SemanticClusters] Error: {ex}")
         return jsonify({"success": False, "error": str(ex), "clusters": []}), 500
 
+def estimate_buhlmann_k(topic_clusters: list) -> tuple:
+    """
+    Nonparametric Empirical Bühlmann Credibility Parameter Estimator.
+    Estimates K = EPV / VHM directly from topic cluster view distributions.
+    - EPV: Expected Process Variance (average within-cluster variance)
+    - VHM: Variance of Hypothetical Means (between-cluster signal variance corrected for sample noise)
+    
+    If VHM <= 0 (common when within-cluster heavy-tailed viral spikes overwhelm between-cluster variance),
+    returns (None, epv, vhm), signaling fallback to domain-justified heavy-tailed prior K=15.
+    """
+    cluster_variances = []
+    cluster_means = []
+    cluster_sizes = []
+
+    for cluster in topic_clusters:
+        videos = cluster.get("videos", []) if isinstance(cluster, dict) else cluster
+        views = [
+            float(v.get("view_count", v.get("views_raw", v)) if isinstance(v, dict) else v)
+            for v in videos
+        ]
+        if len(views) < 2:
+            continue
+
+        n = len(views)
+        mean_v = sum(views) / n
+        var_v = sum((x - mean_v) ** 2 for x in views) / (n - 1)
+        
+        cluster_variances.append(var_v)
+        cluster_means.append(mean_v)
+        cluster_sizes.append(n)
+
+    if not cluster_variances or len(cluster_means) < 2:
+        return 15.0, 0.0, 0.0
+
+    r = len(cluster_variances)
+    epv = sum(cluster_variances) / r
+    avg_n = sum(cluster_sizes) / r
+
+    grand_mean = sum(cluster_means) / r
+    sample_vhm = sum((m - grand_mean) ** 2 for m in cluster_means) / (r - 1)
+    vhm = sample_vhm - (epv / avg_n)
+
+    if vhm <= 0:
+        return None, float(epv), float(vhm)
+
+    k_est = epv / vhm
+    return float(k_est), float(epv), float(vhm)
+
+def compute_blue_ocean_metrics(raw_rpi: float, sample_size: int, recent_supply_14d: int, k_param: float = 15.0) -> dict:
+    """
+    Compute Blue Ocean Opportunity Metrics with strict invariant guarantee:
+    Uses pure un-decayed Relative Performance Index (raw_rpi), eliminating age decay distortion.
+    """
+    w = sample_size / (sample_size + k_param)
+    shrunken_rpi = round((w * raw_rpi) + ((1.0 - w) * 1.0), 2)
+    blue_ocean_score = round(shrunken_rpi / (1.0 + recent_supply_14d), 2)
+    
+    quadrant = "emerging"
+    if shrunken_rpi >= 1.25 and recent_supply_14d < 2:
+        quadrant = "blue_ocean"
+    elif shrunken_rpi >= 1.25 and recent_supply_14d >= 2:
+        quadrant = "red_ocean"
+    elif shrunken_rpi < 1.25 and recent_supply_14d >= 2:
+        quadrant = "saturated"
+    else:
+        quadrant = "emerging"
+
+    return {
+        "raw_rpi": raw_rpi,
+        "sample_size": sample_size,
+        "k_param": k_param,
+        "credibility_weight": round(w, 4),
+        "shrunken_rpi": shrunken_rpi,
+        "recent_supply_14d": recent_supply_14d,
+        "blue_ocean_score": blue_ocean_score,
+        "quadrant": quadrant,
+        "age_decay_applied": False
+    }
+
+@app.route("/api/topics/estimate-credibility", methods=["POST"])
+def api_estimate_credibility():
+    """Diagnostically estimate empirical Bühlmann K parameter across active topic clusters."""
+    body = request.get_json(silent=True) or {}
+    clusters = body.get("clusters", [])
+    k_est, epv, vhm = estimate_buhlmann_k(clusters)
+    return jsonify({
+        "success": True,
+        "empirical_k": round(k_est, 2) if k_est is not None else None,
+        "epv": round(epv, 2),
+        "vhm": round(vhm, 2),
+        "vhm_positive": vhm > 0,
+        "fallback_k": 15.0 if k_est is None else None,
+        "decision": f"Using empirical K={k_est:.2f}" if k_est is not None else "VHM <= 0 (within-topic process noise dominates); falling back to heavy-tailed prior K=15.0"
+    })
+
 
 # ── Phase 4: Zero-Quota Google WebSub Ingestion & Snapshot Scheduler ─────────
 

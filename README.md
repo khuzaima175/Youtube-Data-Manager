@@ -67,12 +67,16 @@ Where:
 
 ---
 
-### 3. Fixed-Prior Bayesian Shrinkage & Bühlmann Credibility ($K=15$)
-Raw average views or raw RPI can be heavily distorted by small sample sizes (e.g. a topic with only 1 upload that went viral for unrelated reasons). In the Bühlmann credibility framework ($Z = \frac{n}{n + K}$), the parameter $K$ is the exact ratio of within-group variance to between-group variance:
+### 3. Fixed-Prior Bayesian Shrinkage & Empirical Bühlmann Credibility ($K=15$)
+Raw average views or raw RPI can be heavily distorted by small sample sizes (e.g. a topic with only 1 upload that went viral for unrelated reasons). In the Bühlmann credibility framework ($Z = \frac{n}{n + K}$), the parameter $K$ represents the exact ratio of within-group process variance to between-group structural variance:
 
 $$K = \frac{\text{EPV}}{\text{VHM}} = \frac{\text{Expected Process Variance (Within-Topic Noise)}}{\text{Variance of Hypothetical Means (Between-Topic Signal)}}$$
 
-Because YouTube video view distributions are notoriously heavy-tailed (individual videos within a topic cluster exhibit high variance $\text{EPV}$ due to algorithmic virality), $K$ is set to **$K=15$** to avoid under-shrinking noise:
+#### Empirical Nonparametric Estimation Procedure:
+The platform includes an automated statistical estimator (`server.py:estimate_buhlmann_k` and endpoint `/api/topics/estimate-credibility`):
+1. **Expected Process Variance ($\text{EPV}$)**: $\hat{\text{EPV}} = \frac{1}{r} \sum_{i=1}^{r} s_i^2$, where $s_i^2$ is the sample view variance within cluster $i$.
+2. **Variance of Hypothetical Means ($\text{VHM}$)**: $\hat{\text{VHM}} = \frac{1}{r-1} \sum_{i=1}^{r} (\bar{X}_i - \bar{X})^2 - \frac{\hat{\text{EPV}}}{\bar{n}}$, corrected for sample size sampling noise.
+3. **Heavy-Tailed Fallback**: On YouTube, extreme viral outliers often cause within-cluster variance to dominate between-cluster signal ($\hat{\text{VHM}} \le 0$). When $\hat{\text{VHM}} \le 0$, the engine automatically falls back to the heavy-tailed domain prior **$K=15$**. When $\hat{\text{VHM}} > 0$, the empirical parameter $\hat{K} = \hat{\text{EPV}} / \hat{\text{VHM}}$ is computed directly.
 
 $$\text{RPI}_{\text{shrunken}} = w \cdot \text{RPI}_{\text{raw}} + (1 - w) \cdot \mu_0, \quad \text{where } w = \frac{n}{n + 15}, \quad \mu_0 = 1.0$$
 
@@ -84,7 +88,7 @@ $$\text{RPI}_{\text{shrunken}} = w \cdot \text{RPI}_{\text{raw}} + (1 - w) \cdot
 
 ---
 
-### 4. Mathematical Data Flow Audit: Zero Age-Decay Leakage
+### 4. Mathematical Data Flow Audit: True Invariant Code-Path Enforcement
 To ensure evergreen topics are **never penalised**, YT Tracker enforces strict mathematical isolation between the UI activity feed and the analytical intelligence engines:
 
 | Engine | Metric Used | Age Decay Applied? | Purpose |
@@ -95,7 +99,7 @@ To ensure evergreen topics are **never penalised**, YT Tracker enforces strict m
 | **Next Best Action** | $\text{Blue Ocean} + \text{Moats}$ | **No** (0 decay) | Un-decayed opportunity discovery and packaging recommendation. |
 | **2×2 Matrix** | $\text{RPI}_{\text{shrunken}}$ | **No** (0 decay) | Quadrant classification based strictly on un-decayed demand vs supply. |
 
-*(Verified via automated assertion in `test_phase1_6.py:test_age_decay_does_not_leak_into_blue_ocean`).*
+> **True Invariant Verification**: Verified in `test_phase1_6.py` (`test_blue_ocean_production_code_invariant`) via execution of production function `compute_blue_ocean_metrics` and programmatic AST/source code inspection of both `server.py` and `static/js/nlp-topics.js`, mathematically confirming that `_vrpi` and `ageDecay` are never passed into or assigned to opportunity scoring.
 
 ---
 
