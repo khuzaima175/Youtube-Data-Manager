@@ -4,7 +4,7 @@ A production-grade, full-spectrum competitive intelligence platform and creator 
 
 ---
 
-## 🌟 Platform Highlights & v5.0 Architecture
+## 🌟 Platform Highlights & System Architecture
 
 ```mermaid
 graph TD
@@ -14,22 +14,110 @@ graph TD
     D -->|50-ID Batches: 1 Unit| E[Snapshot Schedule Worker]
     E -->|Range Partitioned| F[(video_snapshots_v4)]
     F -->|23-25h & 164-172h Tolerance Windows| G[Materialized Baselines v2m & 168h]
-    G -->|Concurrent Refresh RPC| G
-    E -->|Time-Bucketed Thresholds| H[Time-Bucketed Outlier Alerts]
+    G -->|Decoupled Concurrent Refresh RPC| G
+    E -->|Time-Bucketed Thresholds| H[Time-Bucketed Outlier Radar]
     H -->|2h >= 3.5x · 24h >= 2.5x · 7d >= 2.0x| I[Discord & Slack Webhooks]
     C -->|FastEmbed: all-MiniLM-L6-v2| J[(Supabase HNSW pgvector)]
-    J -->|Cosine Distance Clustering| K[Semantic Topic Radar & Archetypes]
-    K -->|WeakMap Deep Proxy + rAF 60fps| L[Creator Studio & Title Lab]
-    L -->|AbortController Request Cancellation| M[Mobile Feed Simulator: 120px & 50-Char Fold]
+    J -->|Cosine Distance Clustering| K[Semantic Topic Radar & Opportunity Matrix]
+    K -->|Blue Ocean & Bayes Shrinkage| L[Next Best Action Engine]
+    L -->|5 Viral Packaging Archetypes| M[Creator Studio & Title Lab]
+    M -->|AbortController Request Cancellation| N[Mobile Feed Simulator: 120px & 50-Char Fold]
 ```
 
 ---
 
-## 🧠 Advanced Intelligence Systems & Math
+## 🧠 Advanced Recommendation System & Opportunity Discovery
+
+YT Tracker features a state-of-the-art recommendation system built specifically for YouTube creators. Rather than relying on simple view counts or vanity metrics, the engine employs statistical modeling, vector similarity clustering, and competitive whitespace analysis to guide creator decisions.
+
+### 1. The 2×2 Market Saturation Matrix
+Every detected topic cluster across the competitor landscape is classified into one of four dynamic market quadrants:
+
+```text
+               ▲ High Demand (High Shrunken RPI)
+               │
+    💎 UNTAPPED BLUE OCEAN      │    🔥 HIGH-DEMAND STAPLE
+    (Low Supply · High Demand   │    (High Supply · High Demand
+     0 Videos on Your Channel)  │     Proven Niche Evergreen)
+  ─────────────┼────────────────────────────────────────►
+               │                               Recent Supply
+    🌱 EMERGING TREND           │    ⚠️ SATURATED ZONE
+    (Low Supply · Surging 14d   │    (High Supply · Low Demand
+     Early Velocity Spikes)     │     Diminishing Returns)
+               │
+```
+
+- 💎 **Untapped Blue Ocean** (*High Demand · Low Supply · 0 Channel Coverage*): Topics where competitors are generating high Relative Performance Index ($\text{RPI}$) but total niche supply is minimal and your channel has **zero published videos**. Represents the highest breakout ROI.
+- 🔥 **High-Demand Staple** (*High Demand · High Supply*): Proven evergreen topics that consistently generate above-average views across the entire niche.
+- 🌱 **Emerging Trend** (*Surging 14d Velocity · Low Total Supply*): Rapidly accelerating keywords and concepts experiencing early velocity spikes.
+- ⚠️ **Saturated Zone** (*Low Demand · High Supply*): Overcrowded topics with declining viewer interest and fierce competition.
+
+---
+
+### 2. The Blue Ocean Mathematical Formula
+To rank opportunities objectively, YT Tracker calculates a continuous **Blue Ocean Opportunity Score**:
+
+$$\text{Blue Ocean Score} = \frac{\text{RPI}_{\text{shrunken}}}{1 + \text{Recent 14d Supply}}$$
+
+Where:
+- $\text{RPI}_{\text{shrunken}}$ is the Bayesian-shrunk Relative Performance Index of the topic cluster.
+- $\text{Recent 14d Supply}$ is the count of competitor uploads on this topic in the last 14 days.
+
+---
+
+### 3. Empirical Bayes Shrinkage (Noise & Small-Sample Filtering)
+Raw average views or raw RPI can be heavily distorted by small sample sizes (e.g. a topic with only 1 upload that went viral for unrelated reasons). YT Tracker eliminates this noise by applying **Empirical Bayes Shrinkage**, pulling low-sample topic scores toward the global prior mean ($1.0\times$):
+
+$$\text{RPI}_{\text{shrunken}} = w \cdot \text{RPI}_{\text{raw}} + (1 - w) \cdot 1.0, \quad \text{where } w = \frac{n}{n + 5}$$
+
+- When $n = 1$, $w = \frac{1}{6} \approx 0.17$ (heavily shrunk to prevent false positives).
+- When $n = 20$, $w = \frac{20}{25} = 0.80$ (high statistical confidence).
+- As $n \to \infty$, $w \to 1.0$ (converges to pure empirical RPI).
+
+---
+
+### 4. Next Best Action (NBA) Recommendation Engine
+The **Next Best Action** card on the Overview dashboard synthesizes market opportunities into a single, high-conviction recommendation for the creator:
+1. **Identifies the Top Blue Ocean Topic**: Scans all active semantic clusters for the highest Blue Ocean score where your channel coverage is $0$.
+2. **Assigns Packaging Archetype**: Automatically selects the optimal viral structure for the topic.
+3. **Calculates Projected Lift**: Predicts expected performance multiplier based on competitor baseline benchmarks.
+4. **One-Click Export to Studio**: Transfers the suggested title, topic tags, and packaging framework directly to the Creator Studio Idea Canvas.
+
+---
+
+### 5. Competitive Moat & Vocabulary Overlap
+Using Jaccard distance over normalized title n-grams and video tags, the engine computes:
+- **Shared Keyword Overlap**: Terms and topics where your channel directly competes with the niche.
+- **Competitor Monopoly Topics**: High-performing keywords owned by competitors with 0 coverage on your channel.
+- **Channel Unique Moat**: Distinct vocabulary clusters where your channel commands exclusive authority.
+
+---
+
+### 6. The 5 Viral Packaging Archetypes
+The Creator Studio Synthesizer maps raw topic ideas into 5 battle-tested YouTube narrative archetypes:
+
+| Archetype | Core Psychological Trigger | Example Title Structure |
+| :--- | :--- | :--- |
+| **1. The Contrarian / Debunking** | Cognitive dissonance & counter-intuitive truth | *"Why Everyone is Wrong About [Topic] (Do This Instead)"* |
+| **2. The Benchmark / Showdown** | High effort, empirical proof & objective data | *"I Tested Top 10 [Topic Tools] for 1,000 Hours — Here's The Best"* |
+| **3. The Zero-to-One Blueprint** | Actionable mastery & complete step-by-step path | *"The Only [Topic] Guide You Need in 2026 (From Scratch to Pro)"* |
+| **4. The High-Stakes Transformation** | Extreme challenge, urgency & visible progression | *"I Built a Full [Topic System] in 30 Days Without Code"* |
+| **5. The Insider / Behind Closed Doors** | Exclusivity, curiosity gap & trade secrets | *"What [Niche Authority] Won't Tell You About [Topic]"* |
+
+---
+
+### 7. Title Lab & Click-Through (CTR) Scoring
+The Title Lab provides real-time scoring (0–100) and optimization feedback:
+- **Curiosity & Power Word Detection**: Evaluates psychological urgency triggers (*Secret, Mistake, Proven, Exposed, Complete*).
+- **50-Character Mobile Fold Cutoff**: Highlights characters 1–50 (`Visible on Mobile`) vs 51+ (`Truncated in Browse Feed`).
+- **Hook Placement Diagnostic**: Confirms whether primary power keywords are front-loaded before character 50.
+- **Keystroke `AbortController`**: Prevents asynchronous network race conditions during fast typing.
+
+---
+
+## ⚡ Statistical & Time-Series Engine
 
 ### 1. Velocity-Weighted RPI ($\text{VRPI}$) with Age Decay
-Static Relative Performance Index ($\text{RPI} = \frac{\text{Views}}{\text{Median Baseline}}$) fails to distinguish a 2-day-old video with 20K views from a 2-year-old video with 20K views. YT Tracker computes **Velocity-Weighted RPI ($\text{VRPI}$)** with publication age decay:
-
 $$\text{Video Velocity } V = \frac{\text{Current Views}}{\max(0.04, \text{Days Published})}$$
 
 $$\text{Daily Baseline Velocity } V_{\text{base}} = \max\left(1, \frac{\text{Channel 30-Day Median Views}}{30}\right)$$
@@ -40,88 +128,61 @@ $$\text{Age Decay Factor} = \begin{cases} 1.0 & \text{if } \text{Age} \le 7\text
 
 $$\text{VRPI} = \text{Raw VRPI} \cdot \text{Age Decay Factor}$$
 
-- 🔥 **Breakout Outliers**: Fresh competitor uploads ($\le 14\text{d}$) surging at $\text{VRPI} \ge 2.5\times$ baseline velocity are automatically flagged with breakout tags and dispatched to configured webhooks.
-- ⚡ **Velocity Spikes**: Uploads with $1.5\times \le \text{VRPI} < 2.5\times$ are highlighted with velocity surge tags in the live drops feed.
+- 🔥 **Breakout Outliers**: Fresh uploads ($\le 14\text{d}$) surging at $\text{VRPI} \ge 2.5\times$ baseline velocity.
+- ⚡ **Velocity Spikes**: Uploads with $1.5\times \le \text{VRPI} < 2.5\times$.
 
 ---
 
-### 2. Time-Bucketed Milestone Thresholds & 168h Baseline (v5.0)
-Outlier velocity thresholds are dynamically adjusted based on milestone checkpoints to capture both viral bursts and evergreen compounders:
+### 2. Time-Bucketed Milestone Thresholds & 168h Baselines
 - **T+2h Viral Breakout**: Requires $\ge 3.5\times$ channel median velocity.
 - **T+24h Velocity Surge**: Requires $\ge 2.5\times$ channel median velocity.
 - **T+168h (Day 7) Sustained Evergreen**: Requires $\ge 2.0\times$ historical 168h baseline computed via `channel_baselines_v2m_168h` (8-hour tolerance window: `age_hours BETWEEN 164.0 AND 172.0`).
 
 ---
 
-### 3. Empirical Bayes Shrinkage for Topic RPI
-To prevent small-sample flukes (e.g. a topic with only 1 upload having high views) from distorting recommendations, the engine applies **Empirical Bayes Shrinkage**:
+## 🛡️ Production Hardening & Bug Fixes (v5.0)
 
-$$\text{RPI}_{\text{shrunken}} = w \cdot \text{RPI}_{\text{raw}} + (1 - w) \cdot 1.0, \quad \text{where } w = \frac{n}{n + 5}$$
+During v5.0 development, seven critical distributed systems and operational bugs were audited and permanently resolved:
 
-*(As sample size $n$ increases, confidence smoothly approaches true field RPI).*
+### 🔧 Fix 1: Pacific Time Midnight Quota Ledger (Drift-Free)
+- **Problem**: YouTube API quota strictly resets at Midnight Pacific Time (`America/Los_Angeles`). Rolling 24-hour keys caused ledger drift and quota exhaustion.
+- **Solution**: Quota keys are formatted with the current Pacific Date string (`quota:spend:YYYY-MM-DD-PT`) and dynamically set with the exact number of seconds remaining until the next PT Midnight reset.
 
----
+### 🔧 Fix 2: Batch 429 & Transient Error Protection (Anti-Wipeout)
+- **Problem**: Temporary YouTube API 429/403/500 errors could cause the batch snapshot processor to misinterpret empty responses as deleted videos.
+- **Solution**: The snapshot worker strictly keeps records in `pending` on transient errors. Only verified `200 OK` API responses with missing video IDs transition records to `deleted_or_privatized`.
 
-### 4. Supply vs. Demand 2×2 Saturation Matrix
-Every topic is classified into one of 4 market quadrants:
-- 💎 **Untapped Blue Ocean** (*High Demand · Low Supply*): High competitor views, low recent uploads, and **0 videos by your channel**. High breakout potential.
-  $$\text{Blue Ocean Score} = \frac{\text{RPI}_{\text{shrunken}}}{1 + \text{Recent 14d Supply}}$$
-- 🔥 **High Demand Staple** (*High Demand · High Supply*): Proven evergreen topics with steady search volume across the niche.
-- 🌱 **Emerging Trend** (*Surging 14d Velocity*): Rapidly accelerating keyword velocity with low competitor saturation.
-- ⚠️ **Saturated** (*Low Demand · High Supply*): Overcrowded topics with diminishing returns.
+### 🔧 Fix 3: 85% Circuit Breaker with Baseline Immunity
+- **Problem**: Hitting API limits should not corrupt historical time-series analytics.
+- **Solution**: At $\ge 8,500$ quota units, non-essential background channel backfills are throttled, but T+24h and T+168h baseline snapshots and all frontend UI routes remain 100% operational, guaranteeing **zero survivorship bias**.
 
----
+### 🔧 Fix 4: Strict FastEmbed Embedding Isolation
+- **Problem**: Silent fallbacks from 384-d dense embeddings to n-gram heuristics corrupt vector databases.
+- **Solution**: FastEmbed is strictly enforced. If unavailable, vector endpoints return a clean `503 Service Unavailable` rather than polluting Supabase pgvector collections with invalid embeddings.
 
-### 5. Strict FastEmbed Semantic Clustering & Zero-Shot Archetype Mapping
-- **Dense 384-d Embeddings**: Uses CPU-optimized `fastembed` (`sentence-transformers/all-MiniLM-L6-v2`) with `vector(384)` HNSW indexing in Supabase PostgreSQL (`scripts/migration_v4_schema.sql`).
-- **Strict Vector Enforcement**: Zero silent N-gram degradation; fails loudly and safely if embeddings are unavailable.
-- **Zero-Shot Archetype Classification**: Formats topic keywords into pseudo-sentences (`f"This video is about {kw1, kw2, ...}"`) and maps them to Creator Studio viral packaging frameworks (*B2B Engineering, Vlog Entertainment, Educational Tutorial, News*).
+### 🔧 Fix 5: Decoupled Non-Blocking Materialized View Refresh
+- **Problem**: Heavyweight `REFRESH MATERIALIZED VIEW CONCURRENTLY` in 5-minute snapshot workers caused database lock contention and query timeouts.
+- **Solution**: Materialized view refreshes are decoupled into a dedicated `/api/cron/refresh-baselines` cron route and backed by a `UNIQUE INDEX` on `channel_id` for zero-downtime concurrent execution.
 
----
+### 🔧 Fix 6: Memory-Safe Deep Reactive Store
+- **Problem**: Nested object proxies in frontend state engines can lose object identity or trigger unbatched DOM redraw thrashing.
+- **Solution**: [`static/js/state.js`](file:///g:/Important%20Projects/Youtube%20Data%20Manager/static/js/state.js) uses a `WeakMap` identity cache with `requestAnimationFrame` 60fps batching and `appstate:${key}` CustomEvents broadcasting both `value` and `oldValue`.
 
-### 6. YouTube Mobile Feed & 50-Char Title Fold Simulator
-Over 70% of YouTube viewership occurs on mobile devices where browse titles truncate after 45–55 characters:
-- **120px Scale Thumbnail Mockup**: Live 16:9 feed preview with timestamp badge and high-contrast concept overlay.
-- **50-Character Dynamic Fold Indicator**: Visual cutoff boundary marking characters 1–50 (`Visible on Mobile`) vs 51+ (`Truncated in Browse Feed`).
-- **Hook Placement Intelligence**: Live diagnostic checking if the primary curiosity trigger / power keyword is front-loaded before the mobile truncation cutoff.
-- **Network Race Prevention**: Title Lab input uses `AbortController` to cancel in-flight async scoring requests on every keystroke.
-
----
-
-### 7. Zero-Quota Google WebSub Ingestion Engine
-- **Endpoint**: `GET` & `POST` `/api/webhooks/youtube-sub`.
-- Handles Google PubSubHubbub subscription challenges (`hub.challenge`) for **0 quota units**.
-- **Edit-Trap Guard (`db_video_exists`)**: Prevents historical video edits from queuing duplicate snapshot records.
-- Enqueues $T+2\text{h}$, $T+24\text{h}$, and $T+168\text{h}$ snapshot milestones into `snapshot_schedule`.
-- **Zombie Video Cleanup**: Missing/deleted/privatized videos are automatically flagged `deleted_or_privatized`, keeping queue throughput at 100%.
+### 🔧 Fix 7: Windows Console Charset Guard
+- **Problem**: Non-ASCII Unicode emoji in terminal logging caused `charmap`/`cp1252` `UnicodeEncodeError` crashes on Windows hosts.
+- **Solution**: Standardized on clean ASCII logging tags (`[CRITICAL]`, `[WARNING]`, `[INFO]`) throughout the backend.
 
 ---
 
-### 8. Pacific Time Midnight Quota Ledger & Circuit Breaker (v5.0)
-- **Strict PT Alignment**: Redis quota keys are date-stamped (`quota:spend:YYYY-MM-DD-PT`) using `America/Los_Angeles` timezone to synchronize with Google's quota reset clock.
-- **85% Capacity Circuit Breaker**: Throttles exploratory UI queries at $\ge 8,500$ units while **preserving all 24h & 168h baseline snapshots**, completely eliminating survivorship bias.
+## 🎨 Linear / Raycast-Grade Design System
 
----
-
-### 9. Deep-Reactive Vanilla JS Event Store (`appState`)
-- **WeakMap Identity Stability**: `appState.a.b === appState.a.b` maintains identity caching across deeply nested object and array mutations.
-- **60fps `requestAnimationFrame` Batching**: Coalesces rapid state modifications with `dirtyKeys` tracking.
-- **Event Bridging**: Dispatches `appstate:${key}` CustomEvents with both `value` and `oldValue` for full backward compatibility.
-
----
-
-## 🎨 Linear / Raycast-Grade Design & Explanation Layer
-
-### 1. The 4-Tier Progressive Disclosure System
-Never leaves the creator wondering *"What does this metric mean?"*:
-- **L0 (Numbers)**: Clean tabular figures (`1.2K`, `4.5%`, `↑ 4%`) with no rainbow clutter.
-- **L1 (Tooltips)**: Fast 120ms hover & focus tooltips on all `[data-tip]` metrics with a `"Learn more →"` trigger.
-- **L2 (Detail Sheets)**: Slide-out drawer displaying exact mathematical formulas, interpretation guides, and tactical next steps.
-- **L3 (Deep Dive)**: Dedicated full-screen forensics view with 90-day upload pulse, split-pane right-rail inspection (`.dd-split-layout`), and topic moats.
-
-### 2. Data Honesty & The "—" Rule
-- If data is missing or calculations fail, the UI renders a clean em-dash (`—`) or `< 1%`, never a misleading `0` or hardcoded fallback.
-- Professional SaaS tone: **Zero exclamation marks** in copy, tooltips, or toast notifications.
+- **4-Tier Progressive Disclosure**:
+  - **L0 (Numbers)**: Tabular figures (`1.2K`, `4.5%`, `↑ 4%`) with no visual clutter.
+  - **L1 (Tooltips)**: Fast 120ms hover & focus tooltips on all `[data-tip]` metrics with `"Learn more →"` triggers.
+  - **L2 (Detail Sheets)**: Slide-out drawer displaying exact mathematical formulas, interpretation guides, and tactical next steps.
+  - **L3 (Deep Dive)**: Dedicated full-screen forensics view with 90-day upload pulse, split-pane right-rail inspection (`.dd-split-layout`), and topic moats.
+- **Data Honesty**: Renders clean em-dashes (`—`) or `< 1%` when data is insufficient; never emits false zeros.
+- **Disciplined Tone**: Zero exclamation marks in copy, tooltips, or toast notifications.
 
 ---
 
@@ -133,10 +194,10 @@ Youtube-Data-Manager/
 ├── requirements.txt            # Python dependencies (flask, supabase, fastembed, redis, etc.)
 ├── Procfile                    # Production deployment configuration (Gunicorn)
 ├── settings.json               # Outlier Radar webhook configuration
-├── test_phase1_6.py            # Automated test suite (13/13 backend tests)
+├── test_phase1_6.py            # Automated test suite (13/13 backend tests passing)
 │
 ├── scripts/
-│   ├── migration_v4_schema.sql # v5.0 PostgreSQL schema (HNSW vector index, partitions, 168h view, RPC)
+│   ├── migration_v4_schema.sql # PostgreSQL schema (HNSW vector index, partitions, 168h view, RPC)
 │   ├── migration_pgvector.sql  # Supabase pgvector extension & IVFFlat cosine index
 │   └── schema_v2.sql           # Baseline relational schema
 │
@@ -186,7 +247,7 @@ Youtube-Data-Manager/
 
 - **Backend**: Python 3.9+ / Flask / Gunicorn
 - **Embeddings & NLP**: FastEmbed (`sentence-transformers/all-MiniLM-L6-v2`) on CPU
-- **Database & Vector Search**: Supabase (Cloud PostgreSQL) + `pgvector` HNSW & IVFFlat Cosine Similarity Indexing
+- **Database & Vector Search**: Supabase (Cloud PostgreSQL) + `pgvector` HNSW Cosine Similarity Indexing
 - **Database Range Partitioning**: Native PostgreSQL partitioning by `recorded_at` (`video_snapshots_v4`)
 - **Frontend Architecture**: Vanilla HTML5, Modular CSS3 (Obsidian Dark Tokens, Linear Indigo `#6672f5`), Deep Reactive ES6+ Proxy Store (`WeakMap` + `requestAnimationFrame`)
 - **Real-Time Drop Ingestion**: Google WebSub (PubSubHubbub Atom Feeds) — **0 Quota Cost**
