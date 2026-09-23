@@ -1,23 +1,26 @@
-# ⚡ YT Tracker — YouTube Competitive Intelligence & Growth Studio
+# ⚡ YT Tracker — YouTube Competitive Intelligence & Growth Studio (v5.0)
 
-A production-grade, full-spectrum competitive intelligence platform and creator workflow suite for YouTube creators. Built with a calm, disciplined **Linear / Raycast-grade dark workspace aesthetic** (`#0b0c0e` dark surfaces, desaturated indigo `#6672f5` accent, tabular typography, Lucide vector icons), a modular **Flask & Vanilla ES6+ JS** architecture, cloud PostgreSQL persistence via **Supabase** with `pgvector`, and **near-zero YouTube Data API quota overhead**.
+A production-grade, full-spectrum competitive intelligence platform and creator workflow suite for YouTube creators. Built with a calm, disciplined **Linear / Raycast-grade dark workspace aesthetic** (`#0b0c0e` dark surfaces, desaturated indigo `#6672f5` accent, tabular typography, Lucide vector icons), a modular **Flask & Vanilla ES6+ JS** architecture, cloud PostgreSQL persistence via **Supabase** with `pgvector` & `HNSW` indexing, and a **zero-quota Google WebSub real-time ingestion engine**.
 
 ---
 
-## 🌟 Platform Highlights & Intelligence Architecture
+## 🌟 Platform Highlights & v5.0 Architecture
 
 ```mermaid
 graph TD
-    A[YouTube Drops & Catalog] -->|Google WebSub: 0 Quota| B[Flask Ingestion Engine]
-    A -->|Playlist Batch Ingest: 2 units / 50 vids| B
-    B -->|FastEmbed: all-MiniLM-L6-v2| C[(Supabase pgvector: videos)]
-    C -->|Cosine Similarity Clustering| D[Semantic Topic Radar]
-    B -->|Velocity-Weighted RPI - VRPI| E[Outlier Radar & Breakout Engine]
-    E -->|VRPI >= 2.5x Alert| F[Discord & Slack Webhooks]
-    D -->|Demand vs 14d Supply| G[2x2 Saturation Matrix]
-    G -->|Blue Ocean Formula| H[Top High-Leverage Opportunities]
-    H -->|5 Packaging Archetypes| I[AI Packaging Synthesizer]
-    I -->|120px Mockup & 50-Char Fold| J[Creator Studio Title Lab & Kanban]
+    A[YouTube Platform Drops] -->|Google WebSub Atom XML Push: 0 Quota| B[WebSub Webhook Listener]
+    B -->|Edit-Trap Guard: db_video_exists| C[Single-Video Ingest: 1 Quota Unit]
+    C -->|Queue Milestones| D[(snapshot_schedule: T+2h, T+24h, T+168h)]
+    D -->|50-ID Batches: 1 Unit| E[Snapshot Schedule Worker]
+    E -->|Range Partitioned| F[(video_snapshots_v4)]
+    F -->|23-25h & 164-172h Tolerance Windows| G[Materialized Baselines v2m & 168h]
+    G -->|Concurrent Refresh RPC| G
+    E -->|Time-Bucketed Thresholds| H[Time-Bucketed Outlier Alerts]
+    H -->|2h >= 3.5x · 24h >= 2.5x · 7d >= 2.0x| I[Discord & Slack Webhooks]
+    C -->|FastEmbed: all-MiniLM-L6-v2| J[(Supabase HNSW pgvector)]
+    J -->|Cosine Distance Clustering| K[Semantic Topic Radar & Archetypes]
+    K -->|WeakMap Deep Proxy + rAF 60fps| L[Creator Studio & Title Lab]
+    L -->|AbortController Request Cancellation| M[Mobile Feed Simulator: 120px & 50-Char Fold]
 ```
 
 ---
@@ -42,7 +45,15 @@ $$\text{VRPI} = \text{Raw VRPI} \cdot \text{Age Decay Factor}$$
 
 ---
 
-### 2. Empirical Bayes Shrinkage for Topic RPI
+### 2. Time-Bucketed Milestone Thresholds & 168h Baseline (v5.0)
+Outlier velocity thresholds are dynamically adjusted based on milestone checkpoints to capture both viral bursts and evergreen compounders:
+- **T+2h Viral Breakout**: Requires $\ge 3.5\times$ channel median velocity.
+- **T+24h Velocity Surge**: Requires $\ge 2.5\times$ channel median velocity.
+- **T+168h (Day 7) Sustained Evergreen**: Requires $\ge 2.0\times$ historical 168h baseline computed via `channel_baselines_v2m_168h` (8-hour tolerance window: `age_hours BETWEEN 164.0 AND 172.0`).
+
+---
+
+### 3. Empirical Bayes Shrinkage for Topic RPI
 To prevent small-sample flukes (e.g. a topic with only 1 upload having high views) from distorting recommendations, the engine applies **Empirical Bayes Shrinkage**:
 
 $$\text{RPI}_{\text{shrunken}} = w \cdot \text{RPI}_{\text{raw}} + (1 - w) \cdot 1.0, \quad \text{where } w = \frac{n}{n + 5}$$
@@ -51,7 +62,7 @@ $$\text{RPI}_{\text{shrunken}} = w \cdot \text{RPI}_{\text{raw}} + (1 - w) \cdot
 
 ---
 
-### 3. Supply vs. Demand 2×2 Saturation Matrix
+### 4. Supply vs. Demand 2×2 Saturation Matrix
 Every topic is classified into one of 4 market quadrants:
 - 💎 **Untapped Blue Ocean** (*High Demand · Low Supply*): High competitor views, low recent uploads, and **0 videos by your channel**. High breakout potential.
   $$\text{Blue Ocean Score} = \frac{\text{RPI}_{\text{shrunken}}}{1 + \text{Recent 14d Supply}}$$
@@ -61,38 +72,41 @@ Every topic is classified into one of 4 market quadrants:
 
 ---
 
-### 4. FastEmbed & Supabase `pgvector` Semantic Clustering
-- Replaces brittle N-gram keyword matching with dense 384-dimensional vector embeddings using CPU-optimized `fastembed` (`sentence-transformers/all-MiniLM-L6-v2`).
-- Stores embeddings in Supabase PostgreSQL using the `vector(384)` extension with an IVFFlat cosine similarity index (`scripts/migration_pgvector.sql`).
-- Endpoint `POST /api/topics/semantic-clusters` groups narrative and concept titles into cohesive clusters regardless of phrasing syntax.
+### 5. Strict FastEmbed Semantic Clustering & Zero-Shot Archetype Mapping
+- **Dense 384-d Embeddings**: Uses CPU-optimized `fastembed` (`sentence-transformers/all-MiniLM-L6-v2`) with `vector(384)` HNSW indexing in Supabase PostgreSQL (`scripts/migration_v4_schema.sql`).
+- **Strict Vector Enforcement**: Zero silent N-gram degradation; fails loudly and safely if embeddings are unavailable.
+- **Zero-Shot Archetype Classification**: Formats topic keywords into pseudo-sentences (`f"This video is about {kw1, kw2, ...}"`) and maps them to Creator Studio viral packaging frameworks (*B2B Engineering, Vlog Entertainment, Educational Tutorial, News*).
 
 ---
 
-### 5. YouTube Mobile Feed & 50-Char Title Fold Simulator
+### 6. YouTube Mobile Feed & 50-Char Title Fold Simulator
 Over 70% of YouTube viewership occurs on mobile devices where browse titles truncate after 45–55 characters:
 - **120px Scale Thumbnail Mockup**: Live 16:9 feed preview with timestamp badge and high-contrast concept overlay.
 - **50-Character Dynamic Fold Indicator**: Visual cutoff boundary marking characters 1–50 (`Visible on Mobile`) vs 51+ (`Truncated in Browse Feed`).
 - **Hook Placement Intelligence**: Live diagnostic checking if the primary curiosity trigger / power keyword is front-loaded before the mobile truncation cutoff.
+- **Network Race Prevention**: Title Lab input uses `AbortController` to cancel in-flight async scoring requests on every keystroke.
 
 ---
 
-### 6. Zero-Quota Google WebSub Real-Time Listener
+### 7. Zero-Quota Google WebSub Ingestion Engine
 - **Endpoint**: `GET` & `POST` `/api/webhooks/youtube-sub`.
 - Handles Google PubSubHubbub subscription challenges (`hub.challenge`) for **0 quota units**.
-- When a tracked competitor publishes a video, YouTube immediately pushes an XML drop notification to the endpoint.
-- Triggers a single-video `videos.list` fetch (**1 quota unit** instead of 100 units for polling `search.list`).
+- **Edit-Trap Guard (`db_video_exists`)**: Prevents historical video edits from queuing duplicate snapshot records.
+- Enqueues $T+2\text{h}$, $T+24\text{h}$, and $T+168\text{h}$ snapshot milestones into `snapshot_schedule`.
+- **Zombie Video Cleanup**: Missing/deleted/privatized videos are automatically flagged `deleted_or_privatized`, keeping queue throughput at 100%.
 
 ---
 
-### 7. Outlier Radar Webhooks (Discord & Slack)
-- Automated background worker scans competitor drops and fires rich webhook embeds whenever an upload hits $\text{VRPI} \ge 2.5\times$.
-- Fully configurable in the **Settings Modal** with custom webhook URL, platform toggle (Discord / Slack), and adjustable VRPI multiplier slider ($2.0\times$ to $5.0\times$).
+### 8. Pacific Time Midnight Quota Ledger & Circuit Breaker (v5.0)
+- **Strict PT Alignment**: Redis quota keys are date-stamped (`quota:spend:YYYY-MM-DD-PT`) using `America/Los_Angeles` timezone to synchronize with Google's quota reset clock.
+- **85% Capacity Circuit Breaker**: Throttles exploratory UI queries at $\ge 8,500$ units while **preserving all 24h & 168h baseline snapshots**, completely eliminating survivorship bias.
 
 ---
 
-### 8. Reactive Vanilla JS Event Store (`appState`)
-- Minimalist `Proxy`-backed reactive state container in `static/js/state.js`.
-- Cross-view synchronization without frontend framework bloat: mutations to `appState.selectedTopic`, `appState.titleLabDraft`, or `appState.filterQuery` dispatch `appstate:${key}` DOM events and update views instantly.
+### 9. Deep-Reactive Vanilla JS Event Store (`appState`)
+- **WeakMap Identity Stability**: `appState.a.b === appState.a.b` maintains identity caching across deeply nested object and array mutations.
+- **60fps `requestAnimationFrame` Batching**: Coalesces rapid state modifications with `dirtyKeys` tracking.
+- **Event Bridging**: Dispatches `appstate:${key}` CustomEvents with both `value` and `oldValue` for full backward compatibility.
 
 ---
 
@@ -103,53 +117,11 @@ Never leaves the creator wondering *"What does this metric mean?"*:
 - **L0 (Numbers)**: Clean tabular figures (`1.2K`, `4.5%`, `↑ 4%`) with no rainbow clutter.
 - **L1 (Tooltips)**: Fast 120ms hover & focus tooltips on all `[data-tip]` metrics with a `"Learn more →"` trigger.
 - **L2 (Detail Sheets)**: Slide-out drawer displaying exact mathematical formulas, interpretation guides, and tactical next steps.
-- **L3 (Deep Dive)**: Dedicated full-screen forensics view with 90-day upload pulse, audience ratios, and topic moats.
+- **L3 (Deep Dive)**: Dedicated full-screen forensics view with 90-day upload pulse, split-pane right-rail inspection (`.dd-split-layout`), and topic moats.
 
 ### 2. Data Honesty & The "—" Rule
 - If data is missing or calculations fail, the UI renders a clean em-dash (`—`) or `< 1%`, never a misleading `0` or hardcoded fallback.
 - Professional SaaS tone: **Zero exclamation marks** in copy, tooltips, or toast notifications.
-
-### 3. 60fps Motion & Animation
-- **Single-Fire Viewport Observer (`ui/reveal.js`)**: Elements fade up once upon entering viewport and never re-trigger on scroll.
-- **Hardware-Accelerated KPI Count-Up (`ui/countup.js`)**: Quartic easing ticker transitions with zero layout thrashing.
-- **Full Reduced-Motion Support**: Respects `prefers-reduced-motion: reduce`.
-
-### 4. Full Mobile & Responsive Design
-- **Off-Canvas Drawer**: Desktop sidebar smoothly collapses into a slide-out drawer on screens $\le 768px$ with a hamburger trigger (`☰`).
-- **Mobile Bottom Navigation Bar**: Fixed 5-tab bar (Overview, Competitors, Radar, Studio, Search) with active state indicators.
-- **Adaptive Grids**: Responsive 1-column & 2-column KPI cards and Title Lab meters.
-
----
-
-## 📊 Core Application Modules
-
-### 1. Overview (Command Center)
-- **Executive Hero**: Active channel details, subscriber count, and cohort ranking.
-- **Next Step Card**: Exactly 1 prioritized strategic recommendation with "Why?" explanation link and 1-click "Plan in Studio" action.
-- **4 Key Performance Indicators**: Subscribers, 30-Day Views Velocity, Upload Cadence, and Niche Share.
-- **30-Day Performance Velocity Trajectory**: Interactive Chart.js curve with dark tooltips.
-- **Recent Uploads**: Compact 5-row table with clear 16:9 thumbnails and relative age.
-
-### 2. Competitors (Benchmark Grid)
-- **Cohort Benchmark Table**: Instant search filter, tabular subscribers, view averages, total views, and sparkline trends.
-- **Overlap Forensics**: Topic overlap percentage calculated via Jaccard similarity.
-- **Recent Competitor Drops Feed**: Live feed of competitor video releases with daily view velocity and $\text{VRPI}$ outlier tags (`🔥 3.4× Outlier`).
-- **Context Menus (`⋯`)**: View details, compare set, set primary, or remove competitor.
-
-### 3. Topic Radar (Opportunities)
-- **Top 8 High-Leverage Opportunities**: Ranked cards with plain-English rationales (*"Competitors average 12.4K views with 0 videos by you"*).
-- **Niche Topic Catalog Table**: Searchable, paginated table with quadrant filters (All, Untapped, High Demand, Emerging).
-
-### 4. Creator Studio
-- **Title Lab Real-Time Scorer (0–100 CTR)**: Evaluates character length against the mobile fold boundary (40–60 chars), topic keyword demand, power curiosity hooks, and syntax structure.
-- **Mobile Feed Simulator**: 120px scale thumbnail concept mockup with 50-character fold boundary and hook position diagnostic.
-- **AI Packaging Synthesizer**: Generates 5 viral packaging archetypes (*Impossible Feat, Hidden Flaw, Head-to-Head, Zero-to-Mastery, Stress Test*) with thumbnail blueprints.
-- **Kanban Content Pipeline**: 4 production stages (`Ideas` $\to$ `In Production` $\to$ `Scheduled` $\to$ `Published`).
-
-### 5. Deep Dive Forensics
-- **Channel Health Rail**: Engagement rates, upload cadence, publishing streak, and total catalog metrics.
-- **90-Day Upload Pulse**: Week-bucketed publishing histogram.
-- **Top Performing Videos & Topic Moats**: Breakdown of highest-performing uploads and keyword clusters.
 
 ---
 
@@ -157,15 +129,16 @@ Never leaves the creator wondering *"What does this metric mean?"*:
 
 ```text
 Youtube-Data-Manager/
-├── server.py                   # Flask backend, WebSub listener, FastEmbed & Webhooks
-├── requirements.txt            # Python dependencies (flask, supabase, fastembed, etc.)
+├── server.py                   # Flask backend, WebSub listener, FastEmbed & Outlier Radar
+├── requirements.txt            # Python dependencies (flask, supabase, fastembed, redis, etc.)
 ├── Procfile                    # Production deployment configuration (Gunicorn)
 ├── settings.json               # Outlier Radar webhook configuration
-├── test_phase1_6.py            # Automated test suite for backend intelligence upgrades
+├── test_phase1_6.py            # Automated test suite (13/13 backend tests)
 │
 ├── scripts/
+│   ├── migration_v4_schema.sql # v5.0 PostgreSQL schema (HNSW vector index, partitions, 168h view, RPC)
 │   ├── migration_pgvector.sql  # Supabase pgvector extension & IVFFlat cosine index
-│   └── schema_v2.sql           # PostgreSQL schema (videos, channel_baselines, topic_metrics)
+│   └── schema_v2.sql           # Baseline relational schema
 │
 ├── static/
 │   ├── index.html              # Core application DOM shell (2-Pane Layout + Mobile Nav)
@@ -176,7 +149,7 @@ Youtube-Data-Manager/
 │   │   ├── base.css            # Layout resets, sidebar skeleton, typography
 │   │   ├── ui.css              # Primitives: context menu, tooltips, sheets, mobile nav
 │   │   ├── dashboard.css       # Executive KPIs, Chart.js wrap, activity feeds
-│   │   ├── deep-dive.css       # Forensics inspector overlay & pulse charts
+│   │   ├── deep-dive.css       # Forensics inspector overlay, split-pane & pulse charts
 │   │   ├── studio.css          # Title Lab, Mobile Simulator, Synthesizer modal, Kanban
 │   │   ├── modals.css          # Command palette, Settings, Glossary modal
 │   │   └── print.css           # @media print rules for PDF export
@@ -194,12 +167,12 @@ Youtube-Data-Manager/
 │       ├── data/
 │       │   └── glossary.js     # Comprehensive data dictionary with 30+ definitions
 │       │
-│       ├── state.js            # ReactiveStore container (window.appState) & state
+│       ├── state.js            # DeepReactiveStore (WeakMap Proxy + rAF Batching)
 │       ├── dashboard.js        # Overview KPI grid, trajectory chart, next step card
 │       ├── channels.js         # Competitor benchmark table & VRPI drops activity feed
 │       ├── nlp-topics.js       # Topic radar, VRPI math, Bayes shrinkage, Blue Ocean scoring
-│       ├── studio.js           # Title Lab scorer, Mobile Feed simulator, Synthesizer, Kanban
-│       ├── deep-dive.js        # Channel forensics inspector modal
+│       ├── studio.js           # Title Lab scorer, AbortController, Mobile Simulator, Kanban
+│       ├── deep-dive.js        # Channel forensics inspector modal & split-pane layout
 │       ├── timing.js           # Publication timing heatmap & timezone engine
 │       ├── api.js              # API client & quota accounting
 │       ├── settings-inbox.js   # Settings modal, Outlier Radar webhooks & alert inbox
@@ -212,14 +185,15 @@ Youtube-Data-Manager/
 ## 🛠️ Technology Stack
 
 - **Backend**: Python 3.9+ / Flask / Gunicorn
-- **Embeddings & NLP**: FastEmbed (`sentence-transformers/all-MiniLM-L6-v2`) on CPU with N-gram fallback
-- **Database & Vector Search**: Supabase (Cloud PostgreSQL) + `pgvector` IVFFlat Cosine Similarity
-- **Frontend Architecture**: Vanilla HTML5, Modular CSS3 (Obsidian Dark Tokens, Linear Indigo `#6672f5`), Modular ES6+ JavaScript (`appState` Proxy Event Store)
+- **Embeddings & NLP**: FastEmbed (`sentence-transformers/all-MiniLM-L6-v2`) on CPU
+- **Database & Vector Search**: Supabase (Cloud PostgreSQL) + `pgvector` HNSW & IVFFlat Cosine Similarity Indexing
+- **Database Range Partitioning**: Native PostgreSQL partitioning by `recorded_at` (`video_snapshots_v4`)
+- **Frontend Architecture**: Vanilla HTML5, Modular CSS3 (Obsidian Dark Tokens, Linear Indigo `#6672f5`), Deep Reactive ES6+ Proxy Store (`WeakMap` + `requestAnimationFrame`)
 - **Real-Time Drop Ingestion**: Google WebSub (PubSubHubbub Atom Feeds) — **0 Quota Cost**
+- **Quota Accounting**: Pacific Time Midnight Redis Ledger (`quota:spend:YYYY-MM-DD-PT`) with 85% Circuit Breaker
 - **Charting & Visualizations**: Chart.js 4.x (Linear curves, subtle gradient fills), SVG Sparklines
 - **Icons**: Lucide Icons (vector SVG)
 - **Typography**: Inter (UI & Displays), JetBrains Mono (Tabular Numerals & Code)
-- **API**: YouTube Data API v3 (`google-api-python-client`) with client caching & thread pooling
 
 ---
 
@@ -249,12 +223,14 @@ Create a `.env` file in the project root:
 YOUTUBE_API_KEY=your_youtube_api_key_here
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your_supabase_service_key_here
+REDIS_URL=redis://localhost:6379/0
 FLASK_DEBUG=1
 PORT=5000
 ```
 
-### 3. (Optional) Run Supabase pgvector Migration
-In your Supabase SQL Editor, execute [`scripts/migration_pgvector.sql`](file:///g:/Important%20Projects/Youtube%20Data%20Manager/scripts/migration_pgvector.sql) to enable vector similarity search.
+### 3. Run Database Migrations
+In your Supabase SQL Editor, execute:
+1. [`scripts/migration_v4_schema.sql`](file:///g:/Important%20Projects/Youtube%20Data%20Manager/scripts/migration_v4_schema.sql) (HNSW vector indexing, `snapshot_schedule`, partitions, materialized views, RPC refresh procedure).
 
 ### 4. Run Automated Test Suite
 ```bash
@@ -281,7 +257,7 @@ Open your browser at **[http://localhost:5000](http://localhost:5000)**.
 | <kbd>3</kbd> | Switch to Topic Radar |
 | <kbd>4</kbd> | Switch to Creator Studio |
 | <kbd>R</kbd> | Refresh All Tracked Channels |
-| <kbd>Esc</kbd> | Close any active modal, detail sheet, or menu |
+| <kbd>Esc</kbd> | Close active modal, detail sheet, or menu |
 
 ---
 

@@ -1742,6 +1742,21 @@ def get_redis_client():
             _redis_instance = False
     return _redis_instance if _redis_instance is not False else None
 
+def get_seconds_until_pt_midnight() -> int:
+    """Calculate exact seconds remaining until next Midnight US Pacific Time (Google Quota Reset)."""
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime, timedelta
+        now_pt = datetime.now(ZoneInfo("America/Los_Angeles"))
+        tomorrow_midnight = (now_pt + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        return max(60, int((tomorrow_midnight - now_pt).total_seconds()))
+    except Exception:
+        from datetime import datetime, timezone, timedelta
+        now_utc = datetime.now(timezone.utc)
+        now_pt = now_utc + timedelta(hours=-7)
+        tomorrow_midnight = (now_pt + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        return max(60, int((tomorrow_midnight - now_pt).total_seconds()))
+
 def get_pacific_date_str() -> str:
     """Returns the current date string in US Pacific Time (Google Quota Reset Clock: America/Los_Angeles)."""
     try:
@@ -1781,8 +1796,8 @@ def is_circuit_breaker_active() -> bool:
 
 def record_quota_spend(units: int = 1):
     """
-    Record quota spend in Redis & Supabase using Pacific Time date-stamped keys (Landmine 1 & 3 Fix).
-    Preserves 100% data integrity for historical baseline snapshots without survivorship bias.
+    Record quota spend in Redis & Supabase using Pacific Time date-stamped keys (Landmine 1, 3, & 8 Fix).
+    Uses dynamic Midnight PT TTL to eliminate memory leaks while preserving 100% baseline snapshot integrity.
     """
     pt_date = get_pacific_date_str()
     r = get_redis_client()
@@ -1797,8 +1812,9 @@ def record_quota_spend(units: int = 1):
                 current_spend = 0
 
             if raw_spend is None:
-                # 48-hour garbage collection TTL (date-stamped key isolates day boundaries cleanly)
-                r.set(key, str(units), ex=172800)
+                # Landmine 8 Fix: Dynamic TTL expiring at exact second of Midnight PT (0 drift, 0 leak)
+                ttl = get_seconds_until_pt_midnight()
+                r.set(key, str(units), ex=ttl)
             else:
                 r.incrby(key, units)
         except Exception as ex:
@@ -1817,10 +1833,10 @@ def record_quota_spend(units: int = 1):
             "circuit_breaker_active": breaker
         }, on_conflict="ledger_date").execute()
 
-        # Landmine 3 Fix: Do NOT cancel historical baseline snapshots (avoids Survivorship Bias).
-        # Throttle/defer non-essential UI exploratory fetches instead.
+        # Landmine 3 & 9 Fix: Do NOT cancel historical baseline snapshots and do NOT throttle UI endpoints.
+        # Restrict only optional background catalog backfills if triggered.
         if breaker and not (db_current >= 8500):
-            print("[CircuitBreaker] [WARNING] Daily quota >= 8,500 units (Pacific Time)! Throttling exploratory polls; baseline snapshots preserved.")
+            print("[CircuitBreaker] [WARNING] Daily quota >= 8,500 units (Pacific Time)! Throttling optional backfills; UI and baseline snapshots preserved.")
     except Exception:
         pass
 
@@ -2034,10 +2050,20 @@ def cron_process_snapshots():
             return jsonify({"success": True, "processed": 0, "message": "No pending snapshots due"})
 
         video_ids = list(set(item["video_id"] for item in pending))
-        yt = get_yt()
-        record_quota_spend(1)
-        res = yt.videos().list(id=",".join(video_ids), part="snippet,statistics").execute()
-        stats_map = {item["id"]: item for item in res.get("items", [])}
+        
+        # Landmine 6 Fix: Guard against batch HTTP/transient API errors (429/403/500)
+        try:
+            yt = get_yt()
+            record_quota_spend(1)
+            res = yt.videos().list(id=",".join(video_ids), part="snippet,statistics").execute()
+            if not isinstance(res, dict) or "items" not in res:
+                print(f"[SnapshotWorker] [WARNING] Unexpected API response: {res}. Leaving batch in pending.")
+                return jsonify({"success": False, "notice": "Transient API response, batch left pending", "processed": 0}), 200
+            stats_map = {item["id"]: item for item in res.get("items", [])}
+        except Exception as api_err:
+            # On transient 429/500/socket errors, DO NOT mark videos deleted. Leave pending for retry.
+            print(f"[SnapshotWorker] [ERROR] YouTube API batch error: {api_err}. Leaving batch pending for next cycle.")
+            return jsonify({"success": False, "error": f"Transient API error: {api_err}", "processed": 0}), 200
 
         now_ts = time.time()
         snap_rows = []
@@ -2070,7 +2096,7 @@ def cron_process_snapshots():
                 evaluate_outlier_threshold(vid, cid or "unknown", current_vel, int(item.get("hour_checkpoint", 24)))
                 completed_ids.append(item["id"])
             else:
-                # Landmine 2 Fix: Handle deleted/privatized videos so they never block the queue
+                # Landmine 2 & 6: Only mark as deleted if batch succeeded (200 OK) but ID was omitted by YouTube
                 deleted_or_privatized_ids.append(item["id"])
 
         if snap_rows:
@@ -2088,9 +2114,8 @@ def cron_process_snapshots():
         if deleted_or_privatized_ids:
             sb.table("snapshot_schedule").update({"status": "deleted_or_privatized", "executed_at": now_iso}).in_("id", deleted_or_privatized_ids).execute()
 
-        # Trigger concurrent refresh of materialized baseline views (Landmine 5 Fix)
-        if completed_ids:
-            threading.Thread(target=refresh_materialized_baselines, daemon=True).start()
+        # Landmine 7 Fix: Materialized views refresh on dedicated hourly cadence (/api/cron/refresh-baselines)
+        # to prevent disk I/O thrashing on large historical snapshot tables.
 
         return jsonify({
             "success": True,
