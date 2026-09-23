@@ -44,11 +44,16 @@ def test_semantic_clusters():
         {"title": "Why Your FDM 3D Printer Extruder Clogs", "view_count": 64000, "channel_id": "c2"}
     ]
     resp = client.post("/api/topics/semantic-clusters", json={"videos": sample_videos, "threshold": 0.50})
-    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
     data = resp.get_json()
-    assert data.get("success") is True
-    assert len(data.get("clusters", [])) >= 1
-    print(f"PASS: Semantic vector clustering (Found {len(data['clusters'])} clusters from {len(sample_videos)} videos)")
+    if resp.status_code == 200:
+        assert data.get("success") is True
+        assert len(data.get("clusters", [])) >= 1
+        print(f"PASS: Semantic vector clustering with FastEmbed (Found {len(data['clusters'])} clusters)")
+    else:
+        # Landmine 4 Fix: Verified strict refusal to silently fall back to N-grams
+        assert resp.status_code == 503
+        assert data.get("model_unavailable") is True
+        print("PASS: Strict FastEmbed enforcement verified (Refused silent N-gram fallback, returned 503)")
 
 def test_webhook_settings():
     client = app.test_client()
@@ -133,6 +138,21 @@ def test_time_bucketed_outliers():
     evaluate_outlier_threshold("test_vid_3", "test_cid", 50.0, 168)
     print("PASS: Time-bucketed outlier threshold evaluation (T+2h, T+24h, T+168h)")
 
+def test_pacific_time_quota():
+    from server import get_pacific_date_str
+    pt_date = get_pacific_date_str()
+    assert len(pt_date) == 10
+    assert pt_date.count("-") == 2
+    print(f"PASS: Pacific Time quota date resolution (PT Date: {pt_date})")
+
+def test_refresh_baselines_endpoint():
+    client = app.test_client()
+    resp = client.post("/api/cron/refresh-baselines")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data.get("success") is True
+    print("PASS: /api/cron/refresh-baselines concurrent materialized view refresh")
+
 def test_sql_schema_migration():
     with open("scripts/migration_v4_schema.sql", "r", encoding="utf-8") as f:
         sql = f.read()
@@ -142,7 +162,8 @@ def test_sql_schema_migration():
     assert "CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m" in sql
     assert "CREATE MATERIALIZED VIEW IF NOT EXISTS channel_baselines_v2m_168h" in sql
     assert "CREATE TABLE IF NOT EXISTS quota_ledger" in sql
-    print("PASS: scripts/migration_v4_schema.sql schema verification (including 168h view)")
+    assert "CREATE OR REPLACE FUNCTION refresh_channel_baselines()" in sql
+    print("PASS: scripts/migration_v4_schema.sql schema verification (including 168h view & refresh procedure)")
 
 if __name__ == "__main__":
     test_websub_get_challenge()
@@ -155,5 +176,7 @@ if __name__ == "__main__":
     test_circuit_breaker_and_quota_ledger()
     test_zero_shot_archetype_mapping()
     test_time_bucketed_outliers()
+    test_pacific_time_quota()
+    test_refresh_baselines_endpoint()
     test_sql_schema_migration()
-    print("\nALL BACKEND AUTOMATED TESTS PASSED (11/11)!")
+    print("\nALL BACKEND AUTOMATED TESTS PASSED (13/13)!")

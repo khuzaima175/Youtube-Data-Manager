@@ -105,3 +105,12 @@ CREATE TABLE IF NOT EXISTS quota_ledger (
     circuit_breaker_active BOOLEAN DEFAULT FALSE,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 7. Automated Materialized View Refresh Stored Procedure
+CREATE OR REPLACE FUNCTION refresh_channel_baselines()
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY channel_baselines_v2m;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY channel_baselines_v2m_168h;
+END;
+$$;

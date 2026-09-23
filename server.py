@@ -1534,7 +1534,7 @@ def get_embedding_model():
             _fastembed_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
             print("[FastEmbed] Model sentence-transformers/all-MiniLM-L6-v2 loaded.")
         except Exception as e:
-            print(f"[FastEmbed] Model init notice (fallback mode active): {e}")
+            print(f"[FastEmbed] Model init notice: {e}")
             _fastembed_model = False
     return _fastembed_model if _fastembed_model else None
 
@@ -1545,43 +1545,26 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 def cluster_titles_semantic(videos: list[dict], threshold: float = 0.60) -> list[dict]:
-    """Semantic clustering using embeddings with cosine similarity distance."""
+    """Semantic clustering using embeddings with cosine similarity distance (Strict: No silent N-gram fallback)."""
     if not videos:
         return []
     
     titles = [v.get("title", "") for v in videos]
     model = get_embedding_model()
     
-    embeddings = []
-    if model:
-        try:
-            embeddings = [list(vec) for vec in model.embed(titles)]
-        except Exception as ex:
-            print(f"[FastEmbed] Embed error: {ex}")
-            embeddings = []
-    
-    # Fallback to simple N-gram token overlap if FastEmbed not available
+    if not model:
+        # Landmine 4 Fix: Fail loudly instead of silently corrupting clusters with N-gram fallback
+        print("[FastEmbed] [CRITICAL] FastEmbed model unavailable. Refusing silent N-gram fallback.")
+        raise RuntimeError("Semantic embedding model unavailable. FastEmbed is required for vector clustering.")
+
+    try:
+        embeddings = [list(vec) for vec in model.embed(titles)]
+    except Exception as ex:
+        print(f"[FastEmbed] [CRITICAL] embed generation error: {ex}")
+        raise RuntimeError(f"FastEmbed embedding failure: {ex}")
+
     if not embeddings or len(embeddings) != len(videos):
-        clusters_map = {}
-        for v in videos:
-            t = v.get("title", "").lower()
-            words = [w for w in re.findall(r"\w+", t) if len(w) > 3]
-            key = " ".join(words[:2]) if len(words) >= 2 else (words[0] if words else "General")
-            clusters_map.setdefault(key, []).append(v)
-        
-        result = []
-        for key, vlist in clusters_map.items():
-            tot_views = sum(int(x.get("view_count") or x.get("views_raw") or 0) for x in vlist)
-            avg_v = tot_views // max(1, len(vlist))
-            result.append({
-                "cluster_id": f"cluster-{abs(hash(key)) % 10000}",
-                "topic": key.title(),
-                "n": len(vlist),
-                "avg_views": avg_v,
-                "centroid_title": vlist[0].get("title", ""),
-                "videos": vlist[:10]
-            })
-        return sorted(result, key=lambda c: c["avg_views"], reverse=True)
+        raise RuntimeError("FastEmbed returned mismatched embedding count.")
 
     # Agglomerative clustering with cosine threshold
     clusters: list[list[int]] = []
@@ -1630,7 +1613,7 @@ def cluster_titles_semantic(videos: list[dict], threshold: float = 0.60) -> list
 
 def map_topic_archetypes(keywords: list[str]) -> list[str]:
     """
-    Map topic keywords to Creator Studio viral packaging archetypes (v5.0 Patch 3):
+    Map topic keywords to Creator Studio viral packaging archetypes:
     - Pseudo-sentence formatting: "This video is about {kw1, kw2, ...}"
     - Complete archetype mappings: B2B Engineering, Vlog Entertainment, Educational Tutorial, News, and Fallback.
     """
@@ -1684,11 +1667,18 @@ def get_semantic_clusters():
         clusters = cluster_titles_semantic(videos, threshold=threshold)
         return jsonify({
             "success": True,
-            "model": "all-MiniLM-L6-v2" if get_embedding_model() else "ngram-fallback",
+            "model": "all-MiniLM-L6-v2",
             "cluster_count": len(clusters),
             "total_videos": len(videos),
             "clusters": clusters
         })
+    except RuntimeError as rex:
+        return jsonify({
+            "success": False,
+            "error": str(rex),
+            "model_unavailable": True,
+            "clusters": []
+        }), 503
     except Exception as ex:
         print(f"[SemanticClusters] Error: {ex}")
         return jsonify({"success": False, "error": str(ex), "clusters": []}), 500
@@ -1752,22 +1742,32 @@ def get_redis_client():
             _redis_instance = False
     return _redis_instance if _redis_instance is not False else None
 
+def get_pacific_date_str() -> str:
+    """Returns the current date string in US Pacific Time (Google Quota Reset Clock: America/Los_Angeles)."""
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime
+        return datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d")
+    except Exception:
+        from datetime import datetime, timezone, timedelta
+        return datetime.now(timezone(timedelta(hours=-7))).strftime("%Y-%m-%d")
+
 def get_daily_quota_spend() -> int:
-    """Get current quota spend for today with Redis byte type-cast and Supabase fallback (v5.0 Patch 1)."""
+    """Get current quota spend for today strictly aligned to Pacific Time midnight reset (Landmine 1 Fix)."""
+    pt_date = get_pacific_date_str()
     r = get_redis_client()
     if r:
         try:
-            raw_spend = r.get("quota:daily_spend")
+            raw_spend = r.get(f"quota:spend:{pt_date}")
             if raw_spend is not None:
                 # 1. TYPE CAST FIX: Decode bytes safely to integer
                 return int(raw_spend.decode("utf-8") if isinstance(raw_spend, bytes) else raw_spend)
         except Exception:
             pass
 
-    today_key = time.strftime("%Y-%m-%d", time.gmtime())
     try:
         sb = get_sb()
-        res = sb.table("quota_ledger").select("units_spent").eq("ledger_date", today_key).limit(1).execute()
+        res = sb.table("quota_ledger").select("units_spent").eq("ledger_date", pt_date).limit(1).execute()
         if res.data:
             return res.data[0].get("units_spent", 0)
     except Exception:
@@ -1775,49 +1775,52 @@ def get_daily_quota_spend() -> int:
     return 0
 
 def is_circuit_breaker_active() -> bool:
-    """Check if circuit breaker is active (>8,500 units spent today)."""
+    """Check if circuit breaker is active (>8,500 units spent today in Pacific Time)."""
     spend = get_daily_quota_spend()
     return spend >= 8500
 
 def record_quota_spend(units: int = 1):
-    """Record quota spend in Redis & Supabase with 24h midnight reset and 85% circuit breaker (v5.0 Patch 1)."""
+    """
+    Record quota spend in Redis & Supabase using Pacific Time date-stamped keys (Landmine 1 & 3 Fix).
+    Preserves 100% data integrity for historical baseline snapshots without survivorship bias.
+    """
+    pt_date = get_pacific_date_str()
     r = get_redis_client()
     current_spend = 0
     if r:
         try:
-            raw_spend = r.get("quota:daily_spend")
-            # 1. TYPE CAST FIX: Decode bytes safely to integer
+            key = f"quota:spend:{pt_date}"
+            raw_spend = r.get(key)
             if raw_spend is not None:
                 current_spend = int(raw_spend.decode("utf-8") if isinstance(raw_spend, bytes) else raw_spend)
             else:
                 current_spend = 0
 
-            # 2. MIDNIGHT RESET FIX: Expire key 24 hours (86400s) on initial creation
             if raw_spend is None:
-                r.set("quota:daily_spend", str(units), ex=86400)
+                # 48-hour garbage collection TTL (date-stamped key isolates day boundaries cleanly)
+                r.set(key, str(units), ex=172800)
             else:
-                r.incrby("quota:daily_spend", units)
+                r.incrby(key, units)
         except Exception as ex:
             print(f"[RedisQuota] Warning: {ex}")
 
-    today_key = time.strftime("%Y-%m-%d", time.gmtime())
     try:
         sb = get_sb()
-        res = sb.table("quota_ledger").select("units_spent").eq("ledger_date", today_key).limit(1).execute()
+        res = sb.table("quota_ledger").select("units_spent").eq("ledger_date", pt_date).limit(1).execute()
         db_current = res.data[0]["units_spent"] if res.data else 0
         new_spend = max(current_spend + units, db_current + units)
         breaker = new_spend >= 8500
 
         sb.table("quota_ledger").upsert({
-            "ledger_date": today_key,
+            "ledger_date": pt_date,
             "units_spent": new_spend,
             "circuit_breaker_active": breaker
         }, on_conflict="ledger_date").execute()
 
-        # 3. Circuit Breaker trigger
+        # Landmine 3 Fix: Do NOT cancel historical baseline snapshots (avoids Survivorship Bias).
+        # Throttle/defer non-essential UI exploratory fetches instead.
         if breaker and not (db_current >= 8500):
-            print("[CircuitBreaker] ⚠️ Daily quota >= 8,500 units! Cancelling non-critical historical checkpoints (24h, 168h).")
-            sb.table("snapshot_schedule").update({"status": "cancelled"}).in_("hour_checkpoint", [24, 168]).eq("status", "pending").execute()
+            print("[CircuitBreaker] [WARNING] Daily quota >= 8,500 units (Pacific Time)! Throttling exploratory polls; baseline snapshots preserved.")
     except Exception:
         pass
 
@@ -2039,6 +2042,7 @@ def cron_process_snapshots():
         now_ts = time.time()
         snap_rows = []
         completed_ids = []
+        deleted_or_privatized_ids = []
 
         for item in pending:
             vid = item["video_id"]
@@ -2064,8 +2068,10 @@ def cron_process_snapshots():
                 # Evaluate Time-Bucketed Outlier Thresholds (v5.0 Patch 2 & 4)
                 current_vel = vc / max(0.1, age_hours)
                 evaluate_outlier_threshold(vid, cid or "unknown", current_vel, int(item.get("hour_checkpoint", 24)))
-
-            completed_ids.append(item["id"])
+                completed_ids.append(item["id"])
+            else:
+                # Landmine 2 Fix: Handle deleted/privatized videos so they never block the queue
+                deleted_or_privatized_ids.append(item["id"])
 
         if snap_rows:
             try:
@@ -2079,10 +2085,37 @@ def cron_process_snapshots():
         if completed_ids:
             sb.table("snapshot_schedule").update({"status": "completed", "executed_at": now_iso}).in_("id", completed_ids).execute()
 
-        return jsonify({"success": True, "processed": len(completed_ids), "snapshots_recorded": len(snap_rows)})
+        if deleted_or_privatized_ids:
+            sb.table("snapshot_schedule").update({"status": "deleted_or_privatized", "executed_at": now_iso}).in_("id", deleted_or_privatized_ids).execute()
+
+        # Trigger concurrent refresh of materialized baseline views (Landmine 5 Fix)
+        if completed_ids:
+            threading.Thread(target=refresh_materialized_baselines, daemon=True).start()
+
+        return jsonify({
+            "success": True,
+            "processed": len(completed_ids) + len(deleted_or_privatized_ids),
+            "snapshots_recorded": len(snap_rows),
+            "deleted_or_privatized": len(deleted_or_privatized_ids)
+        })
     except Exception as ex:
         print(f"[SnapshotWorker] Notice: {ex}")
         return jsonify({"success": True, "processed": 0, "notice": str(ex)})
+
+def refresh_materialized_baselines():
+    """Concurrently refresh PostgreSQL baseline materialized views (Landmine 5 Fix)."""
+    try:
+        sb = get_sb()
+        sb.rpc("refresh_channel_baselines").execute()
+        print("[BaselineRefresher] Materialized views refreshed concurrently.")
+    except Exception as ex:
+        print(f"[BaselineRefresher] Notice: {ex}")
+
+@app.route("/api/cron/refresh-baselines", methods=["GET", "POST"])
+def cron_refresh_baselines():
+    """Manual or cron-triggered concurrent refresh of baseline views."""
+    refresh_materialized_baselines()
+    return jsonify({"success": True, "refreshed_views": ["channel_baselines_v2m", "channel_baselines_v2m_168h"]})
 
 @app.route("/api/intelligence/score-title", methods=["POST"])
 def api_score_title():
