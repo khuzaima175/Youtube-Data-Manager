@@ -7,6 +7,73 @@ const ICON_FONT = 'Material Symbols Rounded';
 const isMac = /Mac|iPhone|iPad/i.test(navigator.userAgent || navigator.platform || '');
 const kbdShortcutText = isMac ? '⌘K' : 'Ctrl K';
 
+/* ── 00.1 Reactive Vanilla JS Event Store (Phase 6) ───────────────────────── */
+class ReactiveStore {
+  constructor(initialState = {}) {
+    this._state = { ...initialState };
+    this._listeners = new Map();
+  }
+
+  get(key) {
+    return this._state[key];
+  }
+
+  set(key, val) {
+    const oldVal = this._state[key];
+    if (oldVal === val) return;
+    this._state[key] = val;
+    this._emit(key, val, oldVal);
+  }
+
+  subscribe(key, fn) {
+    if (!this._listeners.has(key)) this._listeners.set(key, new Set());
+    this._listeners.get(key).add(fn);
+    return () => {
+      const set = this._listeners.get(key);
+      if (set) set.delete(fn);
+    };
+  }
+
+  _emit(key, val, oldVal) {
+    const subs = this._listeners.get(key);
+    if (subs) {
+      subs.forEach(fn => {
+        try { fn(val, oldVal); } catch (err) { console.error(`[appState] Listener error for ${key}:`, err); }
+      });
+    }
+    try {
+      window.dispatchEvent(new CustomEvent(`appstate:${key}`, { detail: { value: val, oldValue: oldVal } }));
+      window.dispatchEvent(new CustomEvent('appstate:change', { detail: { key, value: val, oldValue: oldVal } }));
+    } catch { }
+  }
+}
+
+const _appStore = new ReactiveStore({
+  activeChannel: null,
+  selectedTopic: null,
+  titleLabDraft: 'How EUV Lithography Works: The Secret to 2nm Chips (Explained)',
+  pipelineCards: [],
+  filterQuery: '',
+  radarRange: '90d',
+  themeAccent: 'cyan'
+});
+
+const appState = new Proxy(_appStore, {
+  get(target, prop) {
+    if (typeof prop === 'symbol') return Reflect.get(target, prop);
+    if (prop in target && typeof target[prop] === 'function') {
+      return target[prop].bind(target);
+    }
+    return target.get(prop);
+  },
+  set(target, prop, value) {
+    target.set(prop, value);
+    return true;
+  }
+});
+
+window.appState = appState;
+
 /* ── Global State ─────────────────────────────────────────────────────────── */
 let all = [];
 let sort = 'subscribers_raw';

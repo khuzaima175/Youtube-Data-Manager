@@ -10,7 +10,9 @@ import time
 import json
 import math
 import urllib.request
+import urllib.error
 import threading
+import xml.etree.ElementTree as ET
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory, Response
 from flask_cors import CORS
@@ -1515,6 +1517,461 @@ def get_trending_velocity():
         return jsonify({"trending": trending})
     except Exception as ex:
         return jsonify({"trending": []})
+
+
+# ── Phase 3: FastEmbed & Semantic Vector Clustering ────────────────────────────
+_fastembed_model = None
+
+def get_embedding_model():
+    """Lazy initialize FastEmbed TextEmbedding model (sentence-transformers/all-MiniLM-L6-v2) on CPU."""
+    global _fastembed_model
+    if _fastembed_model is None:
+        try:
+            import importlib
+            fastembed_pkg = importlib.import_module("fastembed")
+            TextEmbedding = getattr(fastembed_pkg, "TextEmbedding")
+            _fastembed_model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+            print("[FastEmbed] Model sentence-transformers/all-MiniLM-L6-v2 loaded.")
+        except Exception as e:
+            print(f"[FastEmbed] Model init notice (fallback mode active): {e}")
+            _fastembed_model = False
+    return _fastembed_model if _fastembed_model else None
+
+def cosine_similarity(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a)) or 1e-9
+    norm_b = math.sqrt(sum(y * y for y in b)) or 1e-9
+    return dot / (norm_a * norm_b)
+
+def cluster_titles_semantic(videos: list[dict], threshold: float = 0.60) -> list[dict]:
+    """Semantic clustering using embeddings with cosine similarity distance."""
+    if not videos:
+        return []
+    
+    titles = [v.get("title", "") for v in videos]
+    model = get_embedding_model()
+    
+    embeddings = []
+    if model:
+        try:
+            embeddings = [list(vec) for vec in model.embed(titles)]
+        except Exception as ex:
+            print(f"[FastEmbed] Embed error: {ex}")
+            embeddings = []
+    
+    # Fallback to simple N-gram token overlap if FastEmbed not available
+    if not embeddings or len(embeddings) != len(videos):
+        clusters_map = {}
+        for v in videos:
+            t = v.get("title", "").lower()
+            words = [w for w in re.findall(r"\w+", t) if len(w) > 3]
+            key = " ".join(words[:2]) if len(words) >= 2 else (words[0] if words else "General")
+            clusters_map.setdefault(key, []).append(v)
+        
+        result = []
+        for key, vlist in clusters_map.items():
+            tot_views = sum(int(x.get("view_count") or x.get("views_raw") or 0) for x in vlist)
+            avg_v = tot_views // max(1, len(vlist))
+            result.append({
+                "cluster_id": f"cluster-{abs(hash(key)) % 10000}",
+                "topic": key.title(),
+                "n": len(vlist),
+                "avg_views": avg_v,
+                "centroid_title": vlist[0].get("title", ""),
+                "videos": vlist[:10]
+            })
+        return sorted(result, key=lambda c: c["avg_views"], reverse=True)
+
+    # Agglomerative clustering with cosine threshold
+    clusters: list[list[int]] = []
+    for idx, emb in enumerate(embeddings):
+        placed = False
+        for cl in clusters:
+            centroid_emb = embeddings[cl[0]]
+            sim = cosine_similarity(emb, centroid_emb)
+            if sim >= threshold:
+                cl.append(idx)
+                placed = True
+                break
+        if not placed:
+            clusters.append([idx])
+
+    result = []
+    for cl in clusters:
+        vlist = [videos[i] for i in cl]
+        tot_views = sum(int(x.get("view_count") or x.get("views_raw") or 0) for x in vlist)
+        avg_v = tot_views // max(1, len(vlist))
+        
+        centroid_idx = cl[0]
+        centroid_title = videos[centroid_idx].get("title", "")
+        
+        all_words = " ".join(v.get("title", "") for v in vlist).lower()
+        word_freq = {}
+        stop_words = {"how", "why", "what", "with", "from", "that", "this", "your", "best", "full", "guide", "tutorial", "video", "works", "using"}
+        for w in re.findall(r"[a-zA-Z0-9#+]{3,}", all_words):
+            if w not in stop_words:
+                word_freq[w] = word_freq.get(w, 0) + 1
+        top_words = sorted(word_freq.keys(), key=lambda w: word_freq[w], reverse=True)[:3]
+        topic_label = " ".join(top_words).title() if top_words else centroid_title[:30]
+
+        result.append({
+            "cluster_id": f"cluster-{abs(hash(centroid_title)) % 10000}",
+            "topic": topic_label,
+            "n": len(vlist),
+            "avg_views": avg_v,
+            "centroid_title": centroid_title,
+            "videos": vlist[:10]
+        })
+
+    return sorted(result, key=lambda c: c["avg_views"], reverse=True)
+
+@app.route("/api/topics/semantic-clusters", methods=["GET", "POST"])
+def get_semantic_clusters():
+    """Cluster video catalog using FastEmbed 384-d semantic vectors."""
+    try:
+        body = request.get_json(silent=True) or {}
+        custom_videos = body.get("videos")
+        threshold = float(body.get("threshold", 0.60))
+
+        if custom_videos and isinstance(custom_videos, list):
+            videos = custom_videos
+        else:
+            # Fetch from DB or memory cache
+            videos = []
+            channels = load_channels()
+            for ch in channels:
+                cid = ch["id"]
+                en = _full_cache.get(cid) or _video_cache.get(cid)
+                if en and en.get("data"):
+                    for v in en["data"]:
+                        videos.append({**v, "channel_name": ch["name"]})
+            
+            # Fallback to Supabase if local cache is empty
+            if not videos:
+                try:
+                    sb = get_sb()
+                    r = sb.table("videos").select("id,channel_id,title,view_count,published_at,thumbnail_url").limit(300).execute()
+                    videos = r.data or []
+                except Exception:
+                    pass
+
+        clusters = cluster_titles_semantic(videos, threshold=threshold)
+        return jsonify({
+            "success": True,
+            "model": "all-MiniLM-L6-v2" if get_embedding_model() else "ngram-fallback",
+            "cluster_count": len(clusters),
+            "total_videos": len(videos),
+            "clusters": clusters
+        })
+    except Exception as ex:
+        print(f"[SemanticClusters] Error: {ex}")
+        return jsonify({"success": False, "error": str(ex), "clusters": []}), 500
+
+
+# ── Phase 4: Zero-Quota Google WebSub Ingestion ────────────────────────────────
+
+@app.route("/api/webhooks/youtube-sub", methods=["GET", "POST"])
+def youtube_websub_webhook():
+    """
+    Google WebSub / PubSubHubbub webhook endpoint for real-time YouTube drop notifications.
+    GET: Echoes hub.challenge to verify subscription.
+    POST: Parses XML drop notifications and enriches newly published video (1 quota unit).
+    """
+    if request.method == "GET":
+        challenge = request.args.get("hub.challenge", "")
+        mode = request.args.get("hub.mode", "")
+        topic = request.args.get("hub.topic", "")
+        print(f"[WebSub] Verification request: mode={mode}, topic={topic}")
+        if challenge:
+            return Response(challenge, status=200, mimetype="text/plain")
+        return "Missing hub.challenge", 400
+
+    # POST: XML Atom drop notification
+    try:
+        raw_xml = request.get_data(as_text=True)
+        if not raw_xml:
+            return "Empty payload", 200
+
+        root = ET.fromstring(raw_xml)
+        ns = {
+            "atom": "http://www.w3.org/2005/Atom",
+            "yt": "http://www.youtube.com/xml/dtd/2015"
+        }
+
+        entry = root.find("atom:entry", ns)
+        if entry is None:
+            return "OK - No entry", 200
+
+        video_id_el = entry.find("yt:videoId", ns)
+        channel_id_el = entry.find("yt:channelId", ns)
+        title_el = entry.find("atom:title", ns)
+        published_el = entry.find("atom:published", ns)
+
+        video_id = video_id_el.text if video_id_el is not None else ""
+        channel_id = channel_id_el.text if channel_id_el is not None else ""
+        title = title_el.text if title_el is not None else "New Drop"
+        published_at = published_el.text if published_el is not None else ""
+
+        print(f"[WebSub] Real-time drop detected! Video: {video_id} ({title}) by Channel: {channel_id}")
+
+        if video_id:
+            # Single-video API fetch (only 1 quota unit!)
+            threading.Thread(target=_process_websub_drop, args=(video_id, channel_id, title, published_at), daemon=True).start()
+
+        return "OK - Processed", 200
+    except Exception as ex:
+        print(f"[WebSub] XML parse error: {ex}")
+        return f"Error: {ex}", 200
+
+def _process_websub_drop(video_id: str, channel_id: str, title: str, published_at: str):
+    """Enrich video stats in background, update DB, and check for Breakout Outlier alerts."""
+    try:
+        yt = get_yt()
+        res = yt.videos().list(id=video_id, part="snippet,statistics,contentDetails").execute()
+        items = res.get("items", [])
+        if not items:
+            return
+
+        item = items[0]
+        snippet = item.get("snippet", {})
+        stats = item.get("statistics", {})
+        content_details = item.get("contentDetails", {})
+
+        views = int(stats.get("viewCount", 0))
+        likes = int(stats.get("likeCount", 0))
+        comments = int(stats.get("commentCount", 0))
+        thumb = snippet.get("thumbnails", {}).get("high", {}).get("url", "")
+        duration = content_details.get("duration", "")
+
+        # Save to Supabase
+        try:
+            sb = get_sb()
+            sb.table("videos").upsert([{
+                "id": video_id,
+                "channel_id": channel_id,
+                "title": snippet.get("title", title),
+                "published_at": snippet.get("publishedAt", published_at),
+                "view_count": views,
+                "like_count": likes,
+                "comment_count": comments,
+                "thumbnail_url": thumb,
+                "duration": duration
+            }]).execute()
+        except Exception as e:
+            print(f"[WebSub] Supabase save warning: {e}")
+
+        # Check VRPI & Breakout Outlier
+        channels = load_channels()
+        ch_meta = next((c for c in channels if c.get("id") == channel_id), None)
+        base_views = int(ch_meta.get("avg_views_raw", 1000) if ch_meta else 1000)
+        daily_base = max(1.0, base_views / 30.0)
+        
+        vrpi = views / daily_base
+
+        if vrpi >= 2.0 or views >= 500:
+            video_data = {
+                "id": video_id,
+                "title": snippet.get("title", title),
+                "view_count": views,
+                "thumbnail_url": thumb,
+                "published_at": snippet.get("publishedAt", published_at)
+            }
+            dispatch_outlier_alert(video_data, ch_meta or {"name": channel_id, "id": channel_id}, vrpi)
+
+    except Exception as ex:
+        print(f"[WebSub] _process_websub_drop error: {ex}")
+
+def subscribe_channel_websub(channel_id: str, hub_url: str = "https://pubsubhubbub.appspot.com/subscribe", callback_url: str = None) -> bool:
+    """Send subscription request to Google WebSub hub for a channel's upload feed."""
+    if not callback_url:
+        return False
+    try:
+        topic_url = f"https://www.youtube.com/xml/feeds/videos.xml?channel_id={channel_id}"
+        data = urllib.parse.urlencode({
+            "hub.callback": callback_url,
+            "hub.mode": "subscribe",
+            "hub.topic": topic_url,
+            "hub.verify": "async"
+        }).encode("utf-8")
+
+        req = urllib.request.Request(hub_url, data=data, headers={"Content-Type": "application/x-www-form-urlencoded"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status in (202, 204)
+    except Exception as ex:
+        print(f"[WebSub] Subscription error for {channel_id}: {ex}")
+        return False
+
+
+# ── Phase 5: Outlier Radar Webhook System ─────────────────────────────────────
+
+_WEBHOOK_SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "settings.json")
+
+def load_webhook_settings() -> dict:
+    """Load user webhook configuration."""
+    default_cfg = {
+        "webhook_url": "",
+        "platform": "discord",  # 'discord' | 'slack'
+        "min_vrpi": 2.5,
+        "enabled": False
+    }
+    if os.path.exists(_WEBHOOK_SETTINGS_FILE):
+        try:
+            with open(_WEBHOOK_SETTINGS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return { **default_cfg, **data }
+        except Exception:
+            pass
+    return default_cfg
+
+def save_webhook_settings(cfg: dict):
+    """Persist user webhook configuration."""
+    try:
+        with open(_WEBHOOK_SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception as ex:
+        print(f"[Webhook] Error saving settings: {ex}")
+
+def dispatch_outlier_alert(video_data: dict, channel_data: dict, vrpi_score: float, custom_url: str = None) -> bool:
+    """Dispatch rich breakout outlier embed to Discord or Slack."""
+    cfg = load_webhook_settings()
+    url = custom_url or cfg.get("webhook_url", "")
+    if not url:
+        return False
+    
+    platform = cfg.get("platform", "discord").lower()
+    ch_name = channel_data.get("name", "Competitor Channel")
+    v_title = video_data.get("title", "Video")
+    v_views = fmt(video_data.get("view_count", 0))
+    v_id = video_data.get("id", "")
+    v_url = f"https://www.youtube.com/watch?v={v_id}"
+    thumb_url = video_data.get("thumbnail_url", "")
+
+    try:
+        if "discord.com" in url or platform == "discord":
+            payload = {
+                "username": "YT Tracker Radar",
+                "avatar_url": "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/radar.png",
+                "embeds": [{
+                    "title": f"🔥 BREAKOUT OUTLIER DETECTED ({vrpi_score:.1f}× Velocity)",
+                    "description": f"**[{v_title}]({v_url})**\n\nUploaded by **{ch_name}** and surging at **{vrpi_score:.1f}×** channel baseline velocity!",
+                    "url": v_url,
+                    "color": 16728132,  # #ef4444 Red
+                    "fields": [
+                        {"name": "Channel", "value": ch_name, "inline": True},
+                        {"name": "Views", "value": v_views, "inline": True},
+                        {"name": "Velocity Multiplier", "value": f"{vrpi_score:.1f}× Baseline", "inline": True}
+                    ],
+                    "image": {"url": thumb_url} if thumb_url else {},
+                    "footer": {"text": "YT Tracker Outlier Radar • Zero-Quota Alert"}
+                }]
+            }
+        else:
+            payload = {
+                "text": f"🔥 *BREAKOUT OUTLIER DETECTED ({vrpi_score:.1f}× Velocity)*\n*<{v_url}|{v_title}>* by *{ch_name}*\nViews: {v_views} | Multiplier: {vrpi_score:.1f}×"
+            }
+
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "YTTracker-OutlierRadar/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            return response.status in (200, 204)
+    except Exception as ex:
+        print(f"[Webhook] Dispatch failed: {ex}")
+        return False
+
+@app.route("/api/settings/get-webhook", methods=["GET"])
+def get_webhook_config():
+    """Return stored webhook settings."""
+    return jsonify(load_webhook_settings())
+
+@app.route("/api/settings/save-webhook", methods=["POST"])
+def save_webhook_config():
+    """Save webhook settings."""
+    body = request.get_json(silent=True) or {}
+    cfg = {
+        "webhook_url": body.get("webhook_url", "").strip(),
+        "platform": body.get("platform", "discord").strip(),
+        "min_vrpi": float(body.get("min_vrpi", 2.5)),
+        "enabled": bool(body.get("enabled", False))
+    }
+    save_webhook_settings(cfg)
+    return jsonify({"success": True, "settings": cfg})
+
+@app.route("/api/settings/test-webhook", methods=["POST"])
+def test_webhook_alert():
+    """Send a test embed to verify user webhook URL."""
+    body = request.get_json(silent=True) or {}
+    url = body.get("webhook_url", "").strip() or load_webhook_settings().get("webhook_url", "")
+    if not url:
+        return jsonify({"success": False, "error": "Webhook URL is required"}), 400
+
+    test_video = {
+        "id": "dQw4w9WgXcQ",
+        "title": "Why SolidWorks Sheet Metal Fails: The Secret K-Factor Guide",
+        "view_count": 48200,
+        "thumbnail_url": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80"
+    }
+    test_channel = {"name": "Titan CAD & Engineering", "id": "UC_titan_sample"}
+    
+    ok = dispatch_outlier_alert(test_video, test_channel, 3.8, custom_url=url)
+    if ok:
+        return jsonify({"success": True, "message": "Test webhook alert dispatched successfully!"})
+    else:
+        return jsonify({"success": False, "error": "Failed to send webhook. Check your URL."}), 502
+
+@app.route("/api/cron/check-outliers", methods=["GET", "POST"])
+def cron_check_outliers():
+    """Scan recent drops across competitor cohort and trigger alerts for videos exceeding VRPI threshold."""
+    cfg = load_webhook_settings()
+    if not cfg.get("enabled") or not cfg.get("webhook_url"):
+        return jsonify({"success": True, "skipped": "Webhook disabled or URL unset", "alerts_sent": 0})
+
+    min_vrpi = float(cfg.get("min_vrpi", 2.5))
+    alerts_sent = 0
+
+    try:
+        channels = load_channels()
+        now = time.time()
+
+        for ch in channels:
+            if ch.get("is_primary"):
+                continue
+            cid = ch["id"]
+            en = _full_cache.get(cid) or _video_cache.get(cid)
+            if not en or not en.get("data"):
+                continue
+
+            base_views = max(1, int(ch.get("avg_views_raw", 1000)))
+            daily_base = max(1.0, base_views / 30.0)
+
+            for v in en["data"][:8]:
+                pub_str = v.get("published_at") or v.get("date")
+                if not pub_str:
+                    continue
+                try:
+                    # Parse publication date
+                    t_pub = time.mktime(time.strptime(pub_str[:10], "%Y-%m-%d"))
+                    days_old = max(0.04, (now - t_pub) / 86400.0)
+                    if days_old > 14.0:
+                        continue # Only alert for fresh drops <= 14 days
+                    
+                    vc = int(v.get("view_count") or v.get("views_raw") or 0)
+                    daily_vel = vc / days_old
+                    raw_vrpi = daily_vel / daily_base
+                    
+                    if raw_vrpi >= min_vrpi:
+                        ok = dispatch_outlier_alert(v, ch, raw_vrpi)
+                        if ok:
+                            alerts_sent += 1
+                except Exception:
+                    pass
+
+        return jsonify({"success": True, "alerts_sent": alerts_sent})
+    except Exception as ex:
+        print(f"[CronOutliers] Error: {ex}")
+        return jsonify({"success": False, "error": str(ex), "alerts_sent": 0}), 500
 
 
 @app.route("/ping")

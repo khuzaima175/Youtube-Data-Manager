@@ -406,19 +406,36 @@ function renderCompetitorActivityFeed() {
             const ch = item.ch;
             const vc = parseInt(v.view_count ?? v.views_raw ?? 0);
             const pub = item.published;
-            const days = Math.max(0.1, (Date.now() - pub) / 864e5);
+            const days = Math.max(0.04, (Date.now() - pub) / 864e5);
             const vpd = Math.round(vc / days);
+
+            const chBase = Math.max(ch.avg_views_raw || 1, 1);
+            const baseVpd = Math.max(1, chBase / 30);
+            const rawVrpi = vpd / baseVpd;
+            const isBreakout = (days <= 14) && (rawVrpi >= 2.5);
+            const isSpike = !isBreakout && (rawVrpi >= 1.5) && (days <= 21);
+
+            let outlierBadge = '';
+            if (isBreakout) {
+              outlierBadge = `<span class="badge" style="background:rgba(239,68,68,0.14);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:10px;font-weight:600;display:inline-flex;align-items:center;gap:3px;margin-left:6px"><i data-lucide="flame" style="width:11px;height:11px"></i> ${rawVrpi.toFixed(1)}× Outlier</span>`;
+            } else if (isSpike) {
+              outlierBadge = `<span class="badge" style="background:rgba(234,179,8,0.14);color:#eab308;border:1px solid rgba(234,179,8,0.3);font-size:10px;font-weight:500;display:inline-flex;align-items:center;gap:3px;margin-left:6px"><i data-lucide="zap" style="width:11px;height:11px"></i> ${rawVrpi.toFixed(1)}× Vel</span>`;
+            }
 
             return `
               <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)">
                 <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1">
-                  <a href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" style="flex-shrink:0">
+                  <a href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" style="flex-shrink:0;position:relative;display:block">
                     <img src="${esc(proxyImg(v.thumb || v.thumbnail_url || ''))}" style="width:72px;height:40px;border-radius:4px;object-fit:cover;background:var(--surface-2)" alt="" onerror="this.style.opacity='.3'">
+                    ${isBreakout ? `<span style="position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,0.85);color:#ef4444;font-size:9px;font-weight:700;padding:1px 3px;border-radius:2px;line-height:1">🔥 ${rawVrpi.toFixed(1)}×</span>` : ''}
                   </a>
                   <div style="min-width:0">
-                    <a href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" style="font-size:13px;font-weight:500;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;text-decoration:none" title="${esc(v.title)}">
-                      ${esc(v.title)}
-                    </a>
+                    <div style="display:flex;align-items:center;gap:4px">
+                      <a href="${esc(v.url || `https://www.youtube.com/watch?v=${v.id || v.video_id}`)}" target="_blank" rel="noopener" style="font-size:13px;font-weight:500;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;text-decoration:none" title="${esc(v.title)}">
+                        ${esc(v.title)}
+                      </a>
+                      ${outlierBadge}
+                    </div>
                     <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;display:flex;align-items:center;gap:6px">
                       <span style="color:var(--text-2);font-weight:500;cursor:pointer" onclick="openDeepDive('${esc(ch.id)}')">${esc(ch.name)}</span>
                       <span>·</span>

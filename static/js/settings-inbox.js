@@ -378,34 +378,86 @@ function renderSettingsBody() {
       </div>`;
   } else if (settingsTab === 'alerts') {
     body.innerHTML = `
+      <!-- Outlier Radar Webhooks Section (Phase 5) -->
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <i data-lucide="radio" style="width:15px;height:15px;color:var(--accent)"></i>
+            <span style="font-size:13px;font-weight:600;color:var(--text-1)">Outlier Radar Webhook Dispatcher</span>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-2);cursor:pointer">
+            <input type="checkbox" id="webhookEnabledInp" ${userPrefs.webhook?.enabled ? 'checked' : ''} onchange="toggleWebhookEnabled(this.checked)" style="accent-color:var(--accent)">
+            <span>Active</span>
+          </label>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:12px;line-height:1.4">
+          Automated background worker sends rich embeds to Discord / Slack whenever a competitor publishes a breakout outlier video (&ge;2.5&times; velocity).
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <label style="font-size:11px;font-weight:500;color:var(--text-2);margin-bottom:4px;display:block">Discord / Slack Webhook URL:</label>
+            <input type="url" id="webhookUrlInp" value="${esc(userPrefs.webhook?.webhook_url || '')}" placeholder="https://discord.com/api/webhooks/..."
+              style="width:100%;padding:7px 10px;font-size:12px;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-1);outline:none">
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label style="font-size:11px;font-weight:500;color:var(--text-2);margin-bottom:4px;display:block">Platform:</label>
+              <select id="webhookPlatformInp" style="width:100%;padding:6px 8px;font-size:11.5px;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-1);outline:none">
+                <option value="discord" ${userPrefs.webhook?.platform === 'discord' ? 'selected' : ''}>Discord Webhook</option>
+                <option value="slack" ${userPrefs.webhook?.platform === 'slack' ? 'selected' : ''}>Slack Webhook</option>
+              </select>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <label style="font-size:11px;font-weight:500;color:var(--text-2)">Min VRPI Multiplier:</label>
+                <span class="badge" style="font-size:10px" id="lblWebhookVrpi">${(userPrefs.webhook?.min_vrpi || 2.5).toFixed(1)}&times;</span>
+              </div>
+              <input type="range" min="1.5" max="5.0" step="0.1" value="${userPrefs.webhook?.min_vrpi || 2.5}" id="webhookVrpiSlider"
+                style="width:100%;accent-color:var(--accent)" oninput="document.getElementById('lblWebhookVrpi').textContent = parseFloat(this.value).toFixed(1) + '×'">
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;padding-top:8px;border-top:1px solid var(--border);justify-content:flex-end">
+            <button class="btn btn-gh btn-sm" onclick="testOutlierWebhook()">
+              <i data-lucide="send" style="width:12px;height:12px"></i> Test Alert
+            </button>
+            <button class="btn btn-acc btn-sm" onclick="saveOutlierWebhook()">
+              <i data-lucide="save" style="width:12px;height:12px"></i> Save Webhook
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div style="font-size:12px;font-weight:700;color:var(--t1)">🕵️ Copycat Match Sensitivity</div>
-          <span class="badge bdg-pr" id="lblCopycat">${userPrefs.copycatThreshold}% Overlap</span>
+          <div style="font-size:12px;font-weight:700;color:var(--text-1)">🕵️ Copycat Match Sensitivity</div>
+          <span class="badge" id="lblCopycat">${userPrefs.copycatThreshold}% Overlap</span>
         </div>
-        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Minimum token overlap ratio to flag competitor uploads as copycats.</div>
+        <div style="font-size:10.5px;color:var(--text-3);margin-bottom:8px">Minimum token overlap ratio to flag competitor uploads as copycats.</div>
         <input type="range" min="40" max="90" step="5" value="${userPrefs.copycatThreshold}"
-          style="width:100%;accent-color:var(--acc)" oninput="updateAlertPref('copycatThreshold', this.value, 'lblCopycat', '% Overlap')">
+          style="width:100%;accent-color:var(--accent)" oninput="updateAlertPref('copycatThreshold', this.value, 'lblCopycat', '% Overlap')">
       </div>
 
-      <div style="padding-top:14px;border-top:1px solid var(--line-1)">
+      <div style="padding-top:14px;border-top:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div style="font-size:12px;font-weight:700;color:var(--t1)">⚡ Collision Size Multiplier</div>
-          <span class="badge bdg-pr" id="lblCollision">${userPrefs.collisionRatio}× Size</span>
+          <div style="font-size:12px;font-weight:700;color:var(--text-1)">⚡ Collision Size Multiplier</div>
+          <span class="badge" id="lblCollision">${userPrefs.collisionRatio}× Size</span>
         </div>
-        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Competitor must be at least this much larger than your channel to flag traffic cannibalization.</div>
+        <div style="font-size:10.5px;color:var(--text-3);margin-bottom:8px">Competitor must be at least this much larger than your channel to flag traffic cannibalization.</div>
         <input type="range" min="1.2" max="3.5" step="0.1" value="${userPrefs.collisionRatio}"
-          style="width:100%;accent-color:var(--acc)" oninput="updateAlertPref('collisionRatio', this.value, 'lblCollision', '× Size')">
+          style="width:100%;accent-color:var(--accent)" oninput="updateAlertPref('collisionRatio', this.value, 'lblCollision', '× Size')">
       </div>
 
-      <div style="padding-top:14px;border-top:1px solid var(--line-1)">
+      <div style="padding-top:14px;border-top:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div style="font-size:12px;font-weight:700;color:var(--t1)">🚀 Viral Surge Velocity Trigger</div>
-          <span class="badge bdg-pr" id="lblSurge">${fmtN(userPrefs.surgeVelThreshold)}/day</span>
+          <div style="font-size:12px;font-weight:700;color:var(--text-1)">🚀 Viral Surge Velocity Trigger</div>
+          <span class="badge" id="lblSurge">${fmtN(userPrefs.surgeVelThreshold)}/day</span>
         </div>
-        <div style="font-size:10.5px;color:var(--t3);margin-bottom:8px">Daily view rate threshold to flag viral competitor breakout videos in Field Feed.</div>
+        <div style="font-size:10.5px;color:var(--text-3);margin-bottom:8px">Daily view rate threshold to flag viral competitor breakout videos in Field Feed.</div>
         <input type="range" min="500" max="10000" step="500" value="${userPrefs.surgeVelThreshold}"
-          style="width:100%;accent-color:var(--acc)" oninput="updateAlertPref('surgeVelThreshold', this.value, 'lblSurge', '/day', true)">
+          style="width:100%;accent-color:var(--accent)" oninput="updateAlertPref('surgeVelThreshold', this.value, 'lblSurge', '/day', true)">
       </div>`;
   } else if (settingsTab === 'timing') {
     const tm = userPrefs.timing || { minAge: 3, maxAge: 180, tier1: 10, tier2: 30, minCellN: 3 };
@@ -570,6 +622,69 @@ function updateAlertPref(key, val, lblId, suffix, isFmt = false) {
   saveUserPrefs();
   const lbl = document.getElementById(lblId);
   if (lbl) lbl.textContent = (isFmt ? fmtN(num) : num) + suffix;
+}
+
+function toggleWebhookEnabled(checked) {
+  userPrefs.webhook = userPrefs.webhook || {};
+  userPrefs.webhook.enabled = !!checked;
+  saveUserPrefs();
+  saveOutlierWebhook();
+}
+
+async function saveOutlierWebhook() {
+  const urlInp = document.getElementById('webhookUrlInp');
+  const platInp = document.getElementById('webhookPlatformInp');
+  const vrpiInp = document.getElementById('webhookVrpiSlider');
+  const enInp = document.getElementById('webhookEnabledInp');
+
+  const webhook_url = (urlInp?.value || userPrefs.webhook?.webhook_url || '').trim();
+  const platform = platInp?.value || userPrefs.webhook?.platform || 'discord';
+  const min_vrpi = parseFloat(vrpiInp?.value || userPrefs.webhook?.min_vrpi || 2.5);
+  const enabled = enInp ? enInp.checked : (userPrefs.webhook?.enabled ?? false);
+
+  userPrefs.webhook = { webhook_url, platform, min_vrpi, enabled };
+  saveUserPrefs();
+
+  try {
+    const res = await apiFetch('/api/settings/save-webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userPrefs.webhook)
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast('Outlier Radar webhook saved!', 's');
+    } else {
+      toast(data.error || 'Failed to save webhook', 'e');
+    }
+  } catch (err) {
+    toast('Saved locally', 's');
+  }
+}
+
+async function testOutlierWebhook() {
+  const urlInp = document.getElementById('webhookUrlInp');
+  const webhook_url = (urlInp?.value || userPrefs.webhook?.webhook_url || '').trim();
+  if (!webhook_url) {
+    toast('Please enter a Webhook URL first', 'e');
+    return;
+  }
+  toast('Sending test outlier alert…', '');
+  try {
+    const res = await apiFetch('/api/settings/test-webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhook_url })
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast('Test alert sent to Discord/Slack!', 's');
+    } else {
+      toast(data.error || 'Webhook test failed. Check URL.', 'e');
+    }
+  } catch (err) {
+    toast('Webhook test failed: ' + err.message, 'e');
+  }
 }
 
 function updateTimingPref(key, val, lblId, suffix) {

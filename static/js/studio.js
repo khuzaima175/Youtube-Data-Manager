@@ -120,6 +120,25 @@ function scoreTitle(title) {
     .sort((a, b) => (b.momentum || 0) - (a.momentum || 0))
     .slice(0, 6);
 
+  // Mobile Fold & Hook Position Analysis (Phase 2)
+  let hookIndex = -1;
+  const powerMatch = t.match(/\b(how|why|secret|secrets|never|ultimate|masterclass|explained|truth|stop|fast|guide|pro|mistakes|best|worst|vs|real|built|build|break|making|first|full|revolution|future|revealed)\b/i);
+  if (powerMatch && powerMatch.index !== undefined) {
+    hookIndex = powerMatch.index;
+  } else {
+    const numMatch = t.match(/\b\d+\b/);
+    if (numMatch && numMatch.index !== undefined) hookIndex = numMatch.index;
+    else {
+      const bMatch = t.match(/(\[|\(|\)|\])/);
+      if (bMatch && bMatch.index !== undefined) hookIndex = bMatch.index;
+    }
+  }
+
+  const isHookBeforeFold = hookIndex === -1 || hookIndex <= 48;
+  const visibleTitle = t.slice(0, 50);
+  const truncatedTitle = t.length > 50 ? t.slice(50) : '';
+  const hasTruncation = t.length > 50;
+
   return {
     score: totalScore,
     len,
@@ -133,7 +152,12 @@ function scoreTitle(title) {
     hasPowerWord,
     structScore,
     wordCount: words.length,
-    missingHotTokens
+    missingHotTokens,
+    hookIndex,
+    isHookBeforeFold,
+    visibleTitle,
+    truncatedTitle,
+    hasTruncation
   };
 }
 
@@ -169,6 +193,35 @@ function onTitleLabInput(val) {
   if (meterLenEl) meterLenEl.style.width = Math.round((res.lenScore / 25) * 100) + '%';
   if (meterStructEl) meterStructEl.style.width = Math.round((res.structScore / 15) * 100) + '%';
   if (feedbackEl) feedbackEl.textContent = res.lenFeedback;
+
+  // Real-time Mobile Feed Simulator updates (Phase 2)
+  const mobileThumbTextEl = document.getElementById('ytMobileThumbText');
+  const mobileTitlePrevEl = document.getElementById('ytMobileTitlePreview');
+  const mobileHookDiagEl = document.getElementById('ytMobileHookDiag');
+  const mobileHookDiagTextEl = document.getElementById('ytMobileHookDiagText');
+
+  if (mobileThumbTextEl) {
+    const topTok = res.matchedTopics[0]?.topic || (res.words > 0 ? val.split(/\s+/)[0] : 'CONCEPT');
+    mobileThumbTextEl.textContent = topTok.toUpperCase();
+  }
+
+  if (mobileTitlePrevEl) {
+    mobileTitlePrevEl.innerHTML = `
+      <span class="yt-mobile-title-visible">${esc(res.visibleTitle || 'Draft Video Title')}</span>${res.hasTruncation ? `<span class="yt-mobile-title-fold-marker">✂️ fold</span><span class="yt-mobile-title-truncated">${esc(res.truncatedTitle)}</span>` : ''}`;
+  }
+
+  if (mobileHookDiagEl && mobileHookDiagTextEl) {
+    const isPass = !res.hasTruncation || res.isHookBeforeFold;
+    mobileHookDiagEl.className = `yt-mobile-hook-diag ${isPass ? 'pass' : 'warn'}`;
+    const iconName = isPass ? 'check-circle-2' : 'alert-triangle';
+    const msg = !res.hasTruncation
+      ? '✅ Full title is 100% visible on mobile feeds without truncation.'
+      : res.isHookBeforeFold
+        ? '✅ Primary curiosity hook is front-loaded before the 50-character mobile fold.'
+        : '⚠️ Primary hook occurs after character 50 — mobile viewers will see truncation before the payoff.';
+    mobileHookDiagEl.innerHTML = `<i data-lucide="${iconName}" style="width:14px;height:14px;flex-shrink:0"></i><span>${msg}</span>`;
+    if (window.lucide) window.lucide.createIcons();
+  }
 }
 
 function appendTokenToTitle(token) {
@@ -775,8 +828,56 @@ function renderStudioLabHtml() {
           </div>
         </div>
 
+        <!-- YouTube Mobile Feed & Title Fold Simulator (Phase 2) -->
+        <div class="yt-mobile-sim-wrap" data-tip="mobile_packaging">
+          <div class="yt-mobile-sim-header">
+            <div style="display:flex;align-items:center;gap:8px">
+              <i data-lucide="smartphone" style="width:15px;height:15px;color:var(--accent)"></i>
+              <span style="font-size:13px;font-weight:600;color:var(--text-1)">YouTube Mobile Feed Preview</span>
+              <span class="badge" style="background:rgba(102,114,245,0.12);color:var(--accent);font-size:10px;font-weight:500">70%+ Mobile Traffic</span>
+            </div>
+            <span style="font-size:11.5px;color:var(--text-3)">50-char fold boundary</span>
+          </div>
+
+          <div class="yt-mobile-feed-card">
+            <!-- 120px Thumbnail Concept Mockup -->
+            <div class="yt-mobile-thumb-preview" id="ytMobileThumbBox">
+              <i data-lucide="play" style="width:16px;height:16px;color:var(--accent);margin-bottom:2px"></i>
+              <div class="yt-mobile-thumb-overlay-text" id="ytMobileThumbText">${esc((res.matchedTopics[0]?.topic || (res.words > 0 ? titleLabDraft.split(/\s+/)[0] : 'CONCEPT')).toUpperCase())}</div>
+              <span class="yt-mobile-thumb-duration">12:45</span>
+            </div>
+
+            <!-- Feed Title & Fold Cutoff Preview -->
+            <div class="yt-mobile-feed-info">
+              <div class="yt-mobile-title-preview" id="ytMobileTitlePreview">
+                <span class="yt-mobile-title-visible">${esc(res.visibleTitle || 'Draft Video Title')}</span>${res.hasTruncation ? `<span class="yt-mobile-title-fold-marker">✂️ fold</span><span class="yt-mobile-title-truncated">${esc(res.truncatedTitle)}</span>` : ''}
+              </div>
+              <div class="yt-mobile-meta-row">
+                <div class="yt-mobile-avatar">${(all.find(c => c.is_primary)?.name || 'Y')[0]}</div>
+                <span>${esc(all.find(c => c.is_primary)?.name || 'Your Channel')}</span>
+                <span>•</span>
+                <span>14K views</span>
+                <span>•</span>
+                <span>2 hours ago</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Real-Time Hook Fold Diagnostic -->
+          <div id="ytMobileHookDiag" class="yt-mobile-hook-diag ${(!res.hasTruncation || res.isHookBeforeFold) ? 'pass' : 'warn'}">
+            <i data-lucide="${(!res.hasTruncation || res.isHookBeforeFold) ? 'check-circle-2' : 'alert-triangle'}" style="width:14px;height:14px;flex-shrink:0"></i>
+            <span id="ytMobileHookDiagText">
+              ${!res.hasTruncation
+                ? '✅ Full title is 100% visible on mobile feeds without truncation.'
+                : res.isHookBeforeFold
+                  ? '✅ Primary curiosity hook is front-loaded before the 50-character mobile fold.'
+                  : '⚠️ Primary hook occurs after character 50 — mobile viewers will see truncation before the payoff.'}
+            </span>
+          </div>
+        </div>
+
         <!-- Actions -->
-        <div style="display:flex;gap:8px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap">
+        <div style="display:flex;gap:8px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;margin-top:14px">
           <button class="btn btn-acc btn-sm" onclick="sendTitleLabToPipeline()">
             <i data-lucide="plus" style="width:13px;height:13px"></i> Send to Pipeline
           </button>

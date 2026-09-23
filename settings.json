@@ -1,0 +1,6 @@
+{
+  "webhook_url": "",
+  "platform": "discord",
+  "min_vrpi": 2.5,
+  "enabled": false
+}

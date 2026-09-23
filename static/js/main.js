@@ -985,6 +985,21 @@ document.addEventListener('click', e => {
 
   deserializeStateFromHash();
 
+  // Phase 6: Reactive AppState Event Subscriptions
+  window.addEventListener('appstate:selectedTopic', e => {
+    const topic = e.detail?.value;
+    if (topic && typeof openTitleLabWithTopic === 'function') {
+      openTitleLabWithTopic(topic);
+    }
+  });
+
+  window.addEventListener('appstate:filterQuery', e => {
+    const q = e.detail?.value || '';
+    if (typeof filterCompetitorGrid === 'function' && document.getElementById('benchTableBody')) {
+      filterCompetitorGrid(q);
+    }
+  });
+
   // First run onboarding tour check
   try {
     if (!localStorage.getItem('yt_tour_completed')) {

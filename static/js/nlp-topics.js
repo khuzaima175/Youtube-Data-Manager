@@ -111,11 +111,28 @@ function buildTopicCache(force = false) {
     const chBase = Math.max(baselines[v._chId] || 1, 1);
     const rpi = vc / chBase;
 
+    // Velocity-Weighted RPI (VRPI) & Outlier Math
+    const ageDays = Math.max(0.04, (now - pub) / 864e5);
+    const velocityDaily = vc / ageDays; // current views / day
+    const baseVelocityDaily = Math.max(1, chBase / 30); // expected daily baseline
+    const rawVrpi = velocityDaily / baseVelocityDaily;
+    // Publication age decay: full weight for first 7d, smooth decay after
+    const ageDecay = ageDays <= 7 ? 1.0 : 1.0 / Math.sqrt(1 + (ageDays - 7) / 21);
+    const vrpi = rawVrpi * ageDecay;
+    const isBreakout = (ageDays <= 14) && (rawVrpi >= 2.5);
+
+    // Attach computed metrics to video object
+    v._ageDays = ageDays;
+    v._velocityDaily = Math.round(velocityDaily);
+    v._vrpi = parseFloat(vrpi.toFixed(2));
+    v._rawVrpi = parseFloat(rawVrpi.toFixed(2));
+    v._isBreakout = isBreakout;
+
     toks.forEach(t => {
       if (!topicMap.has(t)) {
         topicMap.set(t, {
           topic: t, n: 0, totalViews: 0, totalEng: 0, engCount: 0,
-          totalRpi: 0, supply14d: 0,
+          totalRpi: 0, totalVrpi: 0, breakoutCount: 0, supply14d: 0,
           lastUsed: 0, recentViews: [], oldViews: [], channels: new Set()
         });
       }
@@ -123,6 +140,8 @@ function buildTopicCache(force = false) {
       s.n++;
       s.totalViews += vc;
       s.totalRpi += rpi;
+      s.totalVrpi += vrpi;
+      if (isBreakout) s.breakoutCount++;
       if (pub >= cut14d) s.supply14d++;
       if (eng !== null) { s.totalEng += eng; s.engCount++; }
       if (pub > s.lastUsed) s.lastUsed = pub;
@@ -143,8 +162,10 @@ function buildTopicCache(force = false) {
     
     // Empirical Bayes Shrinkage for RPI (P1)
     const rawRpi = s.n > 0 ? s.totalRpi / s.n : 1.0;
+    const rawVrpi = s.n > 0 ? s.totalVrpi / s.n : 1.0;
     const w = s.n / (s.n + 5); // Weight formula w = n / (n + 5)
     const shrunkenRpi = parseFloat((w * rawRpi + (1 - w) * 1.0).toFixed(2));
+    const shrunkenVrpi = parseFloat((w * rawVrpi + (1 - w) * 1.0).toFixed(2));
     const confidenceTag = s.n >= 8 ? `High (n=${s.n})` : s.n >= 4 ? `Moderate (n=${s.n})` : `Shrunken (n=${s.n})`;
     
     // Supply / Demand Saturation Matrix Metrics (P2)
@@ -182,6 +203,10 @@ function buildTopicCache(force = false) {
       recentAvg: Math.round(recentAvg), oldAvg: Math.round(oldAvg),
       rawRpi: parseFloat(rawRpi.toFixed(2)),
       shrunkenRpi,
+      rawVrpi: parseFloat(rawVrpi.toFixed(2)),
+      shrunkenVrpi,
+      breakoutCount: s.breakoutCount,
+      isBreakoutTopic: s.breakoutCount > 0,
       confidenceTag,
       supply14d,
       blueOceanScore,
